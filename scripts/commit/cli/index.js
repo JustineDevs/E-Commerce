@@ -12,6 +12,10 @@ const commands = {
   commit: require('./commands/commit'),
   security: require('./commands/security'),
   linear: require('./commands/linear'),
+  help: {
+    run: () => {},
+    help: () => printUsage(),
+  },
 };
 
 async function main() {
@@ -26,7 +30,7 @@ async function main() {
     process.exit(1);
   }
 
-  if (opts.help) {
+  if (opts.help || sub === 'help') {
     cmd.help();
     return;
   }
