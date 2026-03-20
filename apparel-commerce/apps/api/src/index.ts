@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import { healthRouter } from "./routes/health.js";
+import { productsRouter } from "./routes/products.js";
 import { ordersRouter } from "./routes/orders.js";
 import { inventoryRouter } from "./routes/inventory.js";
 import { paymentsRouter } from "./routes/payments.js";
@@ -15,6 +16,7 @@ app.use(cors());
 app.use(express.json());
 
 app.use("/health", healthRouter);
+app.use("/products", productsRouter);
 app.use("/orders", ordersRouter);
 app.use("/inventory", inventoryRouter);
 app.use("/payments", paymentsRouter);
