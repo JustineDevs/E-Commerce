@@ -82,6 +82,7 @@ The internal application SHALL include the following pages:
 - `/admin` Dashboard
 - `/admin/inventory` Inventory management
 - `/admin/orders` Order fulfillment hub
+- `/admin/orders/[orderId]` Order detail — line items, staff shipment registration, mark shipped / delivered
 - `/admin/pos` POS terminal
 
 ### 5. Catalog and Variant Model
@@ -248,6 +249,10 @@ Each shipment SHALL support:
 
 The customer tracking page SHALL render shipment progress based on stored shipment state synchronized from provider events or polling jobs.
 
+Anonymous tracking SHALL use a **scoped secret** (e.g. HMAC of order id) conveyed in the URL query string so that knowledge of the order UUID alone is insufficient to read order or shipment data.
+
+After checkout begins, the platform SHOULD email the buyer (when an email address is collected and transactional email is configured) a message containing the **same signed tracking URL** shown on the checkout step before hosted payment.
+
 ### 11. OMS Processing Flow
 
 The standard order flow SHALL be:
@@ -331,6 +336,55 @@ The platform SHOULD satisfy the following operational goals:
 - Migration-based database evolution
 - Copy-pasteable environment configuration
 - Deployment compatibility with branch-based staging and production workflows
+
+### 15. Stakeholder business requirements (Maharlika Apparel Custom intake)
+
+The following rows are taken from the submitted **Apparel Business Requirement Form** (`internal/docs/exclusive/Apparel Business Requirement Form.csv`). The on-disk artifact is a **ZIP** wrapping the CSV export; see `ARCHITECTURE-DELIVERABLE.md` §1 for how to open it.
+
+| Topic | Stated requirement |
+|--------|---------------------|
+| Business | Maharlika Apparel Custom |
+| Contact | Maharlikaapparelcustom@gmail.com |
+| Current sales channels | Facebook / Instagram |
+| Target launch date | 2026-04-10 |
+| Scale | 500+ SKU positions / items in stock (stated as “500+”) |
+| Product attributes | Category (shorts/shirt/jacket/etc.); size; color; **material**; **condition (new / old stock)** |
+| Variant / tracking dimensions | Size variants; color variants; **style variants**; **bundle packs** |
+| Additional services | **Custom printing**; **bulk orders**; **uniform orders** |
+| Admin / POS users | Owner; sales clerk; accountant |
+| Minimum reorder level | **1000** per SKU (stated in form) |
+| Customer Google login | **Yes** — faster checkout |
+| Pre-orders when out of stock | **Yes** |
+| Payment methods (desired) | PayPal; GCash/Maya with **manual receipt upload**; **COD**; **bank transfer** |
+| Promo codes / vouchers | **Yes** |
+| Size guide on PDP | **Yes** |
+| Return / exchange | Flexibility level **3** (scale in form); details in `internal/docs/Exchange Policy Details.md` |
+| J&T pickup address | B16 L45 ACM Paramount Homes, Brgy. Navarro, General Trias, Cavite |
+| J&T rate calculation at checkout | **Yes** — by weight / dimensions |
+| Tracking notifications | **Yes** — automated SMS **and** email |
+| Average parcel weight | **5 kg** (per form; validate with ops — may be ~0.5 kg in practice) |
+| Typical parcel dimensions | 10 × 10 × 10 (units assumed cm) |
+| Shipping zones | **Separate rules** for Metro Manila, provincial, **international** |
+| Business permits (payments) | **Processing** (DTI/SEC + BIR 2303 path in progress) |
+| Domain | Not owned yet (“N/A” in form) |
+| FB Shop / TikTok Shop | **No** for launch |
+| Commercial rules (notes) | Example: **free shipping** when order quantity crosses thresholds (e.g. 10–20+ pieces) |
+
+#### 15.1 As-built vs intake (explicit gaps)
+
+This repository’s **as-built** slice (Express + Supabase + Lemon Squeezy + AfterShip) **does not yet implement** every cell above. Track these deltas in backlog, not as optional “nice-to-haves” when the business has already answered **Yes**:
+
+- **Payments:** Production path is **Lemon Squeezy** (hosted checkout + webhook truth). PayPal, GCash/Maya manual proof, COD, and bank transfer require separate flows, risk controls, and reconciliation — not interchangeable with LS webhook semantics.
+- **Catalog:** **Material**, **condition**, **style**, and **bundle** constructs may need schema and admin UX beyond current `products` / `product_variants`.
+- **Pre-orders:** Requires sellable state when `available_qty = 0`, distinct reservations, and fulfillment SLAs.
+- **Shipping:** Automatic J&T rating by weight/dimensions + **zone tables** (Metro / provincial / international) and “free shipping at N pieces” need quote service + rules engine + tests.
+- **Notifications:** **Resend** (optional) sends **checkout-started** email with signed tracking link when `RESEND_*` is configured; **SMS** and full order-lifecycle alerts are not wired.
+- **Reorder / low stock:** Intake states **1000** minimum per SKU; wire to low-stock jobs and admin surfacing (see §13).
+- **Customer Google OAuth:** NextAuth exists; **account linking** and **order history by user** remain productized per §7–8.
+
+### 16. Medusa migration (program)
+
+The repository includes a **parallel Medusa 2.x backend** (`apparel-commerce/apps/medusa`) as the **declared future system of record** for commerce domains. The authoritative program table and ADR live in **`internal/docs/MEDUSA-MIGRATION-PROGRAM.md`** and **`internal/docs/adr/0001-medusa-system-of-record.md`**. **Operational scripts:** `seed:ph` (Philippines region, **Web PH** sales channel, default stock location + legacy location code metadata), `import:legacy-catalog`, and `import:legacy-inventory` (see `apps/medusa/README.md`, `internal/docs/migration/field-mapping.md`). Until cutover (Phase 8), the specification’s functional SHALL statements continue to be satisfied by the **legacy Express + Supabase** stack unless explicitly dual-documented.
 
 ## Rationale
 
