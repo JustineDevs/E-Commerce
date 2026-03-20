@@ -1,0 +1,23 @@
+{
+  "name": "Maharlika — Grand Custom",
+  "short_name": "Maharlika",
+  "description": "Grand Custom apparel by Maharlika.",
+  "icons": [
+    {
+      "src": "/icons/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "theme_color": "#fafafa",
+  "background_color": "#ffffff",
+  "display": "browser",
+  "start_url": "/"
+}
