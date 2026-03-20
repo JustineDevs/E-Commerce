@@ -1,15 +1,9 @@
 import Link from "next/link";
-import type { Product } from "@apparel-commerce/types";
+import { notFound } from "next/navigation";
+import { AddToCartSection } from "@/components/AddToCartSection";
+import { fetchProductBySlug } from "@/lib/catalog-fetch";
 
 export const dynamic = "force-dynamic";
-
-async function fetchProduct(slug: string): Promise<Product | null> {
-  const base = process.env.API_URL ?? "http://localhost:4000";
-  const res = await fetch(`${base}/products/${slug}`, { next: { revalidate: 60 } });
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error("Failed to fetch product");
-  return res.json();
-}
 
 export default async function ProductPage({
   params,
@@ -17,26 +11,16 @@ export default async function ProductPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const product = await fetchProduct(slug);
+  const product = await fetchProductBySlug(slug, 60);
 
   if (!product) {
-    return (
-      <main className="min-h-screen bg-surface">
-        <div className="mx-auto max-w-7xl px-4 py-12 text-center">
-          <h1 className="text-xl font-semibold text-primary">Product not found</h1>
-          <Link href="/shop" className="mt-4 inline-block text-on-surface-variant hover:text-primary">
-            Back to shop
-          </Link>
-        </div>
-      </main>
-    );
+    notFound();
   }
 
   const images = product.images;
   const mainImage = images[0];
-  const sizes = [...new Set(product.variants.map((v) => v.size))].sort();
-  const colors = [...new Set(product.variants.map((v) => v.color))];
   const minPrice = Math.min(...product.variants.map((v) => v.price));
+  const sizeRun = [...new Set(product.variants.map((v) => v.size))].filter(Boolean).sort();
 
   return (
     <main className="pt-32 pb-24 px-6 md:px-12 lg:px-24 max-w-[1600px] mx-auto">
@@ -87,51 +71,34 @@ export default async function ProductPage({
           </div>
 
           <div className="space-y-10">
-            <div className="space-y-4">
-              <p className="text-xs font-label font-bold uppercase tracking-wider">
-                Color — <span className="text-secondary font-normal">{colors[0] ?? ""}</span>
-              </p>
-              <div className="flex gap-3">
-                {colors.map((color) => (
-                  <button
-                    key={color}
-                    className="w-10 h-10 rounded-full bg-surface-container-high ring-1 ring-outline-variant hover:ring-2 hover:ring-primary transition-all"
-                    title={color}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex justify-between items-end">
-                <p className="text-xs font-label font-bold uppercase tracking-wider">Size</p>
-                <button className="text-xs font-label text-secondary underline hover:text-primary transition-colors">
-                  Size Guide
-                </button>
-              </div>
-              <div className="grid grid-cols-4 gap-2">
-                {sizes.map((size) => (
-                  <button
-                    key={size}
-                    className="py-3 text-sm font-medium bg-surface-container-low hover:bg-surface-container-high transition-colors"
-                  >
-                    {size}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="pt-4">
-              <Link
-                href={`/checkout?product=${product.id}`}
-                className="block w-full py-5 bg-gradient-to-br from-primary to-primary-container text-on-primary font-headline font-bold tracking-tight rounded text-center hover:opacity-90 active:scale-95 transition-all duration-200"
-              >
-                Add to Bag
-              </Link>
-            </div>
+            <AddToCartSection product={product} />
 
             <div className="space-y-0 pt-8 border-t border-outline-variant/20">
-              {product.description && (
+              <details className="group py-5 border-b border-outline-variant/20" open>
+                <summary className="flex justify-between items-center cursor-pointer list-none">
+                  <span className="text-sm font-bold uppercase tracking-wider">
+                    Size guide
+                  </span>
+                  <span className="material-symbols-outlined transition-transform group-open:rotate-180">
+                    expand_more
+                  </span>
+                </summary>
+                <div className="pt-4 text-sm leading-relaxed text-on-surface-variant font-body space-y-3">
+                  <p>
+                    <strong>In-stock sizes:</strong> {sizeRun.length ? sizeRun.join(" · ") : "See variants above."}
+                  </p>
+                  <p>
+                    Maharlika Apparel Custom publishes detailed measurements with new runs. If your size is between two
+                    options, size up for a relaxed fit or down for a closer silhouette. Eligible size exchanges may be
+                    requested within <strong>7 days</strong> of delivery for unworn items—see{" "}
+                    <Link href="/returns" className="text-primary underline">
+                      Returns &amp; exchanges
+                    </Link>
+                    .
+                  </p>
+                </div>
+              </details>
+              {product.description ? (
                 <details className="group py-5 border-b border-outline-variant/20" open>
                   <summary className="flex justify-between items-center cursor-pointer list-none">
                     <span className="text-sm font-bold uppercase tracking-wider">
@@ -145,7 +112,7 @@ export default async function ProductPage({
                     {product.description}
                   </div>
                 </details>
-              )}
+              ) : null}
               <details className="group py-5 border-b border-outline-variant/20">
                 <summary className="flex justify-between items-center cursor-pointer list-none">
                   <span className="text-sm font-bold uppercase tracking-wider">
@@ -156,7 +123,8 @@ export default async function ProductPage({
                   </span>
                 </summary>
                 <div className="pt-4 text-sm leading-relaxed text-on-surface-variant font-body">
-                  100% Cotton. Cold wash only. Dry flat in shade.
+                  Fabric notes appear in the description when provided. Unless the sewn-in label states otherwise, machine
+                  cold wash with like colors and dry flat in shade to preserve shape and print.
                 </div>
               </details>
               <details className="group py-5">
@@ -168,8 +136,20 @@ export default async function ProductPage({
                     expand_more
                   </span>
                 </summary>
-                <div className="pt-4 text-sm leading-relaxed text-on-surface-variant font-body">
-                  Complimentary standard shipping on all orders. Returns accepted within 14 days of delivery in original packaging.
+                <div className="pt-4 text-sm leading-relaxed text-on-surface-variant font-body space-y-3">
+                  <p>
+                    We ship nationwide via trusted couriers (including J&amp;T). Pickup from Cavite can be arranged for
+                    qualifying orders—details on your confirmation.
+                  </p>
+                  <p>
+                    <Link href="/shipping" className="text-primary underline">
+                      Shipping
+                    </Link>
+                    {" · "}
+                    <Link href="/returns" className="text-primary underline">
+                      Returns &amp; exchanges
+                    </Link>
+                  </p>
                 </div>
               </details>
             </div>
