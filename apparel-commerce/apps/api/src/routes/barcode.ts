@@ -1,7 +1,10 @@
 import { Router } from "express";
 import { createSupabaseClient, lookupVariantByBarcode, lookupVariantBySku } from "@apparel-commerce/database";
+import { requireInternalApiKey } from "../lib/requireInternalApiKey.js";
 
 export const barcodeRouter: ReturnType<typeof Router> = Router();
+
+barcodeRouter.use(requireInternalApiKey);
 
 barcodeRouter.post("/lookup", async (req, res) => {
   const { barcode, sku } = req.body ?? {};
