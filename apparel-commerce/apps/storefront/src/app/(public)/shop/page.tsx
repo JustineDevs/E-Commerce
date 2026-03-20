@@ -1,173 +1,215 @@
 import Link from "next/link";
-import type { Product } from "@apparel-commerce/types";
+import { CatalogProductCard } from "@apparel-commerce/ui";
+import {
+  fetchProductsPage,
+  fetchCategorySummaries,
+  fetchVariantFacets,
+} from "@/lib/catalog-fetch";
+import { shopHref } from "@/lib/shop-url";
+import { ShopSortSelect } from "@/components/ShopSortSelect";
 
 export const dynamic = "force-dynamic";
 
-async function fetchProducts(): Promise<{ products: Product[]; total: number }> {
-  const base = process.env.API_URL ?? "http://localhost:4000";
-  const res = await fetch(`${base}/products?limit=20`, { next: { revalidate: 60 } });
-  if (!res.ok) throw new Error("Failed to fetch products");
-  return res.json();
+const SORTS = ["newest", "name_asc", "price_asc", "price_desc"] as const;
+type Sort = (typeof SORTS)[number];
+
+function parseSort(value: string | undefined): Sort {
+  if (value && (SORTS as readonly string[]).includes(value)) return value as Sort;
+  return "newest";
 }
 
-export default async function ShopPage() {
-  const { products, total } = await fetchProducts();
+function parseOffset(value: string | undefined): number {
+  const n = parseInt(value ?? "0", 10);
+  if (!Number.isFinite(n) || n < 0 || n > 50_000) return 0;
+  return n;
+}
+
+export default async function ShopPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    category?: string;
+    size?: string;
+    color?: string;
+    sort?: string;
+    offset?: string;
+    q?: string;
+  }>;
+}) {
+  const sp = await searchParams;
+  const category = sp.category?.trim() || undefined;
+  const size = sp.size?.trim() || undefined;
+  const color = sp.color?.trim() || undefined;
+  const searchQ = sp.q?.trim() || undefined;
+  const sort = parseSort(sp.sort);
+  const offset = parseOffset(sp.offset);
+  const limit = 20;
+
+  const [{ products, total }, categories, facets] = await Promise.all([
+    fetchProductsPage(limit, {
+      category,
+      size,
+      color,
+      q: searchQ,
+      sort,
+      offset,
+      revalidate: 60,
+    }),
+    fetchCategorySummaries(120),
+    fetchVariantFacets(category, 120),
+  ]);
+
+  const totalActive = categories.reduce((s, c) => s + c.count, 0);
+  const hasMore = offset + products.length < total;
 
   return (
-    <main className="pt-32 pb-24 px-8 max-w-[1600px] mx-auto">
-      <header className="mb-20 grid grid-cols-1 lg:grid-cols-12 gap-8 items-end">
-        <div className="lg:col-span-8">
-          <h1 className="font-headline text-6xl md:text-8xl font-bold tracking-tighter text-primary mb-6">
-            Essential
+    <main className="mx-auto max-w-[1600px] px-[clamp(0.75rem,4vw,2rem)] pb-16 pt-24 sm:pb-24 sm:pt-28 md:pt-32">
+      <header className="mb-12 grid grid-cols-1 items-end gap-8 sm:mb-16 lg:mb-20 lg:grid-cols-12">
+        <div className="min-w-0 lg:col-span-8">
+          <h1 className="font-headline text-[clamp(2.25rem,8vw,6rem)] font-bold leading-[1.05] tracking-tighter text-primary md:text-7xl lg:text-8xl">
+            Maharlika
             <br />
-            Architectures
+            <span className="text-[clamp(1.5rem,5vw,3.75rem)]">Grand Custom</span>
           </h1>
-          <p className="font-body text-lg text-on-surface-variant max-w-xl leading-relaxed">
-            A collection defined by structural integrity and quiet luxury. Each piece is an exercise in restraint.
+          {searchQ ? (
+            <p className="mt-4 font-body text-base text-on-surface-variant">
+              Search results for <strong className="text-primary">{searchQ}</strong>
+            </p>
+          ) : null}
+          <p className="mt-4 max-w-xl font-body text-base leading-relaxed text-on-surface-variant md:text-lg">
+            Structural silhouettes and quiet luxury—shorts, shirts, and layers built for everyday precision. Every
+            piece reflects Maharlika Apparel Custom craft.
           </p>
         </div>
-        <div className="lg:col-span-4 flex justify-start lg:justify-end">
-          <div className="flex gap-4 items-center">
-            <span className="font-label text-xs uppercase tracking-widest text-on-surface-variant">
-              Filter by
-            </span>
-            <button className="bg-surface-container-high px-4 py-2 text-xs font-medium uppercase tracking-wider flex items-center gap-2">
-              Sort: Newest First
-              <span className="material-symbols-outlined text-[16px]">expand_more</span>
-            </button>
-          </div>
+        <div className="flex justify-start lg:col-span-4 lg:justify-end">
+          <ShopSortSelect value={sort} category={category} size={size} color={color} search={searchQ} />
         </div>
       </header>
 
-      <div className="flex flex-col lg:flex-row gap-12">
+      <div className="flex min-w-0 flex-col gap-10 lg:flex-row lg:gap-12">
         <aside className="w-full lg:w-64 flex-shrink-0 space-y-12">
           <section>
-            <h3 className="font-headline text-sm font-bold uppercase tracking-[0.2em] mb-6 text-primary">
-              Category
-            </h3>
+            <h3 className="font-headline text-sm font-bold uppercase tracking-[0.2em] mb-6 text-primary">Category</h3>
             <ul className="space-y-4">
-              <li className="flex items-center justify-between text-sm font-medium text-primary">
-                <span>All Items</span>
-                <span className="text-[10px] text-on-surface-variant">({total})</span>
+              <li>
+                <Link
+                  href={shopHref({ size, color, sort, search: searchQ })}
+                  className={`flex items-center justify-between text-sm transition-colors ${
+                    !category ? "font-medium text-primary" : "text-on-surface-variant hover:text-primary"
+                  }`}
+                >
+                  <span>All</span>
+                  <span className="text-[10px] text-on-surface-variant">({totalActive})</span>
+                </Link>
               </li>
-              <li className="flex items-center justify-between text-sm text-on-surface-variant hover:text-primary cursor-pointer transition-colors">
-                <span>Shorts</span>
-                <span className="text-[10px]">(12)</span>
-              </li>
-              <li className="flex items-center justify-between text-sm text-on-surface-variant hover:text-primary cursor-pointer transition-colors">
-                <span>Tops</span>
-                <span className="text-[10px]">(18)</span>
-              </li>
-              <li className="flex items-center justify-between text-sm text-on-surface-variant hover:text-primary cursor-pointer transition-colors">
-                <span>Bottoms</span>
-                <span className="text-[10px]">(12)</span>
-              </li>
+              {categories.map((c) => (
+                <li key={c.category}>
+                  <Link
+                    href={shopHref({ category: c.category, size: undefined, color: undefined, sort, search: searchQ })}
+                    className={`flex items-center justify-between text-sm transition-colors ${
+                      category === c.category ? "font-medium text-primary" : "text-on-surface-variant hover:text-primary"
+                    }`}
+                  >
+                    <span>{c.category}</span>
+                    <span className="text-[10px]">({c.count})</span>
+                  </Link>
+                </li>
+              ))}
             </ul>
           </section>
+
           <section>
-            <h3 className="font-headline text-sm font-bold uppercase tracking-[0.2em] mb-6 text-primary">
-              Size
-            </h3>
-            <div className="grid grid-cols-4 gap-2">
-              {["S", "M", "L", "XL"].map((size) => (
-                <button
-                  key={size}
-                  className="aspect-square bg-surface-container-low text-[10px] font-bold hover:bg-primary hover:text-on-primary transition-all"
-                >
-                  {size}
-                </button>
-              ))}
-            </div>
+            <h3 className="font-headline text-sm font-bold uppercase tracking-[0.2em] mb-6 text-primary">Size</h3>
+            {facets.sizes.length === 0 ? (
+              <p className="text-xs text-on-surface-variant">No sizes in this view.</p>
+            ) : (
+              <div className="grid grid-cols-4 gap-2">
+                {facets.sizes.map((s) => {
+                  const active = size === s;
+                  return (
+                    <Link
+                      key={s}
+                      href={shopHref({ category, size: active ? undefined : s, color, sort, search: searchQ })}
+                      className={`aspect-square flex items-center justify-center text-[10px] font-bold transition-all rounded ${
+                        active
+                          ? "bg-primary text-on-primary"
+                          : "bg-surface-container-low hover:bg-primary hover:text-on-primary"
+                      }`}
+                    >
+                      {s}
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
           </section>
+
           <section>
-            <h3 className="font-headline text-sm font-bold uppercase tracking-[0.2em] mb-6 text-primary">
-              Color
-            </h3>
-            <div className="space-y-3">
-              {["Black", "White", "Navy", "Olive"].map((color) => (
-                <button
-                  key={color}
-                  className="flex items-center gap-3 w-full group"
-                >
-                  <span
-                    className={`w-4 h-4 rounded-full ${
-                      color === "Black"
-                        ? "bg-black outline outline-1 outline-offset-2 outline-primary"
-                        : color === "White"
-                        ? "bg-white border border-outline-variant"
-                        : color === "Navy"
-                        ? "bg-[#232D3F]"
-                        : "bg-[#4B5320]"
-                    }`}
-                  />
-                  <span className="text-xs font-medium text-on-surface-variant group-hover:text-primary transition-colors uppercase tracking-wider">
-                    {color}
-                  </span>
-                </button>
-              ))}
-            </div>
+            <h3 className="font-headline text-sm font-bold uppercase tracking-[0.2em] mb-6 text-primary">Color</h3>
+            {facets.colors.length === 0 ? (
+              <p className="text-xs text-on-surface-variant">No colors in this view.</p>
+            ) : (
+              <div className="space-y-3">
+                {facets.colors.map((col) => {
+                  const active = color === col;
+                  return (
+                    <Link
+                      key={col}
+                      href={shopHref({ category, size, color: active ? undefined : col, sort, search: searchQ })}
+                      className={`flex items-center gap-3 w-full group rounded px-1 py-0.5 -mx-1 ${
+                        active ? "ring-1 ring-primary" : ""
+                      }`}
+                    >
+                      <span className="w-4 h-4 rounded-full bg-surface-container-highest border border-outline-variant shrink-0" />
+                      <span className="text-xs font-medium text-on-surface-variant group-hover:text-primary transition-colors uppercase tracking-wider">
+                        {col}
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
           </section>
+
+          {(category || size || color || searchQ) && (
+            <Link
+              href="/shop"
+              className="inline-block text-xs font-medium text-primary underline underline-offset-4 hover:opacity-80"
+            >
+              Clear filters
+            </Link>
+          )}
         </aside>
 
         <div className="flex-grow">
           {products.length === 0 ? (
             <div className="rounded-lg border border-surface-container-high bg-surface-container-lowest p-12 text-center">
-              <p className="text-on-surface-variant">No products yet.</p>
+              <p className="text-on-surface-variant">No products match these filters.</p>
+              <Link href="/shop" className="mt-4 inline-block text-primary text-sm font-medium underline">
+                View all products
+              </Link>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-8 gap-y-16">
-              {products.map((product) => {
-                const image = product.images[0];
-                const minPrice = Math.min(...product.variants.map((v) => v.price));
-                const firstVariant = product.variants[0];
-                return (
-                  <Link key={product.id} href={`/shop/${product.slug}`} className="group cursor-pointer">
-                    <div className="relative overflow-hidden bg-surface-container-low aspect-[3/4] mb-6">
-                      {image ? (
-                        <img
-                          src={image.imageUrl}
-                          alt={product.name}
-                          className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-700"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-surface-container-high" />
-                      )}
-                      <div className="absolute bottom-4 left-4 right-4 translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
-                        <span className="block w-full bg-primary text-on-primary py-3 text-xs font-bold uppercase tracking-widest text-center">
-                          Quick Add
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-headline text-lg font-bold text-primary mb-1">
-                          {product.name.toUpperCase()}
-                        </h3>
-                        <p className="font-body text-xs text-on-surface-variant uppercase tracking-widest">
-                          {firstVariant?.color ?? product.variants[0]?.color ?? ""}
-                        </p>
-                      </div>
-                      <span className="font-headline text-lg font-medium text-primary">
-                        PHP {minPrice.toLocaleString("en-PH")}
-                      </span>
-                    </div>
-                  </Link>
-                );
-              })}
+            <div className="grid grid-cols-1 gap-x-6 gap-y-12 sm:grid-cols-2 sm:gap-x-8 sm:gap-y-16 xl:grid-cols-3">
+              {products.map((product) => (
+                <CatalogProductCard key={product.id} product={product} intervalMs={3000} />
+              ))}
             </div>
           )}
 
-          {total > 20 && (
-            <div className="mt-32 flex flex-col items-center gap-6">
+          {total > 0 && (
+            <div className="mt-16 flex flex-col items-center gap-6">
               <p className="font-body text-xs text-on-surface-variant uppercase tracking-widest">
-                Showing 20 of {total} items
+                Showing {offset + 1}–{Math.min(offset + products.length, total)} of {total}
               </p>
-              <div className="w-full max-w-xs h-[1px] bg-surface-container-high relative">
-                <div className="absolute left-0 top-0 h-full bg-primary w-[14%]" />
-              </div>
-              <button className="mt-4 px-12 py-4 border border-primary text-primary text-xs font-bold uppercase tracking-[0.2em] hover:bg-primary hover:text-on-primary transition-all">
-                Load More
-              </button>
+              {hasMore && (
+                <Link
+                  href={shopHref({ category, size, color, sort, search: searchQ, offset: offset + limit })}
+                  className="px-12 py-4 border border-primary text-primary text-xs font-bold uppercase tracking-[0.2em] hover:bg-primary hover:text-on-primary transition-all"
+                >
+                  Load more
+                </Link>
+              )}
             </div>
           )}
         </div>
