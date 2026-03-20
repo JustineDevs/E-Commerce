@@ -1,8 +1,248 @@
+"use client";
+
+import { useState } from "react";
+
+type CartItem = {
+  id: string;
+  name: string;
+  size: string;
+  color: string;
+  price: number;
+  qty: number;
+  imageUrl?: string;
+};
+
 export default function POSPage() {
+  const [barcodeInput, setBarcodeInput] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [cart, setCart] = useState<CartItem[]>([]);
+
+  function addToCart(item: Omit<CartItem, "id">) {
+    const existing = cart.find(
+      (c) => c.name === item.name && c.size === item.size && c.color === item.color
+    );
+    if (existing) {
+      setCart(
+        cart.map((c) =>
+          c === existing ? { ...c, qty: c.qty + 1 } : c
+        )
+      );
+    } else {
+      setCart([
+        ...cart,
+        { ...item, id: crypto.randomUUID() },
+      ]);
+    }
+  }
+
+  function removeFromCart(id: string) {
+    setCart(cart.filter((c) => c.id !== id));
+  }
+
+  function updateQty(id: string, delta: number) {
+    setCart(
+      cart.map((c) => {
+        if (c.id !== id) return c;
+        const newQty = Math.max(0, c.qty + delta);
+        return newQty === 0 ? c : { ...c, qty: newQty };
+      }).filter((c) => c.qty > 0)
+    );
+  }
+
+  const subtotal = cart.reduce((sum, c) => sum + c.price * c.qty, 0);
+  const tax = subtotal * 0.085;
+  const total = subtotal + tax;
+
+  const quickProducts = [
+    { name: "Structure Jacket", price: 420, imageUrl: "" },
+    { name: "Heavy Canvas Tee", price: 185, imageUrl: "" },
+    { name: "Draft Trousers", price: 310, imageUrl: "" },
+    { name: "Void Weekender", price: 890, imageUrl: "" },
+  ];
+
   return (
-    <main>
-      <h1>POS</h1>
-      <p>Point of sale terminal.</p>
+    <main className="p-8 flex flex-col lg:flex-row gap-8 min-h-screen">
+      <div className="flex-grow space-y-8">
+        <header className="mb-12">
+          <h1 className="text-4xl font-extrabold font-headline tracking-tight text-primary">
+            Terminal 01
+          </h1>
+          <p className="text-on-surface-variant font-body mt-2">
+            Ready for transactions. Scanning active.
+          </p>
+        </header>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="relative">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-on-surface-variant">
+              barcode_scanner
+            </span>
+            <input
+              value={barcodeInput}
+              onChange={(e) => setBarcodeInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  addToCart({
+                    name: "Scanned Item",
+                    size: "M",
+                    color: "Black",
+                    price: 1299,
+                    qty: 1,
+                  });
+                  setBarcodeInput("");
+                }
+              }}
+              className="w-full bg-surface-container-highest border-none rounded py-4 pl-12 pr-4 focus:ring-1 focus:ring-secondary/40 font-body text-sm transition-all"
+              placeholder="Scan Barcode or SKU..."
+              autoFocus
+            />
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 bg-surface-container-low px-2 py-1 rounded text-[10px] font-bold text-on-surface-variant border border-outline-variant/20 uppercase tracking-tighter">
+              F1
+            </div>
+          </div>
+          <div className="relative">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-on-surface-variant">
+              search
+            </span>
+            <input
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="w-full bg-surface-container-highest border-none rounded py-4 pl-12 pr-4 focus:ring-1 focus:ring-secondary/40 font-body text-sm transition-all"
+              placeholder="Search product name..."
+            />
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 bg-surface-container-low px-2 py-1 rounded text-[10px] font-bold text-on-surface-variant border border-outline-variant/20 uppercase tracking-tighter">
+              F2
+            </div>
+          </div>
+        </div>
+
+        <section className="mt-12">
+          <h3 className="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-6">
+            Quick Select / Recent Items
+          </h3>
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6">
+            {quickProducts.map((p) => (
+              <button
+                key={p.name}
+                onClick={() =>
+                  addToCart({
+                    name: p.name,
+                    size: "M",
+                    color: "Black",
+                    price: p.price,
+                    qty: 1,
+                  })
+                }
+                className="bg-surface-container-lowest p-4 group cursor-pointer transition-all hover:bg-surface-container-low text-left"
+              >
+                <div className="aspect-square mb-4 overflow-hidden rounded bg-surface-container-high" />
+                <p className="text-xs font-bold uppercase tracking-tighter font-headline">
+                  {p.name}
+                </p>
+                <p className="text-sm text-on-surface-variant mt-1">
+                  PHP {p.price.toLocaleString("en-PH")}
+                </p>
+              </button>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      <div className="w-full lg:w-96 flex flex-col h-[calc(100vh-4rem)] sticky top-8">
+        <div className="bg-surface-container-lowest/80 backdrop-blur-xl flex flex-col h-full shadow-[0px_20px_40px_rgba(0,0,0,0.04)] rounded-xl overflow-hidden">
+          <div className="p-6 bg-primary text-on-primary">
+            <h2 className="text-lg font-bold font-headline tracking-tight">Active Sale</h2>
+            <p className="text-[10px] uppercase tracking-widest text-on-primary/60">
+              Session: #{Date.now().toString(36).slice(-5).toUpperCase()} · {new Date().toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit" })}
+            </p>
+          </div>
+          <div className="flex-grow overflow-y-auto p-6 space-y-6">
+            {cart.length === 0 ? (
+              <p className="text-on-surface-variant text-sm">Cart is empty. Scan or search to add items.</p>
+            ) : (
+              cart.map((item) => (
+                <div key={item.id} className="flex gap-4">
+                  <div className="w-16 h-16 bg-surface-container-low rounded overflow-hidden flex-shrink-0" />
+                  <div className="flex-grow">
+                    <div className="flex justify-between items-start">
+                      <h4 className="text-xs font-bold font-headline uppercase">{item.name}</h4>
+                      <button
+                        onClick={() => removeFromCart(item.id)}
+                        className="text-on-surface-variant hover:text-error transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-sm">close</span>
+                      </button>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <span className="bg-surface-container-low px-2 py-1 rounded text-[10px] font-medium text-on-surface-variant uppercase">
+                        Size: {item.size}
+                      </span>
+                      <span className="bg-surface-container-low px-2 py-1 rounded text-[10px] font-medium text-on-surface-variant uppercase">
+                        Color: {item.color}
+                      </span>
+                    </div>
+                    <div className="mt-3 flex justify-between items-center">
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => updateQty(item.id, -1)}
+                          className="w-6 h-6 flex items-center justify-center bg-surface-container-high rounded hover:bg-surface-dim transition-colors"
+                        >
+                          <span className="material-symbols-outlined text-xs">remove</span>
+                        </button>
+                        <span className="text-xs font-bold">{item.qty}</span>
+                        <button
+                          onClick={() => updateQty(item.id, 1)}
+                          className="w-6 h-6 flex items-center justify-center bg-surface-container-high rounded hover:bg-surface-dim transition-colors"
+                        >
+                          <span className="material-symbols-outlined text-xs">add</span>
+                        </button>
+                      </div>
+                      <span className="text-sm font-medium">
+                        PHP {(item.price * item.qty).toLocaleString("en-PH")}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          <div className="p-6 bg-surface-container-low space-y-2">
+            <div className="flex justify-between text-xs text-on-surface-variant font-medium">
+              <span>Subtotal</span>
+              <span>PHP {subtotal.toLocaleString("en-PH")}</span>
+            </div>
+            <div className="flex justify-between text-xs text-on-surface-variant font-medium">
+              <span>Tax (8.5%)</span>
+              <span>PHP {tax.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-lg font-extrabold font-headline mt-2">
+              <span>Total</span>
+              <span>PHP {total.toFixed(2)}</span>
+            </div>
+          </div>
+          <div className="p-6 space-y-3">
+            <button className="w-full py-4 px-6 bg-secondary text-on-secondary font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:opacity-90 transition-opacity">
+              <span className="material-symbols-outlined text-lg">link</span>
+              Generate Payment Link
+            </button>
+            <button className="w-full py-4 px-6 bg-primary text-on-primary font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-95 transition-all shadow-xl shadow-black/10">
+              <span className="material-symbols-outlined text-lg">shopping_cart_checkout</span>
+              Commit Sale
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="fixed bottom-8 left-72 flex gap-4">
+        <div className="bg-surface-container-highest px-4 py-2 rounded-full flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          Scanner Online
+        </div>
+        <div className="bg-surface-container-highest px-4 py-2 rounded-full flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+          <span className="w-2 h-2 rounded-full bg-emerald-500" />
+          Printer Ready
+        </div>
+      </div>
     </main>
   );
 }
