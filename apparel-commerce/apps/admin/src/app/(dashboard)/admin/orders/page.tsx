@@ -1,4 +1,5 @@
-import { getApiUrl } from "@apparel-commerce/sdk";
+import Link from "next/link";
+import { getApiUrl, getInternalApiHeaders } from "@apparel-commerce/sdk";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,10 @@ type OrderRow = {
 
 async function fetchOrders(): Promise<{ orders: OrderRow[]; total: number }> {
   const base = process.env.API_URL ?? getApiUrl();
-  const res = await fetch(`${base}/orders?limit=50`, { cache: "no-store" });
+  const res = await fetch(`${base}/orders?limit=50`, {
+    cache: "no-store",
+    headers: { ...getInternalApiHeaders() },
+  });
   if (!res.ok) return { orders: [], total: 0 };
   return res.json();
 }
@@ -63,7 +67,11 @@ export default async function OrdersPage() {
             ) : (
               orders.map((o) => (
                 <tr key={o.id} className="border-b border-surface-container-high/50">
-                  <td className="py-4 px-6 font-medium text-primary">{o.order_number}</td>
+                  <td className="py-4 px-6 font-medium text-primary">
+                    <Link href={`/admin/orders/${o.id}`} className="hover:underline">
+                      {o.order_number}
+                    </Link>
+                  </td>
                   <td className="py-4 px-6 text-on-surface-variant text-sm">
                     {o.customer_id ? "Customer" : "Guest"}
                   </td>
