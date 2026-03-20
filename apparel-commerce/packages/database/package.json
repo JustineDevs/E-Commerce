@@ -2,6 +2,7 @@
   "name": "@apparel-commerce/database",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
@@ -11,7 +12,11 @@
   "scripts": {
     "migrate": "supabase db push",
     "seed": "tsx scripts/seed.ts",
-    "lint": "eslint src --ext .ts"
+    "apply-rls": "tsx scripts/apply-sql.ts supabase/migrations/enable_rls.sql",
+    "lint": "eslint src --ext .ts",
+    "test": "node --import tsx/esm --test \"src/**/*.test.ts\"",
+    "export:catalog-for-medusa": "tsx scripts/export-legacy-catalog-for-medusa.ts",
+    "export:inventory-for-medusa": "tsx scripts/export-legacy-inventory-for-medusa.ts"
   },
   "dependencies": {
     "@apparel-commerce/types": "workspace:*",
