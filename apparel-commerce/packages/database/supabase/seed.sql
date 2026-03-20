@@ -1,50 +1,16 @@
--- Seed data for apparel-commerce
+-- Seed schema and data for apparel-commerce (idempotent)
 -- Run with: pnpm db:seed
 
 create extension if not exists "pgcrypto";
 
-create type public.user_role as enum ('admin', 'staff', 'customer');
-create type public.order_channel as enum ('web', 'pos');
-create type public.order_status as enum (
-  'draft',
-  'pending_payment',
-  'paid',
-  'ready_to_ship',
-  'shipped',
-  'delivered',
-  'cancelled',
-  'refunded'
-);
-create type public.payment_status as enum (
-  'pending',
-  'paid',
-  'failed',
-  'refunded',
-  'voided'
-);
-create type public.shipment_status as enum (
-  'pending',
-  'label_created',
-  'in_transit',
-  'out_for_delivery',
-  'delivered',
-  'failed',
-  'returned'
-);
-create type public.inventory_reason as enum (
-  'opening_stock',
-  'purchase',
-  'reservation',
-  'reservation_release',
-  'sale',
-  'return',
-  'adjustment',
-  'damage',
-  'transfer_in',
-  'transfer_out'
-);
+do $$ begin create type public.user_role as enum ('admin', 'staff', 'customer'); exception when duplicate_object then null; end $$;
+do $$ begin create type public.order_channel as enum ('web', 'pos'); exception when duplicate_object then null; end $$;
+do $$ begin create type public.order_status as enum ('draft', 'pending_payment', 'paid', 'ready_to_ship', 'shipped', 'delivered', 'cancelled', 'refunded'); exception when duplicate_object then null; end $$;
+do $$ begin create type public.payment_status as enum ('pending', 'paid', 'failed', 'refunded', 'voided'); exception when duplicate_object then null; end $$;
+do $$ begin create type public.shipment_status as enum ('pending', 'label_created', 'in_transit', 'out_for_delivery', 'delivered', 'failed', 'returned'); exception when duplicate_object then null; end $$;
+do $$ begin create type public.inventory_reason as enum ('opening_stock', 'purchase', 'reservation', 'reservation_release', 'sale', 'return', 'adjustment', 'damage', 'transfer_in', 'transfer_out'); exception when duplicate_object then null; end $$;
 
-create table public.users (
+create table if not exists public.users (
   id uuid primary key default gen_random_uuid(),
   email text not null unique,
   name text,
@@ -55,7 +21,7 @@ create table public.users (
   updated_at timestamptz not null default now()
 );
 
-create table public.addresses (
+create table if not exists public.addresses (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.users(id) on delete cascade,
   label text,
@@ -72,7 +38,7 @@ create table public.addresses (
   created_at timestamptz not null default now()
 );
 
-create table public.products (
+create table if not exists public.products (
   id uuid primary key default gen_random_uuid(),
   slug text not null unique,
   name text not null,
@@ -84,7 +50,7 @@ create table public.products (
   updated_at timestamptz not null default now()
 );
 
-create table public.product_images (
+create table if not exists public.product_images (
   id uuid primary key default gen_random_uuid(),
   product_id uuid not null references public.products(id) on delete cascade,
   image_url text not null,
@@ -92,7 +58,7 @@ create table public.product_images (
   created_at timestamptz not null default now()
 );
 
-create table public.product_variants (
+create table if not exists public.product_variants (
   id uuid primary key default gen_random_uuid(),
   product_id uuid not null references public.products(id) on delete cascade,
   sku text not null unique,
@@ -108,7 +74,7 @@ create table public.product_variants (
   unique(product_id, size, color)
 );
 
-create table public.inventory_locations (
+create table if not exists public.inventory_locations (
   id uuid primary key default gen_random_uuid(),
   code text not null unique,
   name text not null,
@@ -116,7 +82,7 @@ create table public.inventory_locations (
   created_at timestamptz not null default now()
 );
 
-create table public.inventory_movements (
+create table if not exists public.inventory_movements (
   id uuid primary key default gen_random_uuid(),
   variant_id uuid not null references public.product_variants(id) on delete restrict,
   location_id uuid not null references public.inventory_locations(id) on delete restrict,
@@ -129,7 +95,7 @@ create table public.inventory_movements (
   created_at timestamptz not null default now()
 );
 
-create table public.stock_reservations (
+create table if not exists public.stock_reservations (
   id uuid primary key default gen_random_uuid(),
   variant_id uuid not null references public.product_variants(id) on delete cascade,
   location_id uuid not null references public.inventory_locations(id) on delete restrict,
@@ -140,7 +106,7 @@ create table public.stock_reservations (
   created_at timestamptz not null default now()
 );
 
-create table public.orders (
+create table if not exists public.orders (
   id uuid primary key default gen_random_uuid(),
   order_number text not null unique,
   customer_id uuid references public.users(id) on delete set null,
@@ -160,11 +126,9 @@ create table public.orders (
   updated_at timestamptz not null default now()
 );
 
-alter table public.stock_reservations
-  add constraint stock_reservations_order_id_fkey
-  foreign key (order_id) references public.orders(id) on delete cascade;
+do $$ begin alter table public.stock_reservations add constraint stock_reservations_order_id_fkey foreign key (order_id) references public.orders(id) on delete cascade; exception when duplicate_object then null; end $$;
 
-create table public.order_items (
+create table if not exists public.order_items (
   id uuid primary key default gen_random_uuid(),
   order_id uuid not null references public.orders(id) on delete cascade,
   variant_id uuid references public.product_variants(id) on delete set null,
@@ -178,7 +142,7 @@ create table public.order_items (
   created_at timestamptz not null default now()
 );
 
-create table public.payments (
+create table if not exists public.payments (
   id uuid primary key default gen_random_uuid(),
   order_id uuid not null references public.orders(id) on delete cascade,
   provider text not null default 'lemonsqueezy',
@@ -192,7 +156,7 @@ create table public.payments (
   created_at timestamptz not null default now()
 );
 
-create table public.shipments (
+create table if not exists public.shipments (
   id uuid primary key default gen_random_uuid(),
   order_id uuid not null references public.orders(id) on delete cascade,
   carrier_slug text not null default 'jtexpress-ph',
@@ -207,7 +171,7 @@ create table public.shipments (
   updated_at timestamptz not null default now()
 );
 
-create table public.webhook_events (
+create table if not exists public.webhook_events (
   id uuid primary key default gen_random_uuid(),
   provider text not null,
   event_id text,
@@ -220,12 +184,37 @@ create table public.webhook_events (
   unique(provider, event_id)
 );
 
-create index idx_variants_product_id on public.product_variants(product_id);
-create index idx_inventory_movements_variant_location on public.inventory_movements(variant_id, location_id);
-create index idx_stock_reservations_variant_status on public.stock_reservations(variant_id, status, expires_at);
-create index idx_orders_customer_id on public.orders(customer_id);
-create index idx_orders_status_channel on public.orders(status, channel);
-create index idx_order_items_order_id on public.order_items(order_id);
-create index idx_payments_order_id on public.payments(order_id);
-create index idx_shipments_order_id on public.shipments(order_id);
-create index idx_webhook_events_provider_status on public.webhook_events(provider, status);
+create index if not exists idx_variants_product_id on public.product_variants(product_id);
+create index if not exists idx_inventory_movements_variant_location on public.inventory_movements(variant_id, location_id);
+create index if not exists idx_stock_reservations_variant_status on public.stock_reservations(variant_id, status, expires_at);
+create index if not exists idx_orders_customer_id on public.orders(customer_id);
+create index if not exists idx_orders_status_channel on public.orders(status, channel);
+create index if not exists idx_order_items_order_id on public.order_items(order_id);
+create index if not exists idx_payments_order_id on public.payments(order_id);
+create index if not exists idx_shipments_order_id on public.shipments(order_id);
+create index if not exists idx_webhook_events_provider_status on public.webhook_events(provider, status);
+
+-- Seed sample data
+insert into public.inventory_locations (code, name, kind) values ('WH1', 'Warehouse', 'warehouse') on conflict (code) do nothing;
+insert into public.products (slug, name, description, category, status, brand) values
+  ('classic-shorts', 'Classic Cargo Shorts', 'Comfortable cotton cargo shorts for everyday wear.', 'Shorts', 'active', 'InHouse'),
+  ('slim-fit-shorts', 'Slim Fit Chino Shorts', 'Lightweight chino shorts with a modern fit.', 'Shorts', 'active', 'InHouse')
+on conflict (slug) do nothing;
+
+insert into public.product_images (product_id, image_url, sort_order)
+select p.id, 'https://placehold.co/600x800/e2e8f0/64748b?text=Product', 0 from public.products p 
+where p.slug in ('classic-shorts', 'slim-fit-shorts') and not exists (select 1 from public.product_images pi where pi.product_id = p.id);
+
+insert into public.product_variants (product_id, sku, barcode, size, color, price, is_active)
+select p.id, 'CS-S-BLK', '1234567890001', 'S', 'Black', 1299.00, true from public.products p where p.slug = 'classic-shorts' and not exists (select 1 from public.product_variants pv where pv.product_id = p.id and pv.sku = 'CS-S-BLK')
+union all select p.id, 'CS-M-BLK', '1234567890002', 'M', 'Black', 1299.00, true from public.products p where p.slug = 'classic-shorts' and not exists (select 1 from public.product_variants pv where pv.product_id = p.id and pv.sku = 'CS-M-BLK')
+union all select p.id, 'CS-L-BLK', '1234567890003', 'L', 'Black', 1299.00, true from public.products p where p.slug = 'classic-shorts' and not exists (select 1 from public.product_variants pv where pv.product_id = p.id and pv.sku = 'CS-L-BLK')
+union all select p.id, 'SF-S-NAV', '1234567890011', 'S', 'Navy', 1499.00, true from public.products p where p.slug = 'slim-fit-shorts' and not exists (select 1 from public.product_variants pv where pv.product_id = p.id and pv.sku = 'SF-S-NAV')
+union all select p.id, 'SF-M-NAV', '1234567890012', 'M', 'Navy', 1499.00, true from public.products p where p.slug = 'slim-fit-shorts' and not exists (select 1 from public.product_variants pv where pv.product_id = p.id and pv.sku = 'SF-M-NAV');
+
+insert into public.inventory_movements (variant_id, location_id, qty_delta, reason)
+select pv.id, il.id, 50, 'opening_stock'::public.inventory_reason
+from public.product_variants pv
+cross join public.inventory_locations il
+where il.code = 'WH1'
+and not exists (select 1 from public.inventory_movements im where im.variant_id = pv.id and im.location_id = il.id);
