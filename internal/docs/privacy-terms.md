@@ -1,7 +1,3 @@
-I'll create a professional PRD for your apparel commerce platform and follow it with a clean programming service contract. Both will be production-ready and formatted for client delivery. [atlassian](https://www.atlassian.com/agile/product-management/requirements)
-
-***
-
 # PRODUCT REQUIREMENT DOCUMENT (PRD)
 
 **Apparel Commerce Platform – Composable POS + Storefront + Fulfillment**
