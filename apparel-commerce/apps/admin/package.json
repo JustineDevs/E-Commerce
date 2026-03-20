@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@apparel-commerce/database": "workspace:*",
     "@apparel-commerce/types": "workspace:*",
     "@apparel-commerce/ui": "workspace:*",
     "@apparel-commerce/validation": "workspace:*",
