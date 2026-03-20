@@ -8,3 +8,7 @@ export function createSupabaseClient() {
 }
 
 export { listProducts, getProductBySlug } from "./queries/products";
+export { getOrderById, getOrderByNumber } from "./queries/orders";
+export { getShipmentsByOrderId } from "./queries/shipments";
+export { getAvailableQty } from "./queries/inventory";
+export { lookupVariantByBarcode, lookupVariantBySku } from "./queries/barcode";
