@@ -41,15 +41,50 @@
       "sourceType": "github",
       "computedHash": "b595748f7247b247fd3342383aab4b7f9372dfab2114fcb8ca1d95bc6cc3de7f"
     },
+    "dogfood": {
+      "source": "vercel-labs/agent-browser",
+      "sourceType": "github",
+      "computedHash": "df1c342a55d5e6a37276efd32a46984270a764563ff2445527f380860596bcc4"
+    },
+    "e2e-testing": {
+      "source": "hieutrtr/ai1-skills",
+      "sourceType": "github",
+      "computedHash": "589373c5db3a01dcb5dfdd22b8fa7a07ee4b6650056c08742227d5e8996eaa03"
+    },
     "lemonsqueezy-ui-skills": {
       "source": "ihlamury/design-skills",
       "sourceType": "github",
       "computedHash": "fec10108a56b5e4a5a998d99e453e0142c92d58f73955b566c2cf7bf8da1fcdc"
     },
+    "owasp-security": {
+      "source": "hoodini/ai-agents-skills",
+      "sourceType": "github",
+      "computedHash": "880d7aa73b001e7e28b9562639defeff11c073d958fe5a253eeea572539439a2"
+    },
+    "responsive-design": {
+      "source": "supercent-io/skills-template",
+      "sourceType": "github",
+      "computedHash": "1c2c94867cc1eeca74977d57b0d9818616934a62a58e100d9350ff11cd7244fd"
+    },
+    "security-best-practices": {
+      "source": "supercent-io/skills-template",
+      "sourceType": "github",
+      "computedHash": "c5ddd50338549d28b2edd45cec131d6a231349b0671a093b3b7e3b51d4780ab8"
+    },
+    "seo-audit": {
+      "source": "coreyhaines31/marketingskills",
+      "sourceType": "github",
+      "computedHash": "941f6f4db0f79248f6480256cf1838ed19bc1a0d70f499bb756f491142625cb4"
+    },
     "storefront-best-practices": {
       "source": "medusajs/medusa-agent-skills",
       "sourceType": "github",
       "computedHash": "e0a9b5a1ca1d4e5eb488cf4366a28a8317000ddaa2eb62a06a35b0c6b0f06085"
+    },
+    "ui-ux-pro-max": {
+      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "sourceType": "github",
+      "computedHash": "6337038fe1fe6bbe1b9f252ab678ee575859190bab6f0f246f4061824eb40875"
     }
   }
 }
