@@ -1,7 +1,10 @@
 import { Router } from "express";
 import { createSupabaseClient, listInventoryWithStock, getAvailableQty } from "@apparel-commerce/database";
+import { requireInternalApiKey } from "../lib/requireInternalApiKey.js";
 
 export const inventoryRouter: ReturnType<typeof Router> = Router();
+
+inventoryRouter.use(requireInternalApiKey);
 
 inventoryRouter.get("/", async (req, res) => {
   const supabase = createSupabaseClient();
