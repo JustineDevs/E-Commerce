@@ -11,11 +11,15 @@
   },
   "dependencies": {
     "@apparel-commerce/database": "workspace:*",
+    "@apparel-commerce/sdk": "workspace:*",
     "@apparel-commerce/types": "workspace:*",
     "@apparel-commerce/validation": "workspace:*",
-    "@apparel-commerce/sdk": "workspace:*",
+    "cors": "^2.8.5",
     "express": "^4.21.0",
-    "cors": "^2.8.5"
+    "express-async-errors": "^3.1.1",
+    "express-rate-limit": "^8.3.1",
+    "helmet": "^7.1.0",
+    "resend": "^4.0.0"
   },
   "devDependencies": {
     "@apparel-commerce/config-typescript": "workspace:*",
