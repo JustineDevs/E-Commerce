@@ -6,3 +6,5 @@ export function createSupabaseClient() {
   if (!url || !key) throw new Error("Missing Supabase credentials");
   return createClient(url, key);
 }
+
+export { listProducts, getProductBySlug } from "./queries/products";
