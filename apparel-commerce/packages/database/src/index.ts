@@ -7,9 +7,28 @@ export function createSupabaseClient() {
   return createClient(url, key);
 }
 
-export { listProducts, getProductBySlug } from "./queries/products";
+export {
+  listProducts,
+  getProductBySlug,
+  listActiveCategorySummaries,
+  listVariantFacets,
+} from "./queries/products";
+export type { ListProductsOpts } from "./queries/products";
 export { listOrders, getOrderById, getOrderByNumber } from "./queries/orders";
 export { createOrder } from "./queries/orders-create";
 export { listInventoryWithStock, getAvailableQty } from "./queries/inventory";
+export { releaseExpiredReservations, sumActiveReservedQtyByVariant } from "./queries/reservations";
+export {
+  createPendingCheckoutOrder,
+  fulfillOrderAfterLemonSqueezyPayment,
+  attachLemonSqueezyCheckoutToPayment,
+  processLemonSqueezyOrderWebhook,
+} from "./queries/checkout";
+export { parseLemonOrderPaidWebhook } from "./queries/lemonsqueezy-webhook";
+export { upsertShipmentFromAftershipPayload } from "./queries/aftership-webhook";
 export { getShipmentsByOrderId } from "./queries/shipments";
+export { updateOrderStatusStaff, createStaffShipment } from "./queries/order-fulfillment";
+export type { StaffShipmentInput } from "./queries/order-fulfillment";
 export { lookupVariantByBarcode, lookupVariantBySku } from "./queries/barcode";
+export { upsertOAuthUser, isStaffRole } from "./queries/admin-users";
+export { exportDataSubjectByEmail, anonymizeStaleOrderAddresses } from "./queries/compliance";
