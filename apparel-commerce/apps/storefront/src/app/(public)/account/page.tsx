@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 
 export default function AccountPage() {
   return (
-    <main className="pt-32 pb-24 px-8 max-w-4xl mx-auto">
+    <main className="mx-auto max-w-4xl px-[clamp(0.75rem,4vw,2rem)] pb-24 pt-24 sm:pt-28">
       <h1 className="font-headline text-4xl font-extrabold tracking-tighter text-primary mb-2">
         Account
       </h1>
@@ -21,7 +21,7 @@ export default function AccountPage() {
             Sign in with Google to view and update your profile.
           </p>
           <Link
-            href="/api/auth/signin"
+            href="/sign-in?callbackUrl=/account"
             className="inline-block bg-primary text-on-primary px-6 py-2.5 rounded font-medium hover:opacity-90"
           >
             Sign in
@@ -48,22 +48,29 @@ export default function AccountPage() {
         <p className="text-on-surface-variant text-sm mb-4">
           Enter your order number to track shipment status.
         </p>
-        <form action="/track" method="GET" className="flex flex-col sm:flex-row gap-4">
+        <form action="/track" method="GET" className="flex flex-col gap-4">
           <input
             type="text"
             name="orderId"
-            placeholder="Order number"
-            className="flex-1 bg-surface-container-low border border-outline-variant/30 rounded px-4 py-3 font-body text-sm outline-none focus:ring-1 focus:ring-primary"
+            placeholder="Order number or full tracking link from email"
+            className="w-full bg-surface-container-low border border-outline-variant/30 rounded px-4 py-3 font-body text-sm outline-none focus:ring-1 focus:ring-primary"
+          />
+          <input
+            type="text"
+            name="t"
+            placeholder="Tracking code (if not pasting full link)"
+            className="w-full bg-surface-container-low border border-outline-variant/30 rounded px-4 py-3 font-body text-sm outline-none focus:ring-1 focus:ring-primary"
           />
           <button
             type="submit"
-            className="bg-primary text-on-primary px-6 py-3 rounded font-medium hover:opacity-90"
+            className="bg-primary text-on-primary px-6 py-3 rounded font-medium hover:opacity-90 w-fit"
           >
             Track
           </button>
         </form>
         <p className="text-xs text-on-surface-variant mt-2">
-          Use the order number from your confirmation email.
+          Your confirmation email includes a secure tracking link. You need that link or both the order reference and
+          tracking code together.
         </p>
       </section>
     </main>
