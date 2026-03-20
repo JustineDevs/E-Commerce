@@ -1,30 +1,24 @@
 import Link from "next/link";
-import type { Product } from "@apparel-commerce/types";
+import { CatalogProductCard } from "@apparel-commerce/ui";
+import { fetchFeaturedProducts } from "@/lib/catalog-fetch";
 
 export const dynamic = "force-dynamic";
 
-async function fetchFeaturedProducts(): Promise<Product[]> {
-  const base = process.env.API_URL ?? "http://localhost:4000";
-  const res = await fetch(`${base}/products?limit=4`, { next: { revalidate: 60 } });
-  if (!res.ok) return [];
-  const data = await res.json();
-  return data.products ?? [];
-}
-
 export default async function HomePage() {
-  const products = await fetchFeaturedProducts();
+  const products = await fetchFeaturedProducts(4, 60);
 
   return (
     <>
       <section className="relative h-[600px] md:h-[721px] w-full overflow-hidden bg-surface-container-low flex items-center px-8 md:px-24">
         <div className="relative z-10 max-w-2xl">
           <h1 className="font-headline text-5xl md:text-7xl lg:text-8xl font-extrabold tracking-tighter leading-none text-primary mb-8">
-            ARCHITECTURAL
+            MAHARLIKA
             <br />
-            SILENCE
+            GRAND CUSTOM
           </h1>
           <p className="font-body text-lg text-on-surface-variant max-w-md mb-12">
-            A study in monochrome precision. High-performance apparel designed for the modern structuralist.
+            Shorts, shirts, and jackets—quiet silhouettes and honest fabrics from Maharlika Apparel Custom, tailored for
+            everyday wear in the Philippines and beyond.
           </p>
           <Link
             href="/shop"
@@ -55,30 +49,30 @@ export default async function HomePage() {
             </div>
           </Link>
           <Link
-            href="/shop"
+            href="/shop?category=Shirt"
             className="md:col-span-4 group relative overflow-hidden bg-surface-container-high rounded-lg"
           >
             <div className="w-full h-full bg-surface-container-low group-hover:scale-105 transition-transform duration-700" />
             <div className="absolute bottom-10 left-10">
-              <h3 className="font-headline text-2xl font-extrabold text-primary">Essentials</h3>
+              <h3 className="font-headline text-2xl font-extrabold text-primary">Shirts</h3>
               <span className="text-primary font-medium hover:underline underline-offset-8 mt-2 inline-block transition-all">
-                Shop Basics
+                Shop shirts
               </span>
             </div>
           </Link>
         </div>
         <div className="mt-6 grid grid-cols-1 md:grid-cols-12 gap-6 h-auto md:h-[400px]">
           <Link
-            href="/shop"
+            href="/shop?category=Jacket"
             className="md:col-span-12 group relative overflow-hidden bg-surface-container-highest rounded-lg"
           >
             <div className="w-full h-full bg-surface-container-high group-hover:scale-105 transition-transform duration-700" />
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
               <h3 className="font-headline text-5xl font-extrabold text-primary drop-shadow-sm">
-                Outerwear
+                Jackets
               </h3>
               <p className="text-on-surface-variant mt-4 font-medium tracking-widest uppercase text-sm">
-                Engineered for Silence
+                Layers &amp; outerwear
               </p>
             </div>
           </Link>
@@ -104,48 +98,18 @@ export default async function HomePage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-16">
-            {products.map((product) => {
-              const image = product.images[0];
-              const minPrice = Math.min(...product.variants.map((v) => v.price));
-              const firstVariant = product.variants[0];
-              return (
-                <Link href={`/shop/${product.slug}`} key={product.id} className="group">
-                  <div className="aspect-[3/4] overflow-hidden bg-surface-container-lowest rounded mb-6">
-                    {image ? (
-                      <img
-                        src={image.imageUrl}
-                        alt={product.name}
-                        className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-surface-container-high" />
-                    )}
-                  </div>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-headline text-lg font-bold text-primary">
-                        {product.name}
-                      </p>
-                      <p className="text-on-surface-variant text-sm mt-1">
-                        {firstVariant?.color ?? product.variants[0]?.color ?? ""}
-                      </p>
-                    </div>
-                    <p className="font-headline font-bold text-primary">
-                      PHP {minPrice.toLocaleString("en-PH")}
-                    </p>
-                  </div>
-                </Link>
-              );
-            })}
+            {products.map((product) => (
+              <CatalogProductCard key={product.id} product={product} />
+            ))}
           </div>
         )}
       </section>
 
-      <section className="py-32 bg-surface flex justify-center text-center px-8">
+      <section id="join-club" className="py-32 bg-surface flex justify-center text-center px-8 scroll-mt-24">
         <div className="max-w-xl">
-          <h2 className="font-headline text-3xl font-extrabold mb-6">JOIN THE SILENCE</h2>
+          <h2 className="font-headline text-3xl font-extrabold mb-6">STAY WITH MAHARLIKA</h2>
           <p className="text-on-surface-variant mb-10">
-            Access early releases and architectural insights. No noise, just essentials.
+            New drops, restocks, and studio notes—straight from Maharlika Apparel Custom.
           </p>
           <form className="flex flex-col md:flex-row gap-4">
             <input
