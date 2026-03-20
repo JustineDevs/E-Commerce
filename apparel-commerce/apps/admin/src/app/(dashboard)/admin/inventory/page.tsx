@@ -1,4 +1,27 @@
-export default function InventoryPage() {
+import { getApiUrl } from "@apparel-commerce/sdk";
+
+export const dynamic = "force-dynamic";
+
+type InventoryRow = {
+  variantId: string;
+  productName: string;
+  sku: string;
+  size: string;
+  color: string;
+  available: number;
+};
+
+async function fetchInventory(): Promise<InventoryRow[]> {
+  const base = process.env.API_URL ?? getApiUrl();
+  const res = await fetch(`${base}/inventory`, { cache: "no-store" });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.inventory ?? [];
+}
+
+export default async function InventoryPage() {
+  const inventory = await fetchInventory();
+
   return (
     <main className="min-h-screen p-8 lg:p-12">
       <header className="flex justify-between items-end mb-12">
@@ -37,27 +60,23 @@ export default function InventoryPage() {
             </tr>
           </thead>
           <tbody>
-            <tr className="border-b border-surface-container-high/50">
-              <td className="py-4 px-6 font-medium text-primary">Classic Cargo Shorts</td>
-              <td className="py-4 px-6 text-on-surface-variant text-sm">CS-S-BLK</td>
-              <td className="py-4 px-6 text-on-surface-variant text-sm">S</td>
-              <td className="py-4 px-6 text-on-surface-variant text-sm">Black</td>
-              <td className="py-4 px-6 text-right font-medium">50</td>
-            </tr>
-            <tr className="border-b border-surface-container-high/50">
-              <td className="py-4 px-6 font-medium text-primary">Classic Cargo Shorts</td>
-              <td className="py-4 px-6 text-on-surface-variant text-sm">CS-M-BLK</td>
-              <td className="py-4 px-6 text-on-surface-variant text-sm">M</td>
-              <td className="py-4 px-6 text-on-surface-variant text-sm">Black</td>
-              <td className="py-4 px-6 text-right font-medium">50</td>
-            </tr>
-            <tr>
-              <td className="py-4 px-6 font-medium text-primary">Slim Fit Chino Shorts</td>
-              <td className="py-4 px-6 text-on-surface-variant text-sm">SF-S-NAV</td>
-              <td className="py-4 px-6 text-on-surface-variant text-sm">S</td>
-              <td className="py-4 px-6 text-on-surface-variant text-sm">Navy</td>
-              <td className="py-4 px-6 text-right font-medium">50</td>
-            </tr>
+            {inventory.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="py-16 text-center text-on-surface-variant">
+                  No inventory data.
+                </td>
+              </tr>
+            ) : (
+              inventory.map((row) => (
+                <tr key={row.variantId} className="border-b border-surface-container-high/50">
+                  <td className="py-4 px-6 font-medium text-primary">{row.productName}</td>
+                  <td className="py-4 px-6 text-on-surface-variant text-sm">{row.sku}</td>
+                  <td className="py-4 px-6 text-on-surface-variant text-sm">{row.size}</td>
+                  <td className="py-4 px-6 text-on-surface-variant text-sm">{row.color}</td>
+                  <td className="py-4 px-6 text-right font-medium">{row.available}</td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
