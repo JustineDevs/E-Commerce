@@ -1,4 +1,4 @@
-import { getApiUrl } from "@apparel-commerce/sdk";
+import { getApiUrl, getInternalApiHeaders } from "@apparel-commerce/sdk";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +13,10 @@ type InventoryRow = {
 
 async function fetchInventory(): Promise<InventoryRow[]> {
   const base = process.env.API_URL ?? getApiUrl();
-  const res = await fetch(`${base}/inventory`, { cache: "no-store" });
+  const res = await fetch(`${base}/inventory`, {
+    cache: "no-store",
+    headers: { ...getInternalApiHeaders() },
+  });
   if (!res.ok) return [];
   const data = await res.json();
   return data.inventory ?? [];
