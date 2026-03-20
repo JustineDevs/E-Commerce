@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { sumActiveReservedQtyByVariant } from "./reservations";
 
 export type InventoryRow = {
   variantId: string;
@@ -18,7 +19,6 @@ export async function listInventoryWithStock(supabase: SupabaseClient): Promise<
   if (vErr) throw vErr;
   if (!variants || variants.length === 0) return [];
 
-  const variantsById = new Map(variants.map((v) => [v.id, v]));
   const variantIds = variants.map((v) => v.id);
 
   const { data: movements, error: mErr } = await supabase
@@ -34,10 +34,14 @@ export async function listInventoryWithStock(supabase: SupabaseClient): Promise<
     qtyByVariant.set(m.variant_id, prev + (m.qty_delta ?? 0));
   }
 
+  const reserved = await sumActiveReservedQtyByVariant(supabase, variantIds);
+
   return variants.map((v) => {
     const product = v.products as { name?: string } | null;
     const productName = product?.name ?? "";
-    const available = Math.max(0, qtyByVariant.get(v.id) ?? 0);
+    const movementQty = qtyByVariant.get(v.id) ?? 0;
+    const reservedQty = reserved.get(v.id) ?? 0;
+    const available = Math.max(0, movementQty - reservedQty);
     return {
       variantId: v.id,
       productName,
@@ -66,8 +70,11 @@ export async function getAvailableQty(supabase: SupabaseClient, variantId: strin
     .select("qty_delta")
     .eq("variant_id", variantId);
 
-  if (!movements || movements.length === 0) return 0;
+  const movementTotal =
+    movements?.reduce((sum, m) => sum + (m.qty_delta ?? 0), 0) ?? 0;
 
-  const total = movements.reduce((sum, m) => sum + (m.qty_delta ?? 0), 0);
-  return Math.max(0, total);
+  const reservedMap = await sumActiveReservedQtyByVariant(supabase, [variantId]);
+  const reserved = reservedMap.get(variantId) ?? 0;
+
+  return Math.max(0, movementTotal - reserved);
 }
