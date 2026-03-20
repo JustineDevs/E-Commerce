@@ -72,10 +72,10 @@ The scripts now include **automatic security checks** to prevent committing sens
 npm run commit
 
 # Warn only (not recommended for production)
-node scripts/commit/parallel-commit.js --warn-only
+node scripts/commit/cli/index.js commit --warn-only
 
 # Disable security checks (NOT RECOMMENDED)
-node scripts/commit/parallel-commit.js --no-security-check
+node scripts/commit/cli/index.js commit --no-security-check
 ```
 
 ## Commit Message Generation (Diff-Parser, No LLM)
@@ -166,12 +166,13 @@ npm run commit
 
 | Command | Description |
 |---------|-------------|
-| `npm run commit` | Parallel commit with security checks |
+| `npm run commit` | Parallel commit with security checks (via CLI) |
 | `npm run commit:dry` | Preview what would be committed |
+| `npm run commit:cli` | Show CLI usage and available commands |
 | `npm run commit:sh` | Bash script version |
 | `npm run commit:sh:dry` | Bash script dry run |
 | `npm run commit:all` | Single commit for all changes |
-| `npm run security:check` | Security scan only |
+| `npm run security:check` | Security scan only (via CLI) |
 
 ## Security Best Practices
 
