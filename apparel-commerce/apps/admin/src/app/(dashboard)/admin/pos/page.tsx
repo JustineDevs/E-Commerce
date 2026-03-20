@@ -1,37 +1,118 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { getApiUrl } from "@apparel-commerce/sdk";
 
 type CartItem = {
   id: string;
+  variantId: string;
   name: string;
   size: string;
   color: string;
+  sku: string;
   price: number;
   qty: number;
   imageUrl?: string;
+};
+
+type VariantLookup = {
+  id: string;
+  sku: string;
+  size: string;
+  color: string;
+  price: number;
+  products: { name?: string } | null;
 };
 
 export default function POSPage() {
   const [barcodeInput, setBarcodeInput] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [lookupError, setLookupError] = useState<string | null>(null);
+  const [commitLoading, setCommitLoading] = useState(false);
 
-  function addToCart(item: Omit<CartItem, "id">) {
-    const existing = cart.find(
-      (c) => c.name === item.name && c.size === item.size && c.color === item.color
-    );
-    if (existing) {
-      setCart(
-        cart.map((c) =>
-          c === existing ? { ...c, qty: c.qty + 1 } : c
-        )
-      );
+  const apiBase = getApiUrl();
+
+  async function lookupBarcodeOrSku(value: string): Promise<VariantLookup | null> {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const isNumeric = /^\d+$/.test(trimmed);
+    const body = isNumeric ? { barcode: trimmed } : { sku: trimmed };
+    const res = await fetch(`${apiBase}/barcode/lookup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) return null;
+    return res.json();
+  }
+
+  const addToCart = useCallback(
+    function addToCart(item: Omit<CartItem, "id">) {
+      const existing = cart.find((c) => c.variantId === item.variantId);
+      if (existing) {
+        setCart(
+          cart.map((c) => (c === existing ? { ...c, qty: c.qty + 1 } : c))
+        );
+      } else {
+        setCart([...cart, { ...item, id: crypto.randomUUID() }]);
+      }
+    },
+    [cart]
+  );
+
+  async function handleBarcodeSubmit() {
+    const value = barcodeInput.trim();
+    if (!value) return;
+    setLookupError(null);
+    const variant = await lookupBarcodeOrSku(value);
+    if (variant) {
+      const name = (variant.products as { name?: string })?.name ?? "Unknown";
+      addToCart({
+        variantId: variant.id,
+        name,
+        size: variant.size,
+        color: variant.color,
+        sku: variant.sku,
+        price: Number(variant.price),
+        qty: 1,
+      });
+      setBarcodeInput("");
     } else {
-      setCart([
-        ...cart,
-        { ...item, id: crypto.randomUUID() },
-      ]);
+      setLookupError("Variant not found");
+    }
+  }
+
+  async function handleCommitSale() {
+    if (cart.length === 0) return;
+    setCommitLoading(true);
+    setLookupError(null);
+    const res = await fetch(`${apiBase}/orders`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        channel: "pos",
+        status: "paid",
+        items: cart.map((c) => ({
+          variantId: c.variantId,
+          sku: c.sku,
+          productName: c.name,
+          size: c.size,
+          color: c.color,
+          unitPrice: c.price,
+          quantity: c.qty,
+        })),
+      }),
+    });
+    setCommitLoading(false);
+    if (res.ok) {
+      const { orderNumber } = await res.json();
+      setCart([]);
+      setLookupError(null);
+      alert(`Order ${orderNumber} created.`);
+    } else {
+      const err = await res.json().catch(() => ({}));
+      setLookupError(err.error ?? "Failed to create order");
     }
   }
 
@@ -53,12 +134,21 @@ export default function POSPage() {
   const tax = subtotal * 0.085;
   const total = subtotal + tax;
 
-  const quickProducts = [
-    { name: "Structure Jacket", price: 420, imageUrl: "" },
-    { name: "Heavy Canvas Tee", price: 185, imageUrl: "" },
-    { name: "Draft Trousers", price: 310, imageUrl: "" },
-    { name: "Void Weekender", price: 890, imageUrl: "" },
-  ];
+  const [quickProducts, setQuickProducts] = useState<Array<{ variantId: string; name: string; sku: string; size: string; color: string; price: number; imageUrl?: string }>>([]);
+
+  useEffect(() => {
+    fetch(`${apiBase}/products?limit=4`)
+      .then((r) => r.json())
+      .then((data: { products?: Array<{ name: string; variants: Array<{ id: string; sku: string; size: string; color: string; price: number }> }> }) => {
+        const list: Array<{ variantId: string; name: string; sku: string; size: string; color: string; price: number }> = [];
+        for (const p of data.products ?? []) {
+          const v = p.variants?.[0];
+          if (v) list.push({ variantId: v.id, name: p.name, sku: v.sku, size: v.size, color: v.color, price: v.price });
+        }
+        setQuickProducts(list);
+      })
+      .catch(() => {});
+  }, [apiBase]);
 
   return (
     <main className="p-8 flex flex-col lg:flex-row gap-8 min-h-screen">
@@ -72,6 +162,11 @@ export default function POSPage() {
           </p>
         </header>
 
+        {lookupError && (
+          <div className="bg-error/10 text-error px-4 py-2 rounded text-sm font-medium">
+            {lookupError}
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="relative">
             <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-on-surface-variant">
@@ -82,14 +177,7 @@ export default function POSPage() {
               onChange={(e) => setBarcodeInput(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
-                  addToCart({
-                    name: "Scanned Item",
-                    size: "M",
-                    color: "Black",
-                    price: 1299,
-                    qty: 1,
-                  });
-                  setBarcodeInput("");
+                  handleBarcodeSubmit();
                 }
               }}
               className="w-full bg-surface-container-highest border-none rounded py-4 pl-12 pr-4 focus:ring-1 focus:ring-secondary/40 font-body text-sm transition-all"
@@ -123,12 +211,14 @@ export default function POSPage() {
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6">
             {quickProducts.map((p) => (
               <button
-                key={p.name}
+                key={p.variantId}
                 onClick={() =>
                   addToCart({
+                    variantId: p.variantId,
                     name: p.name,
-                    size: "M",
-                    color: "Black",
+                    sku: p.sku,
+                    size: p.size,
+                    color: p.color,
                     price: p.price,
                     qty: 1,
                   })
@@ -225,9 +315,13 @@ export default function POSPage() {
               <span className="material-symbols-outlined text-lg">link</span>
               Generate Payment Link
             </button>
-            <button className="w-full py-4 px-6 bg-primary text-on-primary font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-95 transition-all shadow-xl shadow-black/10">
+            <button
+              disabled={cart.length === 0 || commitLoading}
+              onClick={handleCommitSale}
+              className="w-full py-4 px-6 bg-primary text-on-primary font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-95 transition-all shadow-xl shadow-black/10 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+            >
               <span className="material-symbols-outlined text-lg">shopping_cart_checkout</span>
-              Commit Sale
+              {commitLoading ? "Creating..." : "Commit Sale"}
             </button>
           </div>
         </div>
