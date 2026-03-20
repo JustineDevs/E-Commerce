@@ -10,6 +10,7 @@
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {
+    "@apparel-commerce/database": "workspace:*",
     "@apparel-commerce/types": "workspace:*",
     "@apparel-commerce/validation": "workspace:*",
     "@apparel-commerce/sdk": "workspace:*",
