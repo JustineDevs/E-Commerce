@@ -2,6 +2,8 @@
   "name": "e-commerce-website",
   "private": true,
   "scripts": {
+    "dev": "pnpm -C apparel-commerce dev",
+    "kill-ports": "pnpm -C apparel-commerce kill-ports",
     "commit": "node scripts/commit/cli/index.js commit",
     "commit:dry": "node scripts/commit/cli/index.js commit --dry-run",
     "commit:cli": "node scripts/commit/cli/index.js help",
