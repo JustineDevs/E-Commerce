@@ -4,14 +4,20 @@
   "private": true,
   "scripts": {
     "build": "turbo build",
+    "kill-ports": "npx --yes kill-port@2.0.1 3000 3001 4000",
     "dev": "turbo dev",
     "lint": "turbo lint",
     "clean": "turbo clean && rm -rf node_modules",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "db:migrate": "pnpm --filter @apparel-commerce/database migrate",
-    "db:seed": "pnpm --filter @apparel-commerce/database seed"
+    "db:seed": "pnpm --filter @apparel-commerce/database seed",
+    "test": "pnpm --filter @apparel-commerce/database test",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed"
   },
   "devDependencies": {
+    "@playwright/test": "^1.49.0",
     "prettier": "^3.2.5",
     "turbo": "^2.3.0"
   },
