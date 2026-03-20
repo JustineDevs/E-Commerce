@@ -1,1 +1,1 @@
-// Shared UI components
+export { CatalogProductCard } from "./CatalogProductCard";
