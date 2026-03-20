@@ -30,15 +30,17 @@ export default function POSPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [commitLoading, setCommitLoading] = useState(false);
+  const [linkLoading, setLinkLoading] = useState(false);
 
-  const apiBase = getApiUrl();
+  const catalogBase = getApiUrl();
+  const internalBase = "/api/backend";
 
   async function lookupBarcodeOrSku(value: string): Promise<VariantLookup | null> {
     const trimmed = value.trim();
     if (!trimmed) return null;
     const isNumeric = /^\d+$/.test(trimmed);
     const body = isNumeric ? { barcode: trimmed } : { sku: trimmed };
-    const res = await fetch(`${apiBase}/barcode/lookup`, {
+    const res = await fetch(`${internalBase}/barcode/lookup`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -83,11 +85,38 @@ export default function POSPage() {
     }
   }
 
+  async function handlePaymentLink() {
+    if (cart.length === 0) return;
+    setLinkLoading(true);
+    setLookupError(null);
+    const res = await fetch(`${internalBase}/payments/pos-checkout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        items: cart.map((c) => ({ variantId: c.variantId, quantity: c.qty })),
+      }),
+    });
+    setLinkLoading(false);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      const msg = typeof err.error === "string" ? err.error : "Could not create payment link";
+      setLookupError(msg);
+      return;
+    }
+    const data = (await res.json()) as { checkoutUrl?: string; orderNumber?: string };
+    if (data.checkoutUrl) {
+      window.open(data.checkoutUrl, "_blank", "noopener,noreferrer");
+    }
+    if (data.orderNumber) {
+      alert(`Checkout opened. Order ref: ${data.orderNumber}`);
+    }
+  }
+
   async function handleCommitSale() {
     if (cart.length === 0) return;
     setCommitLoading(true);
     setLookupError(null);
-    const res = await fetch(`${apiBase}/orders`, {
+    const res = await fetch(`${internalBase}/orders`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -137,7 +166,7 @@ export default function POSPage() {
   const [quickProducts, setQuickProducts] = useState<Array<{ variantId: string; name: string; sku: string; size: string; color: string; price: number; imageUrl?: string }>>([]);
 
   useEffect(() => {
-    fetch(`${apiBase}/products?limit=4`)
+    fetch(`${catalogBase}/products?limit=4`)
       .then((r) => r.json())
       .then((data: { products?: Array<{ name: string; variants: Array<{ id: string; sku: string; size: string; color: string; price: number }> }> }) => {
         const list: Array<{ variantId: string; name: string; sku: string; size: string; color: string; price: number }> = [];
@@ -148,7 +177,7 @@ export default function POSPage() {
         setQuickProducts(list);
       })
       .catch(() => {});
-  }, [apiBase]);
+  }, [catalogBase]);
 
   return (
     <main className="p-8 flex flex-col lg:flex-row gap-8 min-h-screen">
@@ -311,9 +340,14 @@ export default function POSPage() {
             </div>
           </div>
           <div className="p-6 space-y-3">
-            <button className="w-full py-4 px-6 bg-secondary text-on-secondary font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:opacity-90 transition-opacity">
+            <button
+              type="button"
+              disabled={cart.length === 0 || linkLoading}
+              onClick={() => void handlePaymentLink()}
+              className="w-full py-4 px-6 bg-secondary text-on-secondary font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               <span className="material-symbols-outlined text-lg">link</span>
-              Generate Payment Link
+              {linkLoading ? "Opening checkout…" : "Generate Payment Link"}
             </button>
             <button
               disabled={cart.length === 0 || commitLoading}
