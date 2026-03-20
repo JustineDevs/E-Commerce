@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "skills": {
+    "authentication-setup": {
+      "source": "supercent-io/skills-template",
+      "sourceType": "github",
+      "computedHash": "1cbdbf19e8473040652714fd035df46c4ae418f93203a790ee67c09ca94b71cd"
+    },
+    "bolder": {
+      "source": "pbakaus/impeccable",
+      "sourceType": "github",
+      "computedHash": "8425fa97206a284f3eb0df652f35e1cb99beee0ea57535493e401edd53584204"
+    },
+    "building-admin-dashboard-customizations": {
+      "source": "medusajs/medusa-agent-skills",
+      "sourceType": "github",
+      "computedHash": "fdf61048a7c3872c70a16861c8bb3e5cf9973a04d55b97139cd49e352fa3f82c"
+    },
+    "building-with-medusa": {
+      "source": "medusajs/medusa-agent-skills",
+      "sourceType": "github",
+      "computedHash": "a0b03d86b418f29a2e822579e139174fe6e06c10d62ea23022047d30a66aa5e2"
+    },
+    "co-star-ui": {
+      "source": "justinedevs/collection",
+      "sourceType": "github",
+      "computedHash": "e15c54ceff775f3f1530d9d714525b88285be69618ebd93a7188ed9828181d9b"
+    },
+    "context-engineering": {
+      "source": "justinedevs/collection",
+      "sourceType": "github",
+      "computedHash": "fb53140a68a2c38badf51ec1b1992f950454c2700330ee9ac8580d4374854609"
+    },
+    "core-engineering": {
+      "source": "justinedevs/collection",
+      "sourceType": "github",
+      "computedHash": "f0f4975092d31e94410a711033ba0d7bbdb56a48eab3440924b0058af6379a32"
+    },
+    "design-with-taste": {
+      "source": "cristicretu/family-taste-skill",
+      "sourceType": "github",
+      "computedHash": "b595748f7247b247fd3342383aab4b7f9372dfab2114fcb8ca1d95bc6cc3de7f"
+    },
+    "lemonsqueezy-ui-skills": {
+      "source": "ihlamury/design-skills",
+      "sourceType": "github",
+      "computedHash": "fec10108a56b5e4a5a998d99e453e0142c92d58f73955b566c2cf7bf8da1fcdc"
+    },
+    "storefront-best-practices": {
+      "source": "medusajs/medusa-agent-skills",
+      "sourceType": "github",
+      "computedHash": "e0a9b5a1ca1d4e5eb488cf4366a28a8317000ddaa2eb62a06a35b0c6b0f06085"
+    }
+  }
+}
