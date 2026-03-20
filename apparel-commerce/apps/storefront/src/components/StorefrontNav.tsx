@@ -1,37 +1,50 @@
+import Image from "next/image";
 import Link from "next/link";
+import { StorefrontMainNav } from "./StorefrontMainNav";
 
 export function StorefrontNav() {
   return (
-    <nav className="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-xl shadow-[0px_20px_40px_rgba(0,0,0,0.04)] flex justify-between items-center px-8 py-4 max-w-full font-headline tracking-tight">
-      <Link href="/" className="text-2xl font-bold tracking-tighter text-primary">
-        ARCHITECT
+    <nav className="relative flex w-full min-w-0 max-w-full items-center justify-between gap-2 px-[clamp(0.75rem,3vw,2rem)] py-3 font-headline tracking-tight shadow-[0px_8px_24px_rgba(0,0,0,0.06)] sm:gap-3 sm:py-4">
+      <Link
+        href="/"
+        className="relative flex h-8 w-[min(180px,38vw)] shrink-0 items-center transition-opacity duration-200 hover:opacity-85 xs:h-9 md:h-11 md:w-[min(200px,42vw)]"
+        data-testid="nav-home"
+        aria-label="Maharlika — Grand Custom, home"
+      >
+        <Image
+          src="/brand/maharlika-logo-horizontal.png"
+          alt="Maharlika — Grand Custom"
+          width={320}
+          height={214}
+          className="h-full w-full object-contain object-left"
+          sizes="(max-width: 768px) 42vw, 200px"
+          priority
+        />
       </Link>
-      <div className="hidden md:flex items-center gap-12">
+      <StorefrontMainNav />
+      <div className="flex shrink-0 items-center gap-3 sm:gap-5 md:gap-6">
         <Link
-          href="/shop"
-          className="text-primary font-semibold border-b-2 border-primary pb-1 transition-colors"
+          href="/wishlist"
+          className="text-primary transition-transform duration-200 hover:scale-95"
+          aria-label="Wishlist"
         >
-          Shop
-        </Link>
-        <Link
-          href="/shop"
-          className="text-on-surface-variant font-medium hover:text-primary transition-colors"
-        >
-          Collections
+          <span className="material-symbols-outlined text-[22px] sm:text-[24px]">favorite</span>
         </Link>
         <Link
-          href="/"
-          className="text-on-surface-variant font-medium hover:text-primary transition-colors"
+          href="/checkout"
+          data-testid="nav-checkout"
+          className="text-primary transition-transform duration-200 hover:scale-95"
+          aria-label="Shopping bag"
         >
-          About
+          <span className="material-symbols-outlined text-[22px] sm:text-[24px]">shopping_bag</span>
         </Link>
-      </div>
-      <div className="flex items-center gap-6">
-        <Link href="/checkout" className="text-primary hover:scale-95 duration-200 transition-transform">
-          <span className="material-symbols-outlined">shopping_bag</span>
-        </Link>
-        <Link href="/account" className="text-primary hover:scale-95 duration-200 transition-transform">
-          <span className="material-symbols-outlined">person</span>
+        <Link
+          href="/account"
+          data-testid="nav-account"
+          className="text-primary transition-transform duration-200 hover:scale-95"
+          aria-label="Account"
+        >
+          <span className="material-symbols-outlined text-[22px] sm:text-[24px]">person</span>
         </Link>
       </div>
     </nav>
