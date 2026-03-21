@@ -4,19 +4,20 @@ Current repository structure and reference. Use this to orient agents and contri
 
 ## Current structure
 
-- **apparel-commerce/** – Monorepo root (Turborepo + pnpm)
+- **Repo root** – Monorepo (Turborepo + pnpm): `package.json`, `pnpm-workspace.yaml`, `turbo.json`
   - **apps/** – Applications
     - `storefront/` – Next.js App Router. Public customer storefront (home, shop, PDP, cart, checkout, tracking, account).
     - `admin/` – Next.js App Router. Internal dashboard (analytics, inventory, orders, POS).
-    - `api/` – Node.js + Express. Webhooks, background jobs, inventory services, order services, barcode lookup.
+    - `api/` – Node.js + Express. Health (`/health`), compliance (`/compliance`, internal API key).
+    - `medusa/` – Medusa 2 commerce backend (cart, orders, payments, webhooks).
 
   - **packages/** – Shared packages
-    - `ui/` – Shared UI components (Tailwind, shadcn/ui).
-    - `types/` – Shared domain types (products, variants, orders, inventory).
-    - `validation/` – Request and payload validation.
-    - `database/` – Migrations, schema utilities, seed files (Supabase).
+    - `types/` – Shared domain types (Product, variants, images).
+    - `validation/` – Zod schemas (shop query params, order status, roles).
+    - `rate-limits/` – Env-driven rate-limit presets (used by `apps/api`).
+    - `database/` – Supabase legacy, compliance queries, OAuth upsert, migration scripts.
     - `config/` – TypeScript, ESLint, Tailwind configuration.
-    - `sdk/` – Internal clients and service adapters (Lemon Squeezy, AfterShip).
+    - `sdk/` – Medusa env helpers and shared constants.
 
 - **internal/docs/** – Internal documentation
   - `spec.md` – Apparel Commerce Platform specification.
@@ -30,12 +31,10 @@ Current repository structure and reference. Use this to orient agents and contri
 
 - **.github/** – Workflows, issue/PR templates (if present)
 
-- **Root** – `package.json` (pnpm workspace), `pnpm-workspace.yaml`, `CODEOWNERS`, config files
-
 ## Reference
 
 Canonical spec and blueprint: see **internal/docs/spec.md** and **internal/docs/blueprint.md** for system scope, tech stack, data model, OMS flow, and sprint plan.
 
 ## Ownership
 
-Review and sign-off are defined in **CODEOWNERS** (people/roles). Path-based auto-review can be added there if needed (e.g. `apparel-commerce/apps/*`, `apparel-commerce/packages/*`, `.cursor/*`).
+Review and sign-off are defined in **CODEOWNERS** (people/roles). Path-based auto-review can be added there if needed (e.g. `apps/*`, `packages/*`, `.cursor/*`).
