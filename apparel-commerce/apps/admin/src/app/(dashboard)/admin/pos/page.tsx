@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { getApiUrl } from "@apparel-commerce/sdk";
 
 type CartItem = {
   id: string;
@@ -32,15 +31,16 @@ export default function POSPage() {
   const [commitLoading, setCommitLoading] = useState(false);
   const [linkLoading, setLinkLoading] = useState(false);
 
-  const catalogBase = getApiUrl();
-  const internalBase = "/api/backend";
+  const medusaPosBase = "/api/pos/medusa";
 
-  async function lookupBarcodeOrSku(value: string): Promise<VariantLookup | null> {
+  async function lookupBarcodeOrSku(
+    value: string,
+  ): Promise<VariantLookup | null> {
     const trimmed = value.trim();
     if (!trimmed) return null;
     const isNumeric = /^\d+$/.test(trimmed);
     const body = isNumeric ? { barcode: trimmed } : { sku: trimmed };
-    const res = await fetch(`${internalBase}/barcode/lookup`, {
+    const res = await fetch(`${medusaPosBase}/lookup`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -54,13 +54,13 @@ export default function POSPage() {
       const existing = cart.find((c) => c.variantId === item.variantId);
       if (existing) {
         setCart(
-          cart.map((c) => (c === existing ? { ...c, qty: c.qty + 1 } : c))
+          cart.map((c) => (c === existing ? { ...c, qty: c.qty + 1 } : c)),
         );
       } else {
         setCart([...cart, { ...item, id: crypto.randomUUID() }]);
       }
     },
-    [cart]
+    [cart],
   );
 
   async function handleBarcodeSubmit() {
@@ -89,59 +89,69 @@ export default function POSPage() {
     if (cart.length === 0) return;
     setLinkLoading(true);
     setLookupError(null);
-    const res = await fetch(`${internalBase}/payments/pos-checkout`, {
+    const items = cart.map((c) => ({
+      variantId: c.variantId,
+      quantity: c.qty,
+    }));
+    const res = await fetch(`${medusaPosBase}/draft-order`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        items: cart.map((c) => ({ variantId: c.variantId, quantity: c.qty })),
-      }),
+      body: JSON.stringify({ items }),
     });
     setLinkLoading(false);
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      const msg = typeof err.error === "string" ? err.error : "Could not create payment link";
+      const msg =
+        typeof err.error === "string"
+          ? err.error
+          : "Could not create Medusa draft order";
       setLookupError(msg);
       return;
     }
-    const data = (await res.json()) as { checkoutUrl?: string; orderNumber?: string };
-    if (data.checkoutUrl) {
-      window.open(data.checkoutUrl, "_blank", "noopener,noreferrer");
-    }
-    if (data.orderNumber) {
-      alert(`Checkout opened. Order ref: ${data.orderNumber}`);
-    }
+    const data = (await res.json()) as {
+      draftOrderId?: string;
+      displayId?: string | number;
+    };
+    const ref =
+      data.displayId != null ? String(data.displayId) : data.draftOrderId ?? "";
+    alert(
+      ref
+        ? `Medusa draft order created (ref: ${ref}). Complete payment in Medusa Admin.`
+        : "Medusa draft order created. Complete payment in Medusa Admin.",
+    );
   }
 
   async function handleCommitSale() {
     if (cart.length === 0) return;
     setCommitLoading(true);
     setLookupError(null);
-    const res = await fetch(`${internalBase}/orders`, {
+    const res = await fetch(`${medusaPosBase}/commit-sale`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        channel: "pos",
-        status: "paid",
         items: cart.map((c) => ({
           variantId: c.variantId,
-          sku: c.sku,
-          productName: c.name,
-          size: c.size,
-          color: c.color,
-          unitPrice: c.price,
           quantity: c.qty,
         })),
       }),
     });
     setCommitLoading(false);
     if (res.ok) {
-      const { orderNumber } = await res.json();
+      const { orderNumber } = (await res.json()) as { orderNumber?: string };
       setCart([]);
       setLookupError(null);
-      alert(`Order ${orderNumber} created.`);
+      alert(
+        orderNumber
+          ? `Medusa order ${orderNumber} created.`
+          : "Medusa order created.",
+      );
     } else {
       const err = await res.json().catch(() => ({}));
-      setLookupError(err.error ?? "Failed to create order");
+      setLookupError(
+        typeof err.error === "string"
+          ? err.error
+          : "Failed to complete Medusa sale",
+      );
     }
   }
 
@@ -151,11 +161,13 @@ export default function POSPage() {
 
   function updateQty(id: string, delta: number) {
     setCart(
-      cart.map((c) => {
-        if (c.id !== id) return c;
-        const newQty = Math.max(0, c.qty + delta);
-        return newQty === 0 ? c : { ...c, qty: newQty };
-      }).filter((c) => c.qty > 0)
+      cart
+        .map((c) => {
+          if (c.id !== id) return c;
+          const newQty = Math.max(0, c.qty + delta);
+          return newQty === 0 ? c : { ...c, qty: newQty };
+        })
+        .filter((c) => c.qty > 0),
     );
   }
 
@@ -163,21 +175,38 @@ export default function POSPage() {
   const tax = subtotal * 0.085;
   const total = subtotal + tax;
 
-  const [quickProducts, setQuickProducts] = useState<Array<{ variantId: string; name: string; sku: string; size: string; color: string; price: number; imageUrl?: string }>>([]);
+  const [quickProducts, setQuickProducts] = useState<
+    Array<{
+      variantId: string;
+      name: string;
+      sku: string;
+      size: string;
+      color: string;
+      price: number;
+      imageUrl?: string;
+    }>
+  >([]);
 
   useEffect(() => {
-    fetch(`${catalogBase}/products?limit=4`)
+    fetch(`${medusaPosBase}/quick-products`)
       .then((r) => r.json())
-      .then((data: { products?: Array<{ name: string; variants: Array<{ id: string; sku: string; size: string; color: string; price: number }> }> }) => {
-        const list: Array<{ variantId: string; name: string; sku: string; size: string; color: string; price: number }> = [];
-        for (const p of data.products ?? []) {
-          const v = p.variants?.[0];
-          if (v) list.push({ variantId: v.id, name: p.name, sku: v.sku, size: v.size, color: v.color, price: v.price });
-        }
-        setQuickProducts(list);
-      })
+      .then(
+        (data: {
+          products?: Array<{
+            variantId: string;
+            name: string;
+            sku: string;
+            size: string;
+            color: string;
+            price: number;
+            imageUrl?: string;
+          }>;
+        }) => {
+          setQuickProducts(data.products ?? []);
+        },
+      )
       .catch(() => {});
-  }, [catalogBase]);
+  }, []);
 
   return (
     <main className="p-8 flex flex-col lg:flex-row gap-8 min-h-screen">
@@ -270,26 +299,38 @@ export default function POSPage() {
       <div className="w-full lg:w-96 flex flex-col h-[calc(100vh-4rem)] sticky top-8">
         <div className="bg-surface-container-lowest/80 backdrop-blur-xl flex flex-col h-full shadow-[0px_20px_40px_rgba(0,0,0,0.04)] rounded-xl overflow-hidden">
           <div className="p-6 bg-primary text-on-primary">
-            <h2 className="text-lg font-bold font-headline tracking-tight">Active Sale</h2>
+            <h2 className="text-lg font-bold font-headline tracking-tight">
+              Active Sale
+            </h2>
             <p className="text-[10px] uppercase tracking-widest text-on-primary/60">
-              Session: #{Date.now().toString(36).slice(-5).toUpperCase()} · {new Date().toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit" })}
+              Session: #{Date.now().toString(36).slice(-5).toUpperCase()} ·{" "}
+              {new Date().toLocaleTimeString("en-PH", {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
             </p>
           </div>
           <div className="flex-grow overflow-y-auto p-6 space-y-6">
             {cart.length === 0 ? (
-              <p className="text-on-surface-variant text-sm">Cart is empty. Scan or search to add items.</p>
+              <p className="text-on-surface-variant text-sm">
+                Cart is empty. Scan or search to add items.
+              </p>
             ) : (
               cart.map((item) => (
                 <div key={item.id} className="flex gap-4">
                   <div className="w-16 h-16 bg-surface-container-low rounded overflow-hidden flex-shrink-0" />
                   <div className="flex-grow">
                     <div className="flex justify-between items-start">
-                      <h4 className="text-xs font-bold font-headline uppercase">{item.name}</h4>
+                      <h4 className="text-xs font-bold font-headline uppercase">
+                        {item.name}
+                      </h4>
                       <button
                         onClick={() => removeFromCart(item.id)}
                         className="text-on-surface-variant hover:text-error transition-colors"
                       >
-                        <span className="material-symbols-outlined text-sm">close</span>
+                        <span className="material-symbols-outlined text-sm">
+                          close
+                        </span>
                       </button>
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2">
@@ -306,14 +347,18 @@ export default function POSPage() {
                           onClick={() => updateQty(item.id, -1)}
                           className="w-6 h-6 flex items-center justify-center bg-surface-container-high rounded hover:bg-surface-dim transition-colors"
                         >
-                          <span className="material-symbols-outlined text-xs">remove</span>
+                          <span className="material-symbols-outlined text-xs">
+                            remove
+                          </span>
                         </button>
                         <span className="text-xs font-bold">{item.qty}</span>
                         <button
                           onClick={() => updateQty(item.id, 1)}
                           className="w-6 h-6 flex items-center justify-center bg-surface-container-high rounded hover:bg-surface-dim transition-colors"
                         >
-                          <span className="material-symbols-outlined text-xs">add</span>
+                          <span className="material-symbols-outlined text-xs">
+                            add
+                          </span>
                         </button>
                       </div>
                       <span className="text-sm font-medium">
@@ -354,7 +399,9 @@ export default function POSPage() {
               onClick={handleCommitSale}
               className="w-full py-4 px-6 bg-primary text-on-primary font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-95 transition-all shadow-xl shadow-black/10 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
-              <span className="material-symbols-outlined text-lg">shopping_cart_checkout</span>
+              <span className="material-symbols-outlined text-lg">
+                shopping_cart_checkout
+              </span>
               {commitLoading ? "Creating..." : "Commit Sale"}
             </button>
           </div>
