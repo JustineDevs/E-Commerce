@@ -1,30 +1,41 @@
 import { Router } from "express";
-import { createSupabaseClient } from "@apparel-commerce/database";
 
 export const healthRouter: ReturnType<typeof Router> = Router();
 
-healthRouter.get("/", async (_req, res) => {
-  try {
-    const supabase = createSupabaseClient();
-    const { error } = await supabase.from("products").select("id").limit(1);
-    if (error) {
-      res.status(503).json({
-        status: "degraded",
-        db: "unavailable",
-        timestamp: new Date().toISOString(),
-      });
-      return;
+healthRouter.get("/commerce", async (_req, res) => {
+  const medusaBase = process.env.MEDUSA_BACKEND_URL?.replace(/\/$/, "") ?? "";
+  let medusaStatus: string = "not_configured";
+  if (medusaBase) {
+    try {
+      const r = await fetch(`${medusaBase}/health`);
+      medusaStatus = r.ok ? "ok" : `http_${r.status}`;
+    } catch {
+      medusaStatus = "unreachable";
     }
-    res.json({
-      status: "ok",
-      db: "ok",
-      timestamp: new Date().toISOString(),
-    });
-  } catch {
-    res.status(503).json({
-      status: "degraded",
-      db: "unavailable",
-      timestamp: new Date().toISOString(),
-    });
   }
+  res.json({
+    commerceEngine: "medusa",
+    medusa: medusaBase ? { url: medusaBase, status: medusaStatus } : null,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+healthRouter.get("/", async (_req, res) => {
+  const medusaBase = process.env.MEDUSA_BACKEND_URL?.replace(/\/$/, "") ?? "";
+  let medusaOk = false;
+  if (medusaBase) {
+    try {
+      const r = await fetch(`${medusaBase}/health`);
+      medusaOk = r.ok;
+    } catch {
+      medusaOk = false;
+    }
+  }
+  const status = medusaOk ? "ok" : medusaBase ? "degraded" : "no_medusa";
+  const code = status === "ok" ? 200 : 503;
+  res.status(code).json({
+    status,
+    medusa: medusaOk ? "ok" : "unavailable",
+    timestamp: new Date().toISOString(),
+  });
 });
