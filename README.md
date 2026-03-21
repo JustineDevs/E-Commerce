@@ -26,6 +26,12 @@ The platform uses a shared monorepo and a single transactional database so that 
 | Payments | Lemon Squeezy |
 | Shipping | AfterShip + J&T Express Philippines |
 
+## Live preview
+
+**Storefront (Vercel):** https://maharlika-apparel-custom.vercel.app
+
+Configure `NEXT_PUBLIC_SITE_URL` and related env vars to this origin when deploying.
+
 ## Project Structure
 
 ```
