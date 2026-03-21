@@ -17,7 +17,7 @@ export function AdminSidebar() {
     <aside className="h-screen w-64 fixed left-0 top-0 bg-slate-50 flex flex-col p-4 gap-2 z-50">
       <div className="px-4 py-6">
         <h1 className="text-lg font-black tracking-widest uppercase text-primary font-headline">
-          ARCHITECT
+          Maharlika
         </h1>
         <p className="text-[10px] text-slate-400 font-medium tracking-widest uppercase mt-1">
           Admin Console
@@ -25,7 +25,9 @@ export function AdminSidebar() {
       </div>
       <nav className="flex-1 flex flex-col gap-1">
         {navItems.map((item) => {
-          const isActive = pathname === item.href || (item.href !== "/admin" && pathname.startsWith(item.href));
+          const isActive =
+            pathname === item.href ||
+            (item.href !== "/admin" && pathname.startsWith(item.href));
           return (
             <Link
               key={item.href}
@@ -37,7 +39,9 @@ export function AdminSidebar() {
               }
             >
               <span className="material-symbols-outlined">{item.icon}</span>
-              <span className="font-body text-sm font-medium">{item.label}</span>
+              <span className="font-body text-sm font-medium">
+                {item.label}
+              </span>
             </Link>
           );
         })}
@@ -46,8 +50,12 @@ export function AdminSidebar() {
         <div className="px-4 py-3 flex items-center gap-3 mb-2">
           <div className="w-8 h-8 rounded-full bg-surface-container-high overflow-hidden" />
           <div className="flex flex-col overflow-hidden">
-            <span className="text-xs font-bold text-primary truncate">Admin User</span>
-            <span className="text-[10px] text-slate-500 truncate">Store Manager</span>
+            <span className="text-xs font-bold text-primary truncate">
+              Admin User
+            </span>
+            <span className="text-[10px] text-slate-500 truncate">
+              Store Manager
+            </span>
           </div>
         </div>
         <Link
