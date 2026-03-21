@@ -7,7 +7,7 @@ Here’s how these roles and branches typically connect in Git workflows:
 
 ### How Frontend and Backend Branches Connect
 
-- Each team (frontend, backend) works on their own branch, e.g., `frontend` and `backend`—sometimes even separate repositories.
+- Each team (frontend, backend) works on their own branch, e.g., `frontend` and `backend`-sometimes even separate repositories.
 - To test if the frontend and backend integrate correctly, a developer creates a new integration branch, e.g., `integration-test` or `merge-preview`, locally or on the remote.
 - Both `frontend` and `backend` branches are merged into this integration branch. This is where manual, unit, and automated integration (E2E, CI/CD) tests are run against the combined codebase.
 - If conflicts arise, they are resolved in the integration branch. No work goes to `main` (or `production`) until all issues are resolved and tested.
