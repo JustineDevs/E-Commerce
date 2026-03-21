@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 
 export default function AccountPage() {
   return (
-    <main className="mx-auto max-w-4xl px-[clamp(0.75rem,4vw,2rem)] pb-24 pt-24 sm:pt-28">
+    <main className="storefront-page-shell max-w-4xl">
       <h1 className="font-headline text-4xl font-extrabold tracking-tighter text-primary mb-2">
         Account
       </h1>
@@ -36,7 +36,11 @@ export default function AccountPage() {
             View and track your orders.
           </p>
           <p className="text-on-surface-variant text-sm">
-            No orders yet. <Link href="/shop" className="text-primary hover:underline">Start shopping</Link>.
+            No orders yet.{" "}
+            <Link href="/shop" className="text-primary hover:underline">
+              Start shopping
+            </Link>
+            .
           </p>
         </section>
       </div>
@@ -69,8 +73,8 @@ export default function AccountPage() {
           </button>
         </form>
         <p className="text-xs text-on-surface-variant mt-2">
-          Your confirmation email includes a secure tracking link. You need that link or both the order reference and
-          tracking code together.
+          Your confirmation email includes a secure tracking link. You need that
+          link or both the order reference and tracking code together.
         </p>
       </section>
     </main>
