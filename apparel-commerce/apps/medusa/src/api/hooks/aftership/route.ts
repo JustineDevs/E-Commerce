@@ -1,5 +1,6 @@
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http";
-import { Modules } from "@medusajs/framework/utils";
+import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils";
+import { capturePaymentWorkflow } from "@medusajs/medusa/core-flows";
 import crypto from "node:crypto";
 
 function verifyAftershipHmac(
@@ -115,6 +116,42 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       aftership_updated_at: new Date().toISOString(),
     },
   });
+
+  // When J&T delivers, capture COD payment (authorized at checkout, captured on delivery)
+  const mappedStatus = mapAftershipTag(tag);
+  if (mappedStatus === "delivered") {
+    try {
+      const query = req.scope.resolve(ContainerRegistrationKeys.QUERY);
+      const { data: orders } = await query.graph({
+        entity: "order",
+        fields: ["payment_collections.*", "payment_collections.payments.*"],
+        filters: { id: orderId },
+      });
+      const order = orders?.[0] as
+        | { payment_collections?: Array<{ payments?: Array<{ id: string; provider_id?: string; captured_at?: string | null }> }> }
+        | undefined;
+      const payments = order?.payment_collections?.[0]?.payments ?? [];
+      const uncapturedCod = payments.find(
+        (p) =>
+          p.provider_id?.toLowerCase().includes("cod") &&
+          !p.captured_at,
+      );
+      if (uncapturedCod) {
+        await capturePaymentWorkflow(req.scope).run({
+          input: { payment_id: uncapturedCod.id },
+        });
+      }
+    } catch (err) {
+      const logger = req.scope.resolve(ContainerRegistrationKeys.LOGGER) as {
+        warn?: (m: string) => void;
+      };
+      logger.warn?.(
+        `[aftership] COD capture on delivery failed for order ${orderId}: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+  }
 
   res.status(200).json({ received: true });
 }
