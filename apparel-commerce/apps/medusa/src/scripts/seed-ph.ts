@@ -1,8 +1,5 @@
 import { ExecArgs } from "@medusajs/framework/types";
-import {
-  ContainerRegistrationKeys,
-  Modules,
-} from "@medusajs/framework/utils";
+import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils";
 import {
   createWorkflow,
   transform,
@@ -30,6 +27,35 @@ const FULFILLMENT_SET_NAME = "PH Warehouse delivery";
 const SHIPPING_OPTION_STANDARD = "Standard PH";
 const LEGACY_LOC_META_KEY = "legacy_inventory_location_code";
 
+/** Aligns with `medusa-config.ts` provider registration (pp_{id}_{id}). */
+function buildPaymentProviderIdsForSeed(): string[] {
+  const ids: string[] = ["pp_system_default", "pp_cod_cod"];
+  if (
+    process.env.LEMONSQUEEZY_API_KEY?.trim() &&
+    process.env.LEMONSQUEEZY_STORE_ID?.trim() &&
+    process.env.LEMONSQUEEZY_CHECKOUT_VARIANT_ID?.trim() &&
+    process.env.LEMONSQUEEZY_WEBHOOK_SECRET?.trim()
+  ) {
+    ids.push("pp_lemonsqueezy_lemonsqueezy");
+  }
+  if (process.env.STRIPE_API_KEY?.trim()) {
+    ids.push("pp_stripe_stripe");
+  }
+  if (
+    process.env.PAYPAL_CLIENT_ID?.trim() &&
+    process.env.PAYPAL_CLIENT_SECRET?.trim()
+  ) {
+    ids.push("pp_paypal_paypal");
+  }
+  if (
+    process.env.PAYMONGO_SECRET_KEY?.trim() &&
+    process.env.PAYMONGO_WEBHOOK_SECRET?.trim()
+  ) {
+    ids.push("pp_paymongo_paymongo");
+  }
+  return [...new Set(ids)];
+}
+
 const updateStoreCurrencies = createWorkflow(
   "update-store-currencies-ph",
   (input: {
@@ -43,13 +69,13 @@ const updateStoreCurrencies = createWorkflow(
           (currency) => ({
             currency_code: currency.currency_code,
             is_default: currency.is_default ?? false,
-          })
+          }),
         ),
       },
     }));
     const stores = updateStoresStep(normalizedInput);
     return new WorkflowResponse(stores);
-  }
+  },
 );
 
 export default async function seedPhilippines({ container }: ExecArgs) {
@@ -66,7 +92,7 @@ export default async function seedPhilippines({ container }: ExecArgs) {
   const legacyLocationCode =
     process.env.MEDUSA_SEED_LEGACY_LOCATION_CODE ?? "WH1";
   const flatShippingMinorUnits = Number(
-    process.env.MEDUSA_PH_FLAT_SHIPPING_MINOR ?? 15000
+    process.env.MEDUSA_PH_FLAT_SHIPPING_MINOR ?? 15000,
   );
 
   const [store] = await storeModuleService.listStores();
@@ -114,12 +140,29 @@ export default async function seedPhilippines({ container }: ExecArgs) {
             name: REGION_NAME,
             currency_code: "php",
             countries: ["ph"],
-            payment_providers: ["pp_system_default"],
+            payment_providers: buildPaymentProviderIdsForSeed(),
           },
         ],
       },
     });
     region = result[0];
+  }
+
+  try {
+    const desired = buildPaymentProviderIdsForSeed();
+    const merged = [
+      ...new Set([...(region.payment_providers ?? []), ...desired]),
+    ];
+    await regionModuleService.updateRegions(region.id, {
+      payment_providers: merged,
+    });
+    logger.info(`PH seed: region payment providers merged (${merged.join(", ")})`);
+  } catch (e) {
+    logger.warn(
+      `PH seed: could not merge payment providers (configure in Admin if needed): ${
+        e instanceof Error ? e.message : String(e)
+      }`,
+    );
   }
 
   logger.info("PH seed: tax region (ph)");
@@ -288,7 +331,7 @@ export default async function seedPhilippines({ container }: ExecArgs) {
     });
   } catch (e) {
     logger.warn(
-      `linkSalesChannelsToStockLocation (may already be linked): ${e instanceof Error ? e.message : String(e)}`
+      `linkSalesChannelsToStockLocation (may already be linked): ${e instanceof Error ? e.message : String(e)}`,
     );
   }
 
@@ -326,11 +369,11 @@ export default async function seedPhilippines({ container }: ExecArgs) {
     });
   } catch (e) {
     logger.warn(
-      `linkSalesChannelsToApiKey (may already be linked): ${e instanceof Error ? e.message : String(e)}`
+      `linkSalesChannelsToApiKey (may already be linked): ${e instanceof Error ? e.message : String(e)}`,
     );
   }
 
   logger.info(
-    `PH seed done: sales_channel=${webPhChannels[0].id} region=${region.id} stock_location=${stockLocation.id} legacy_loc=${legacyLocationCode}`
+    `PH seed done: sales_channel=${webPhChannels[0].id} region=${region.id} stock_location=${stockLocation.id} legacy_loc=${legacyLocationCode}`,
   );
 }
