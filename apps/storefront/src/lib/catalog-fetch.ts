@@ -355,3 +355,39 @@ export async function fetchVariantFacets(
 ): Promise<VariantFacetsResult> {
   return fetchMedusaVariantFacets(category);
 }
+
+/** Lightweight list of product slugs for sitemap/SEO. Returns [] when misconfigured. */
+export async function fetchProductSlugsForSitemap(
+  maxItems = 1000,
+): Promise<string[]> {
+  const gate = requireMedusaClientConfig();
+  if (!gate.ok) return [];
+
+  try {
+    const sdk = createStorefrontMedusaSdk();
+    const regionId = getMedusaRegionId()!;
+    const slugs: string[] = [];
+    let offset = 0;
+    const pageSize = 100;
+
+    while (slugs.length < maxItems) {
+      const { products } = await sdk.store.product.list({
+        region_id: regionId,
+        limit: pageSize,
+        offset,
+        fields: "handle",
+        order: "-created_at",
+      });
+      for (const p of products ?? []) {
+        const h = (p as { handle?: string }).handle?.trim();
+        if (h && !slugs.includes(h)) slugs.push(h);
+      }
+      if (!products?.length || products.length < pageSize) break;
+      offset += pageSize;
+    }
+
+    return slugs.slice(0, maxItems);
+  } catch {
+    return [];
+  }
+}
