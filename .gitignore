@@ -46,9 +46,9 @@ playwright/.cache/
 e2e/.auth/
 
 # Dogfood (agent-browser): keep report.md; ignore heavy captures
-apparel-commerce/dogfood-output/**/*.png
-apparel-commerce/dogfood-output/**/*.webm
-apparel-commerce/dogfood-output/**/*.mp4
+dogfood-output/**/*.png
+dogfood-output/**/*.webm
+dogfood-output/**/*.mp4
 
 # Supabase local
 .supabase/
