@@ -32,9 +32,9 @@ importers:
       '@apparel-commerce/ui':
         specifier: workspace:*
         version: link:../../packages/ui
-      '@apparel-commerce/validation':
-        specifier: workspace:*
-        version: link:../../packages/validation
+      lenis:
+        specifier: ^1.3.19
+        version: 1.3.19(react@18.3.1)
       '@medusajs/js-sdk':
         specifier: 2.13.1
         version: 2.13.1
