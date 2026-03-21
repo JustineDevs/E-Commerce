@@ -148,20 +148,17 @@ export default async function seedPhilippines({ container }: ExecArgs) {
     region = result[0];
   }
 
-  try {
-    const desired = buildPaymentProviderIdsForSeed();
-    const merged = [
-      ...new Set([...(region.payment_providers ?? []), ...desired]),
-    ];
-    await regionModuleService.updateRegions(region.id, {
-      payment_providers: merged,
-    });
-    logger.info(`PH seed: region payment providers merged (${merged.join(", ")})`);
-  } catch (e) {
-    logger.warn(
-      `PH seed: could not merge payment providers (configure in Admin if needed): ${
-        e instanceof Error ? e.message : String(e)
-      }`,
+  // UpdateRegionDTO does not include payment_providers; use Admin → Settings → Regions to configure.
+  const desired = buildPaymentProviderIdsForSeed();
+  const regionWithProviders = region as unknown as {
+    payment_providers?: { id: string }[];
+  };
+  const current =
+    regionWithProviders.payment_providers?.map((p) => p.id) ?? [];
+  const merged = [...new Set([...current, ...desired])];
+  if (merged.length > current.length) {
+    logger.info(
+      `PH seed: configure payment providers in Admin → Regions (suggested: ${merged.join(", ")})`,
     );
   }
 
