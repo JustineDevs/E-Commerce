@@ -1,14 +1,14 @@
 /**
- * playwright-config-example.ts — Production Playwright configuration.
+ * playwright-config-example.ts: Production Playwright configuration.
  *
  * Place at: e2e/playwright.config.ts (or project root playwright.config.ts)
  *
  * This config provides:
- *   - Auth state reuse via a setup project
- *   - Multi-browser testing (Chromium, Firefox, WebKit)
- *   - CI-aware settings (retries, workers, traces)
- *   - Automatic dev server startup
- *   - Sensible timeouts and viewport defaults
+ * - Auth state reuse via a setup project
+ * - Multi-browser testing (Chromium, Firefox, WebKit)
+ * - CI-aware settings (retries, workers, traces)
+ * - Automatic dev server startup
+ * - Sensible timeouts and viewport defaults
  */
 
 import { defineConfig, devices } from "@playwright/test";
@@ -41,7 +41,9 @@ export default defineConfig({
   reporter: [
     ["list"], // Console output during runs
     ["html", { open: CI ? "never" : "on-failure" }], // HTML report
-    ...(CI ? [["junit", { outputFile: "test-results/junit.xml" }] as const] : []),
+    ...(CI
+      ? [["junit", { outputFile: "test-results/junit.xml" }] as const]
+      : []),
   ],
 
   // ─── Shared Settings ─────────────────────────────────
