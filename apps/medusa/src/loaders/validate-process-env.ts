@@ -1,0 +1,175 @@
+/**
+ * Medusa process boot validation (Zod). Imported from medusa-config after loadEnv.
+ */
+import { z } from "zod";
+
+const devOk = z.string().min(1);
+
+function productionStripeSchema() {
+  return z
+    .object({
+      STRIPE_API_KEY: z.string().optional(),
+      STRIPE_WEBHOOK_SECRET: z.string().optional(),
+    })
+    .refine(
+      (d) => {
+        if (!d.STRIPE_API_KEY?.trim()) return true;
+        return Boolean(d.STRIPE_WEBHOOK_SECRET?.trim());
+      },
+      {
+        message:
+          "STRIPE_WEBHOOK_SECRET is required in production when STRIPE_API_KEY is set",
+      },
+    );
+}
+
+function productionPaymongoSchema() {
+  return z
+    .object({
+      PAYMONGO_SECRET_KEY: z.string().optional(),
+      PAYMONGO_WEBHOOK_SECRET: z.string().optional(),
+    })
+    .refine(
+      (d) => {
+        if (!d.PAYMONGO_SECRET_KEY?.trim()) return true;
+        return Boolean(d.PAYMONGO_WEBHOOK_SECRET?.trim());
+      },
+      {
+        message:
+          "PAYMONGO_WEBHOOK_SECRET is required in production when PAYMONGO_SECRET_KEY is set",
+      },
+    );
+}
+
+function productionLemonSqueezySchema() {
+  return z
+    .object({
+      LEMONSQUEEZY_API_KEY: z.string().optional(),
+      LEMONSQUEEZY_STORE_ID: z.string().optional(),
+      LEMONSQUEEZY_CHECKOUT_VARIANT_ID: z.string().optional(),
+      LEMONSQUEEZY_WEBHOOK_SECRET: z.string().optional(),
+    })
+    .refine(
+      (d) => {
+        if (!d.LEMONSQUEEZY_API_KEY?.trim()) return true;
+        return (
+          Boolean(d.LEMONSQUEEZY_STORE_ID?.trim()) &&
+          Boolean(d.LEMONSQUEEZY_CHECKOUT_VARIANT_ID?.trim()) &&
+          Boolean(d.LEMONSQUEEZY_WEBHOOK_SECRET?.trim())
+        );
+      },
+      {
+        message:
+          "LEMONSQUEEZY_STORE_ID, LEMONSQUEEZY_CHECKOUT_VARIANT_ID, and LEMONSQUEEZY_WEBHOOK_SECRET are required when LEMONSQUEEZY_API_KEY is set",
+      },
+    );
+}
+
+function productionPayPalSchema() {
+  return z
+    .object({
+      PAYPAL_CLIENT_ID: z.string().optional(),
+      PAYPAL_CLIENT_SECRET: z.string().optional(),
+    })
+    .refine(
+      (d) => {
+        if (!d.PAYPAL_CLIENT_ID?.trim()) return true;
+        return Boolean(d.PAYPAL_CLIENT_SECRET?.trim());
+      },
+      {
+        message:
+          "PAYPAL_CLIENT_SECRET is required in production when PAYPAL_CLIENT_ID is set",
+      },
+    );
+}
+
+function warnPartialOptionalProvider(
+  name: string,
+  keys: string[],
+  env: Record<string, string | undefined>,
+): void {
+  const set = keys.filter((k) => Boolean(env[k]?.trim()));
+  if (set.length > 0 && set.length < keys.length) {
+    const missing = keys.filter((k) => !env[k]?.trim());
+    console.warn(
+      `[env] ${name}: partially configured (set: ${set.join(", ")}; missing: ${missing.join(", ")}). Feature may not work.`,
+    );
+  }
+}
+
+export function validateMedusaProcessEnv(): void {
+  const db = z.object({
+    DATABASE_URL: devOk,
+  });
+  const r = db.safeParse(process.env);
+  if (!r.success) {
+    throw new Error(
+      `Medusa: DATABASE_URL is required — ${r.error.message}`,
+    );
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    const jwt = process.env.JWT_SECRET?.trim() ?? "";
+    const cookie = process.env.COOKIE_SECRET?.trim() ?? "";
+    if (jwt === "supersecret" || cookie === "supersecret") {
+      throw new Error(
+        "Medusa: JWT_SECRET and COOKIE_SECRET must not use default 'supersecret' in production",
+      );
+    }
+    if (!jwt.length || !cookie.length) {
+      throw new Error(
+        "Medusa: JWT_SECRET and COOKIE_SECRET are required in production",
+      );
+    }
+
+    const storeCors = process.env.STORE_CORS?.trim() ?? "";
+    const adminCors = process.env.ADMIN_CORS?.trim() ?? "";
+    const authCors = process.env.AUTH_CORS?.trim() ?? "";
+    if (!storeCors || !adminCors || !authCors) {
+      const missing: string[] = [];
+      if (!storeCors) missing.push("STORE_CORS");
+      if (!adminCors) missing.push("ADMIN_CORS");
+      if (!authCors) missing.push("AUTH_CORS");
+      throw new Error(
+        `Medusa: required CORS env in production: ${missing.join(", ")}`,
+      );
+    }
+
+    const stripe = productionStripeSchema().safeParse(process.env);
+    if (!stripe.success) {
+      throw new Error(
+        `Medusa: ${stripe.error.issues[0]?.message ?? "Stripe env invalid"}`,
+      );
+    }
+
+    const paymongo = productionPaymongoSchema().safeParse(process.env);
+    if (!paymongo.success) {
+      throw new Error(
+        `Medusa: ${paymongo.error.issues[0]?.message ?? "Paymongo env invalid"}`,
+      );
+    }
+
+    const lemon = productionLemonSqueezySchema().safeParse(process.env);
+    if (!lemon.success) {
+      throw new Error(
+        `Medusa: ${lemon.error.issues[0]?.message ?? "Lemon Squeezy env invalid"}`,
+      );
+    }
+
+    const paypal = productionPayPalSchema().safeParse(process.env);
+    if (!paypal.success) {
+      throw new Error(
+        `Medusa: ${paypal.error.issues[0]?.message ?? "PayPal env invalid"}`,
+      );
+    }
+  }
+
+  warnPartialOptionalProvider("Resend", [
+    "RESEND_API_KEY",
+    "RESEND_FROM_EMAIL",
+  ], process.env as Record<string, string | undefined>);
+
+  warnPartialOptionalProvider("AfterShip", [
+    "AFTERSHIP_API_KEY",
+  ], process.env as Record<string, string | undefined>);
+}
