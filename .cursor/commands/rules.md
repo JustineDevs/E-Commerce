@@ -8,8 +8,8 @@ Mandatory Rules followed guide for operation and development
 
 Before running any other tool or writing any code or answer that implements a user request:
 
-1. **First:** Check `.cursor/rules/` — review rule files (e.g. `AGENT.mdc`, `AGENTS.mdc`, `production.mdc`, `rules.mdc`) relevant to the task so your actions align with project standards.
-2. **Second:** Check `.cursor/wiki/` — read wiki docs (e.g. `robots.txt`, crawler/scope boundaries, project wiki) that apply to the request.
+1. **First:** Check `.cursor/rules/`: review rule files (e.g. `AGENT.mdc`, `AGENTS.mdc`, `production.mdc`, `rules.mdc`) relevant to the task so your actions align with project standards.
+2. **Second:** Check `.cursor/wiki/`: read wiki docs (e.g. `robots.txt`, crawler/scope boundaries, project wiki) that apply to the request.
 3. **Third:** List or read `.cursor/skills/` and identify skills that apply. Read the relevant `SKILL.md` (or skill docs) for those skills.
 4. **Fourth:** Check `.cursor/llm/` for any docs or prompts that apply (e.g. `llm.txt`, usage constraints).
 5. **Then:** Proceed with your reply or implementation using those resources.
