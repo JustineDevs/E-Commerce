@@ -12,13 +12,13 @@ Systematically explore a web application, find issues, and produce a report with
 
 Only the **Target URL** is required. Everything else has sensible defaults -- use them unless the user explicitly provides an override.
 
-| Parameter | Default | Example override |
-|-----------|---------|-----------------|
-| **Target URL** | _(required)_ | `vercel.com`, `http://localhost:3000` |
-| **Session name** | Slugified domain (e.g., `vercel.com` -> `vercel-com`) | `--session my-session` |
-| **Output directory** | `./dogfood-output/` | `Output directory: /tmp/qa` |
-| **Scope** | Full app | `Focus on the billing page` |
-| **Authentication** | None | `Sign in to user@example.com` |
+| Parameter            | Default                                               | Example override                      |
+| -------------------- | ----------------------------------------------------- | ------------------------------------- |
+| **Target URL**       | _(required)_                                          | `vercel.com`, `http://localhost:3000` |
+| **Session name**     | Slugified domain (e.g., `vercel.com` -> `vercel-com`) | `--session my-session`                |
+| **Output directory** | `./dogfood-output/`                                   | `Output directory: /tmp/qa`           |
+| **Scope**            | Full app                                              | `Focus on the billing page`           |
+| **Authentication**   | None                                                  | `Sign in to user@example.com`         |
 
 If the user says something like "dogfood vercel.com", start immediately with defaults. Do not ask clarifying questions unless authentication is mentioned but credentials are missing.
 
@@ -27,12 +27,12 @@ Always use `agent-browser` directly -- never `npx agent-browser`. The direct bin
 ## Workflow
 
 ```
-1. Initialize    Set up session, output dirs, report file
-2. Authenticate  Sign in if needed, save state
-3. Orient        Navigate to starting point, take initial snapshot
-4. Explore       Systematically visit pages and test features
-5. Document      Screenshot + record each issue as found
-6. Wrap up       Update summary counts, close session
+1. Initialize Set up session, output dirs, report file
+2. Authenticate Sign in if needed, save state
+3. Orient Navigate to starting point, take initial snapshot
+4. Explore Systematically visit pages and test features
+5. Document Screenshot + record each issue as found
+6. Wrap up Update summary counts, close session
 ```
 
 ### 1. Initialize
@@ -195,8 +195,8 @@ agent-browser --session {SESSION} close
 - **For interactive issues, screenshot each step.** Capture the before, the action, and the after -- so someone can see the full sequence.
 - **Write repro steps that map to screenshots.** Each numbered step in the report should reference its corresponding screenshot. A reader should be able to follow the steps visually without touching a browser.
 - **Use the right snapshot command.**
-  - `snapshot -i` — for finding clickable/fillable elements (buttons, inputs, links)
-  - `snapshot` (no flag) — for reading page content (text, headings, data lists)
+- `snapshot -i`: for finding clickable/fillable elements (buttons, inputs, links)
+- `snapshot` (no flag): for reading page content (text, headings, data lists)
 - **Be thorough but use judgment.** You are not following a test script -- you are exploring like a real user would. If something feels off, investigate.
 - **Write findings incrementally.** Append each issue to the report as you discover it. If the session is interrupted, findings are preserved. Never batch all issues for the end.
 - **Never delete output files.** Do not `rm` screenshots, videos, or the report mid-session. Do not close the session and restart. Work forward, not backward.
@@ -209,12 +209,12 @@ agent-browser --session {SESSION} close
 
 ## References
 
-| Reference | When to Read |
-|-----------|--------------|
+| Reference                                                    | When to Read                                                                           |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
 | [references/issue-taxonomy.md](references/issue-taxonomy.md) | Start of session -- calibrate what to look for, severity levels, exploration checklist |
 
 ## Templates
 
-| Template | Purpose |
-|----------|---------|
+| Template                                                                     | Purpose                                       |
+| ---------------------------------------------------------------------------- | --------------------------------------------- |
 | [templates/dogfood-report-template.md](templates/dogfood-report-template.md) | Copy into output directory as the report file |
