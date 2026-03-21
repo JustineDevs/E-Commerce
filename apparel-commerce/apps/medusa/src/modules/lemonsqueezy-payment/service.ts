@@ -32,6 +32,10 @@ import {
 } from "@medusajs/framework/utils";
 import { PaymentActions } from "@medusajs/utils";
 import crypto from "node:crypto";
+import {
+  buildLemonWebhookDedupId,
+  claimLemonWebhookDedup,
+} from "../../lib/lemon-webhook-dedup";
 
 const JSON_API_HEADERS = {
   Accept: "application/vnd.api+json",
@@ -387,6 +391,14 @@ export default class LemonSqueezyPaymentProviderService extends AbstractPaymentP
 
     if (!isPaidOrderWebhook(body)) {
       return { action: PaymentActions.NOT_SUPPORTED };
+    }
+
+    const dedupId = buildLemonWebhookDedupId(body);
+    if (dedupId) {
+      const first = await claimLemonWebhookDedup(dedupId);
+      if (!first) {
+        return { action: PaymentActions.NOT_SUPPORTED };
+      }
     }
 
     const sessionId = extractMedusaSessionId(body);
