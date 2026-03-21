@@ -1,34 +1,100 @@
 "use client";
 
-import { ReactLenis } from "lenis/react";
-import { useEffect, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
+import { usePathname } from "next/navigation";
+import Lenis from "lenis";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 
-type Props = {
+gsap.registerPlugin(ScrollTrigger);
+
+interface SmoothScrollContextValue {
+  lenis: Lenis | null;
+  setScrollLocked: (locked: boolean) => void;
+}
+
+const SmoothScrollContext = createContext<SmoothScrollContextValue>({
+  lenis: null,
+  setScrollLocked: () => {},
+});
+
+export function useSmoothScroll() {
+  return useContext(SmoothScrollContext);
+}
+
+/**
+ * Global smooth-scroll provider (Infiner pattern):
+ * - Creates Lenis imperatively (`new Lenis`)
+ * - Drives Lenis from GSAP's ticker (single animation loop for both Lenis + GSAP tweens)
+ * - Syncs ScrollTrigger on every Lenis scroll frame
+ * - Scrolls to top on route change
+ * - Exposes lock/unlock for modals and mobile menus
+ * - Skipped entirely when the user prefers reduced motion
+ */
+export function SmoothScrollProvider({
+  children,
+}: {
   children: React.ReactNode;
-};
+}) {
+  const [lenis, setLenis] = useState<Lenis | null>(null);
+  const [scrollLocked, setScrollLockedRaw] = useState(false);
+  const pathname = usePathname();
 
-export function SmoothScrollProvider({ children }: Props) {
-  const [reduceMotion, setReduceMotion] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setReduceMotion(mq.matches);
-    const onChange = () => setReduceMotion(mq.matches);
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
+  const setScrollLocked = useCallback((locked: boolean) => {
+    setScrollLockedRaw(locked);
   }, []);
 
-  if (reduceMotion === null) {
-    return <>{children}</>;
-  }
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
-  if (reduceMotion) {
-    return <>{children}</>;
-  }
+    const instance = new Lenis({
+      duration: 1.2,
+      easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+      smoothWheel: true,
+      orientation: "vertical",
+      gestureOrientation: "vertical",
+    });
+
+    setLenis(instance);
+
+    const unsubScroll = instance.on("scroll", ScrollTrigger.update);
+
+    const onTick = (time: number) => {
+      instance.raf(time * 1000);
+    };
+    gsap.ticker.add(onTick);
+    gsap.ticker.lagSmoothing(0);
+
+    return () => {
+      unsubScroll();
+      gsap.ticker.remove(onTick);
+      instance.destroy();
+      setLenis(null);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!lenis) return;
+    lenis.scrollTo(0, { immediate: true });
+  }, [pathname, lenis]);
+
+  useEffect(() => {
+    if (scrollLocked) {
+      lenis?.stop();
+    } else {
+      lenis?.start();
+    }
+  }, [scrollLocked, lenis]);
 
   return (
-    <ReactLenis root options={{ lerp: 0.09, smoothWheel: true }}>
+    <SmoothScrollContext.Provider value={{ lenis, setScrollLocked }}>
       {children}
-    </ReactLenis>
+    </SmoothScrollContext.Provider>
   );
 }
