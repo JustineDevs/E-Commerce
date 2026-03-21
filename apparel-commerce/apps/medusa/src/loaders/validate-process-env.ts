@@ -66,6 +66,19 @@ export function validateMedusaProcessEnv(): void {
       );
     }
 
+    const storeCors = process.env.STORE_CORS?.trim() ?? "";
+    const adminCors = process.env.ADMIN_CORS?.trim() ?? "";
+    const authCors = process.env.AUTH_CORS?.trim() ?? "";
+    if (!storeCors || !adminCors || !authCors) {
+      const missing: string[] = [];
+      if (!storeCors) missing.push("STORE_CORS");
+      if (!adminCors) missing.push("ADMIN_CORS");
+      if (!authCors) missing.push("AUTH_CORS");
+      throw new Error(
+        `Medusa: required CORS env in production: ${missing.join(", ")}`,
+      );
+    }
+
     const stripe = productionStripeSchema().safeParse(process.env);
     if (!stripe.success) {
       throw new Error(
