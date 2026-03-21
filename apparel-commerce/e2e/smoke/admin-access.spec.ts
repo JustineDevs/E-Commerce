@@ -15,4 +15,20 @@ test.describe("Admin access control", () => {
       timeout: 20_000,
     });
   });
-});
+
+  test("POS API returns 401 when no session", async ({ request }) => {
+    const res = await request.post(`${adminBase}/api/pos/medusa/lookup`, {
+      data: { barcode: "test" },
+      failOnStatusCode: false,
+    });
+    expect(res.status()).toBe(401);
+    const body = await res.json().catch(() => ({}));
+    expect(body).toMatchObject({ code: "NO_SESSION" });
+  });
+
+  test("Medusa BFF API returns 401 when no session", async ({ request }) => {
+    const res = await request.get(`${adminBase}/api/medusa/orders/any-id`, {
+      failOnStatusCode: false,
+    });
+    expect(res.status()).toBe(401);
+  });
