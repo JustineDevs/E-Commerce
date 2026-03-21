@@ -345,13 +345,6 @@ importers:
         version: 5.9.3
 
   packages/sdk:
-    dependencies:
-      '@apparel-commerce/types':
-        specifier: workspace:*
-        version: link:../types
-      zod:
-        specifier: ^3.23.8
-        version: 3.25.76
     devDependencies:
       '@apparel-commerce/config-typescript':
         specifier: workspace:*
