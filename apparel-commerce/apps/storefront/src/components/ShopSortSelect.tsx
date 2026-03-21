@@ -11,7 +11,13 @@ type Props = {
   search?: string;
 };
 
-export function ShopSortSelect({ value, category, size, color, search }: Props) {
+export function ShopSortSelect({
+  value,
+  category,
+  size,
+  color,
+  search,
+}: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
@@ -29,7 +35,10 @@ export function ShopSortSelect({ value, category, size, color, search }: Props) 
 
   return (
     <div className="flex flex-col gap-2 w-full max-w-xs">
-      <label htmlFor="shop-sort" className="font-label text-xs uppercase tracking-widest text-on-surface-variant">
+      <label
+        htmlFor="shop-sort"
+        className="font-label text-xs uppercase tracking-widest text-on-surface-variant"
+      >
         Sort
       </label>
       <select
