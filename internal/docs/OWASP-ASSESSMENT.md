@@ -20,4 +20,4 @@ This document maps **OWASP Top 10 (2021)** categories to **implemented code path
 1. **Production:** `INTERNAL_API_KEY`, `TRACKING_LINK_SECRET`, `CORS_ORIGIN`, `TRUST_PROXY=true` behind a reverse proxy.
 2. **Database:** Apply `rls_deny_anon_sensitive.sql` after `enable_rls.sql` on Supabase.
 3. **SIEM:** Ship stdout JSON (`security_event`, `application_error`) to your log stack; alert on `webhook_signature_rejected` spikes.
-4. **skills-lock.json** `owasp-security` entry only pins a skill repo — it is **not** a compliance certificate.
+4. **skills-lock.json** `owasp-security` entry only pins a skill repo: it is **not** a compliance certificate.
