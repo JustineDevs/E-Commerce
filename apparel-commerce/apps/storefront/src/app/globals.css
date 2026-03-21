@@ -1,3 +1,5 @@
+@import "lenis/dist/lenis.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -6,10 +8,23 @@
   :root {
     --font-headline: "Plus Jakarta Sans", sans-serif;
     --font-body: "Inter", sans-serif;
+    /* Layout rhythm: fixed header offset lives on (public)/layout; pages add only this vertical pad */
+    --storefront-page-px: clamp(0.75rem, 4vw, 2rem);
+    --storefront-page-pt: clamp(1rem, 2.5vw, 2.5rem);
+    --storefront-page-pb: clamp(4rem, 8vw, 6rem);
+    --storefront-content-max: 1600px;
   }
 
   html {
     @apply min-w-0;
+  }
+
+  html.lenis {
+    height: auto;
+  }
+
+  .lenis.lenis-smooth {
+    scroll-behavior: auto !important;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -29,5 +44,31 @@
     transition-property: color, background-color, border-color, opacity, transform, box-shadow;
     transition-duration: 280ms;
     transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
+@layer components {
+  /**
+   * Standard content page shell: horizontal padding + modest top pad (header offset is in layout).
+   * Pair with max-w-* mx-auto on the same element or a child.
+   */
+  .storefront-page-shell {
+    width: 100%;
+    min-width: 0;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: var(--storefront-page-px);
+    padding-right: var(--storefront-page-px);
+    padding-top: var(--storefront-page-pt);
+    padding-bottom: var(--storefront-page-pb);
+  }
+
+  .storefront-content-wide {
+    max-width: var(--storefront-content-max);
+  }
+
+  .storefront-section-x {
+    padding-left: var(--storefront-page-px);
+    padding-right: var(--storefront-page-px);
   }
 }
