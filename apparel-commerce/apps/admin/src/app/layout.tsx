@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Inter } from "next/font/google";
+import { LenisProvider } from "@/components/LenisProvider";
+import { VercelWebAnalytics } from "@/components/VercelWebAnalytics";
 import "./globals.css";
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -15,8 +17,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "ARCHITECT | Admin Console",
-  description: "Administrative nerve center for Architectural Silence",
+  title: "Maharlika Apparel Custom | Admin",
+  description: "Staff console for orders, inventory, and POS",
 };
 
 export default function RootLayout({
@@ -32,7 +34,10 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="bg-surface text-on-surface antialiased">{children}</body>
+      <body className="bg-surface text-on-surface antialiased">
+        <LenisProvider>{children}</LenisProvider>
+        <VercelWebAnalytics />
+      </body>
     </html>
   );
 }
