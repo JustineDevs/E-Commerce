@@ -2,8 +2,17 @@ import Link from "next/link";
 import { HomeScrollExperience } from "@/components/home/HomeScrollExperience";
 import { StorefrontCommerceAlert } from "@/components/StorefrontCommerceAlert";
 import { fetchFeaturedProducts } from "@/lib/catalog-fetch";
+import {
+  buildJsonLdOrganization,
+  buildJsonLdWebSite,
+  canonicalUrl,
+} from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
+
+export const metadata = {
+  alternates: { canonical: canonicalUrl("/") },
+};
 
 export default async function HomePage() {
   const featured = await fetchFeaturedProducts(4, 60);
@@ -32,5 +41,20 @@ export default async function HomePage() {
     );
   }
 
-  return <HomeScrollExperience products={featured.products} />;
+  const orgJsonLd = buildJsonLdOrganization();
+  const webJsonLd = buildJsonLdWebSite();
+
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(webJsonLd) }}
+      />
+      <HomeScrollExperience products={featured.products} />
+    </>
+  );
 }
