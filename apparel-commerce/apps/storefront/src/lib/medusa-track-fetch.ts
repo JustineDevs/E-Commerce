@@ -1,6 +1,8 @@
-import { getCommerceSource } from "./commerce-source";
 import { createStorefrontMedusaSdk } from "./medusa-sdk";
-import { getMedusaPublishableKey, getMedusaRegionId } from "./storefront-medusa-env";
+import {
+  getMedusaPublishableKey,
+  getMedusaRegionId,
+} from "./storefront-medusa-env";
 
 type TrackPayload = {
   order: Record<string, unknown> & {
@@ -16,9 +18,10 @@ type TrackPayload = {
   }>;
 };
 
-function medusaLegacyStatus(order: Record<string, unknown>): string {
+function orderTrackStatusFromMedusa(order: Record<string, unknown>): string {
   const meta = (order.metadata ?? {}) as Record<string, unknown>;
-  const after = typeof meta.aftership_status === "string" ? meta.aftership_status : "";
+  const after =
+    typeof meta.aftership_status === "string" ? meta.aftership_status : "";
   if (after === "delivered") return "delivered";
   if (after === "out_for_delivery") return "shipped";
   if (after === "in_transit" || after === "pending") return "shipped";
@@ -42,7 +45,9 @@ function medusaLegacyStatus(order: Record<string, unknown>): string {
 }
 
 function mapMedusaOrderToTrack(order: Record<string, unknown>): TrackPayload {
-  const fulfillments = (order.fulfillments ?? []) as Array<Record<string, unknown>>;
+  const fulfillments = (order.fulfillments ?? []) as Array<
+    Record<string, unknown>
+  >;
   const shipments: TrackPayload["shipments"] = [];
 
   for (const f of fulfillments) {
@@ -51,17 +56,25 @@ function mapMedusaOrderToTrack(order: Record<string, unknown>): TrackPayload {
       for (const l of labels) {
         shipments.push({
           id: String(l.id ?? f.id ?? "lbl"),
-          tracking_number: typeof l.tracking_number === "string" ? l.tracking_number : undefined,
-          status: medusaLegacyStatus(order),
-          carrier_slug: typeof f.provider_id === "string" ? f.provider_id : undefined,
+          tracking_number:
+            typeof l.tracking_number === "string"
+              ? l.tracking_number
+              : undefined,
+          status: orderTrackStatusFromMedusa(order),
+          carrier_slug:
+            typeof f.provider_id === "string" ? f.provider_id : undefined,
         });
       }
     } else {
       shipments.push({
         id: String(f.id ?? "ful"),
         tracking_number: undefined,
-        status: typeof f.shipped_at === "string" || f.shipped_at ? "shipped" : "pending",
-        carrier_slug: typeof f.provider_id === "string" ? f.provider_id : undefined,
+        status:
+          typeof f.shipped_at === "string" || f.shipped_at
+            ? "shipped"
+            : "pending",
+        carrier_slug:
+          typeof f.provider_id === "string" ? f.provider_id : undefined,
       });
     }
   }
@@ -76,7 +89,7 @@ function mapMedusaOrderToTrack(order: Record<string, unknown>): TrackPayload {
       ...order,
       id: typeof order.id === "string" ? order.id : undefined,
       order_number: displayId,
-      status: medusaLegacyStatus(order),
+      status: orderTrackStatusFromMedusa(order),
     },
     shipments,
   };
@@ -88,13 +101,14 @@ export async function fetchMedusaTrackByOrderId(orderId: string): Promise<{
   status: number;
 }> {
   const key = getMedusaPublishableKey();
-  if (!key || getCommerceSource() !== "medusa") {
+  if (!key) {
     return { ok: false, data: null, status: 503 };
   }
   try {
     const sdk = createStorefrontMedusaSdk();
     const { order } = await sdk.store.order.retrieve(orderId, {
-      fields: "*fulfillments,*fulfillments.labels,+metadata,+payment_status,+fulfillment_status,+display_id",
+      fields:
+        "*fulfillments,*fulfillments.labels,+metadata,+payment_status,+fulfillment_status,+display_id",
     } as never);
     if (!order) {
       return { ok: false, data: null, status: 404 };
@@ -116,7 +130,7 @@ export async function fetchMedusaTrackByCartId(cartId: string): Promise<{
 }> {
   const key = getMedusaPublishableKey();
   const regionId = getMedusaRegionId();
-  if (!key || !regionId || getCommerceSource() !== "medusa") {
+  if (!key || !regionId) {
     return { ok: false, data: null, status: 503 };
   }
   try {
