@@ -2,8 +2,8 @@
 
 Strangler migration for **`apparel-commerce/`**: Medusa becomes **system of record** for catalog, cart, checkout, customers, orders, inventory locations, fulfillments. **No long-term dual write path** for the same order or stock movement.
 
-**Signed decision:** `internal/docs/adr/0001-medusa-system-of-record.md`  
-**Field mapping:** `internal/docs/migration/field-mapping.md`  
+**Signed decision:** `internal/docs/adr/0001-medusa-system-of-record.md` 
+**Field mapping:** `internal/docs/migration/field-mapping.md` 
 **Cutover / rollback:** `internal/docs/runbooks/cutover.md`, `internal/docs/runbooks/rollback.md`
 
 ---
@@ -12,14 +12,14 @@ Strangler migration for **`apparel-commerce/`**: Medusa becomes **system of reco
 
 | Phase | Goal | Repo deliverables | Exit criterion |
 |-------|------|-------------------|----------------|
-| **0 — Program setup** | ADR, Node LTS, DB, CI | ADR; `apps/medusa` on Medusa **2.13.x**; `pnpm exec turbo build` includes **medusa**; `.env.template` documents DB isolation | Medusa boots locally; CI green |
-| **1 — Foundation** | Region PHP, tax, channel, stock, shipping, keys | `pnpm seed:ph` → **Web PH**, **Philippines** / `php`, **Warehouse PH** + `legacy_inventory_location_code`, flat **Standard PH**, tax `ph`, publishable key | Admin login; manual **one product + options** possible |
-| **2 — Catalog migration** | Legacy → Medusa products | `pnpm --filter @apparel-commerce/database run export:catalog-for-medusa -- file.jsonl`; `MIGRATION_CATALOG_JSONL=... pnpm import:legacy-catalog` (idempotent by **handle**) | Staging SKU parity smoke (see **G1**) |
-| **3 — Inventory migration** | Opening levels per location | `export:inventory-for-medusa`; `MIGRATION_INVENTORY_JSONL=... pnpm import:legacy-inventory` | Totals within tolerance vs legacy export |
-| **4 — Payments** | Lemon on Medusa | Custom or community **payment provider** + webhook + idempotency store (mirror `apps/api` HMAC rules) | Test: cart → pay → **completed** order |
-| **5 — Fulfillment** | AfterShip / J&T | Subscribers on fulfillment; tracking written on order/fulfillment for **track** UX | Test AWB visible on customer track path |
-| **6 — Storefront** | Medusa Store API only | `apps/storefront`: PDP, cart, checkout, account, track → Medusa; retire Express for that traffic | E2E on staging |
-| **7 — Admin / POS** | Single OMS | Medusa Admin **or** `apps/admin` calling **only** Medusa Admin API; draft orders for POS | No new legacy **`orders`** inserts for ops sales |
+| **0: Program setup** | ADR, Node LTS, DB, CI | ADR; `apps/medusa` on Medusa **2.13.x**; `pnpm exec turbo build` includes **medusa**; `.env.template` documents DB isolation | Medusa boots locally; CI green |
+| **1: Foundation** | Region PHP, tax, channel, stock, shipping, keys | `pnpm seed:ph` → **Web PH**, **Philippines** / `php`, **Warehouse PH** + `legacy_inventory_location_code`, flat **Standard PH**, tax `ph`, publishable key | Admin login; manual **one product + options** possible |
+| **2: Catalog migration** | Legacy → Medusa products | `pnpm --filter @apparel-commerce/database run export:catalog-for-medusa -- file.jsonl`; `MIGRATION_CATALOG_JSONL=... pnpm import:legacy-catalog` (idempotent by **handle**) | Staging SKU parity smoke (see **G1**) |
+| **3: Inventory migration** | Opening levels per location | `export:inventory-for-medusa`; `MIGRATION_INVENTORY_JSONL=... pnpm import:legacy-inventory` | Totals within tolerance vs legacy export |
+| **4: Payments** | Lemon on Medusa | Custom or community **payment provider** + webhook + idempotency store (mirror `apps/api` HMAC rules) | Test: cart → pay → **completed** order |
+| **5: Fulfillment** | AfterShip / J&T | Subscribers on fulfillment; tracking written on order/fulfillment for **track** UX | Test AWB visible on customer track path |
+| **6: Storefront** | Medusa Store API only | `apps/storefront`: PDP, cart, checkout, account, track → Medusa; retire Express for that traffic | E2E on staging |
+| **7: Admin / POS** | Single OMS | Medusa Admin **or** `apps/admin` calling **only** Medusa Admin API; draft orders for POS | No new legacy **`orders`** inserts for ops sales |
 
 **Later (program doc alignment):** Phase **8–9** in-repo map = **cutover flag + decommission** (`runbooks/cutover.md`, Express route archive).
 
@@ -52,10 +52,10 @@ Strangler migration for **`apparel-commerce/`**: Medusa becomes **system of reco
 
 ## Definition of done (migration)
 
-1. **New** orders exist **only** in Medusa DB.  
-2. **Storefront** uses **only** Medusa **Store API** for commerce paths.  
-3. **Lemon** payment confirmation runs through Medusa payment flow + webhooks.  
-4. **Fulfillment + AfterShip** update Medusa fulfillments (not only legacy `shipments`).  
+1. **New** orders exist **only** in Medusa DB. 
+2. **Storefront** uses **only** Medusa **Store API** for commerce paths. 
+3. **Lemon** payment confirmation runs through Medusa payment flow + webhooks. 
+4. **Fulfillment + AfterShip** update Medusa fulfillments (not only legacy `shipments`). 
 5. **Staff** daily ops from Medusa Admin **or** UI with **zero** legacy commerce writes.
 
 ---
@@ -73,11 +73,12 @@ Strangler migration for **`apparel-commerce/`**: Medusa becomes **system of reco
 
 ## Environment (Medusa)
 
-Dedicated **`DATABASE_URL`** in `apps/medusa/.env` / `.env.template` — **not** the same schema as legacy Supabase used by **`packages/database`**.
+Dedicated **`DATABASE_URL`** in `apps/medusa/.env` / `.env.template`: **not** the same schema as legacy Supabase used by **`packages/database`**.
 
 ## CI
 
 - `pnpm exec turbo build` (includes **medusa**).
+- `pnpm verify:public-env` — ensures `.env.example` / `apps/medusa/.env.template` have no secret-like patterns on `NEXT_PUBLIC_*` lines (`SOP-MEDUSA-ENV-AND-LEGACY`).
 - Optional: `cd apps/medusa && pnpm run test:unit` when DB harness is wired.
 
 ## Related
