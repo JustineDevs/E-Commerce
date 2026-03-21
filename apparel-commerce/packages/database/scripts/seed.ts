@@ -7,9 +7,12 @@ import pg from "pg";
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 config({ path: join(__dirname, "../../../.env") });
 
-const databaseUrl = process.env.DATABASE_URL;
+/** Legacy/app Postgres only — never Medusa’s DATABASE_URL (see apps/medusa/.env). */
+const databaseUrl = process.env.LEGACY_DATABASE_URL;
 if (!databaseUrl) {
-  console.error("DATABASE_URL is required");
+  console.error(
+    "LEGACY_DATABASE_URL is required (legacy Supabase pooler URI for this schema).",
+  );
   process.exit(1);
 }
 
