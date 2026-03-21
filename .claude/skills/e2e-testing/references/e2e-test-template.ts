@@ -1,14 +1,14 @@
 /**
- * e2e-test-template.ts — Annotated E2E test using Playwright.
+ * e2e-test-template.ts: Annotated E2E test using Playwright.
  *
  * Place at: e2e/tests/users/create-user.spec.ts
  *
  * This template demonstrates:
- *   - Using page objects (tests never touch selectors directly)
- *   - API-based test data setup (fast) and cleanup (reliable)
- *   - Explicit waits (never hardcoded timeouts)
- *   - Testing success paths, error paths, and edge cases
- *   - Auth state reuse via storageState
+ * - Using page objects (tests never touch selectors directly)
+ * - API-based test data setup (fast) and cleanup (reliable)
+ * - Explicit waits (never hardcoded timeouts)
+ * - Testing success paths, error paths, and edge cases
+ * - Auth state reuse via storageState
  */
 
 import { test, expect } from "@playwright/test";
