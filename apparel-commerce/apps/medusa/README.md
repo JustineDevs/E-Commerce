@@ -1,53 +1,61 @@
 <p align="center">
-  <a href="https://www.medusajs.com">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://user-images.githubusercontent.com/59018053/229103275-b5e482bb-4601-46e6-8142-244f531cebdb.svg">
-    <source media="(prefers-color-scheme: light)" srcset="https://user-images.githubusercontent.com/59018053/229103726-e5b529a3-9b3f-4970-8a1f-c6af37f087bf.svg">
-    <img alt="Medusa logo" src="https://user-images.githubusercontent.com/59018053/229103726-e5b529a3-9b3f-4970-8a1f-c6af37f087bf.svg">
-    </picture>
-  </a>
+ <a href="https://www.medusajs.com">
+ <picture>
+ <source media="(prefers-color-scheme: dark)" srcset="https://user-images.githubusercontent.com/59018053/229103275-b5e482bb-4601-46e6-8142-244f531cebdb.svg">
+ <source media="(prefers-color-scheme: light)" srcset="https://user-images.githubusercontent.com/59018053/229103726-e5b529a3-9b3f-4970-8a1f-c6af37f087bf.svg">
+ <img alt="Medusa logo" src="https://user-images.githubusercontent.com/59018053/229103726-e5b529a3-9b3f-4970-8a1f-c6af37f087bf.svg">
+ </picture>
+ </a>
 </p>
 <h1 align="center">
-  Medusa
+ Medusa
 </h1>
 
 <h4 align="center">
-  <a href="https://docs.medusajs.com">Documentation</a> |
-  <a href="https://www.medusajs.com">Website</a>
+ <a href="https://docs.medusajs.com">Documentation</a> |
+ <a href="https://www.medusajs.com">Website</a>
 </h4>
 
 <p align="center">
-  Building blocks for digital commerce
+ Building blocks for digital commerce
 </p>
 <p align="center">
-  <a href="https://github.com/medusajs/medusa/blob/master/CONTRIBUTING.md">
-    <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat" alt="PRs welcome!" />
-  </a>
-    <a href="https://www.producthunt.com/posts/medusa"><img src="https://img.shields.io/badge/Product%20Hunt-%231%20Product%20of%20the%20Day-%23DA552E" alt="Product Hunt"></a>
-  <a href="https://discord.gg/xpCwq3Kfn8">
-    <img src="https://img.shields.io/badge/chat-on%20discord-7289DA.svg" alt="Discord Chat" />
-  </a>
-  <a href="https://twitter.com/intent/follow?screen_name=medusajs">
-    <img src="https://img.shields.io/twitter/follow/medusajs.svg?label=Follow%20@medusajs" alt="Follow @medusajs" />
-  </a>
+ <a href="https://github.com/medusajs/medusa/blob/master/CONTRIBUTING.md">
+ <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat" alt="PRs welcome!" />
+ </a>
+ <a href="https://www.producthunt.com/posts/medusa"><img src="https://img.shields.io/badge/Product%20Hunt-%231%20Product%20of%20the%20Day-%23DA552E" alt="Product Hunt"></a>
+ <a href="https://discord.gg/xpCwq3Kfn8">
+ <img src="https://img.shields.io/badge/chat-on%20discord-7289DA.svg" alt="Discord Chat" />
+ </a>
+ <a href="https://twitter.com/intent/follow?screen_name=medusajs">
+ <img src="https://img.shields.io/twitter/follow/medusajs.svg?label=Follow%20@medusajs" alt="Follow @medusajs" />
+ </a>
 </p>
 
 ## Apparel Commerce monorepo
 
-This app lives under **`apparel-commerce/apps/medusa`**. Migration phases, ADR, and legacy export tools are in **`internal/docs/`** (`MEDUSA-MIGRATION-PROGRAM.md`, `adr/0001-medusa-system-of-record.md`). Legacy Express remains until Phase 8–9 cutover.
+This app lives under **`apparel-commerce/apps/medusa`**. Migration phases, ADR, and legacy export tools are in **`internal/docs/`** (`MEDUSA-MIGRATION-PROGRAM.md`, `adr/0001-medusa-system-of-record.md`).
+
+**Storefront (Vercel preview):** https://maharlika-apparel-custom.vercel.app — add this origin to `STORE_CORS` / `STOREFRONT_PUBLIC_URL` when deploying.
 
 ### Philippines foundation + legacy import (from `apps/medusa`)
 
-From this directory, with `DATABASE_URL` set (see `.env.template`):
+From this directory, with `apps/medusa/.env` created from `.env.template` (commerce DB + Lemon/AfterShip/Resend are documented only here; root `.env` is for Next/Express/legacy DB):
 
-1. **`pnpm seed:ph`** — Region **Philippines** (`php`), sales channel **Web PH**, stock location **Warehouse PH** (metadata `legacy_inventory_location_code`, default `WH1`), flat **Standard PH** shipping, tax region `ph`, store default currency PHP, publishable API key linked to **Web PH**. Env: `MEDUSA_SEED_LEGACY_LOCATION_CODE`, `MEDUSA_PH_FLAT_SHIPPING_MINOR` (amount in **minor** php units; default `15000` = ₱150.00).
-2. **Export legacy JSONL** (from `apparel-commerce/`):  
-   `pnpm --filter @apparel-commerce/database run export:catalog-for-medusa -- path/to/catalog.jsonl`  
-   `pnpm --filter @apparel-commerce/database run export:inventory-for-medusa -- path/to/inventory.jsonl`
-3. **`MIGRATION_CATALOG_JSONL=... pnpm import:legacy-catalog`** — Idempotent **by product `handle`** (= legacy `slug`). Creates categories from legacy `category`. See `internal/docs/migration/field-mapping.md`. Optional: `MIGRATION_SALES_CHANNEL_NAME`, `MIGRATION_CATALOG_BATCH`, `LEGACY_PRICE_ALREADY_MINOR=1` if legacy prices are already smallest-unit integers.
-4. **`MIGRATION_INVENTORY_JSONL=... pnpm import:legacy-inventory`** — Resolves stock location by **`legacy_inventory_location_code`** on the Medusa location (from `seed:ph`) or by matching **location name**. Matches SKUs to inventory items (run after catalog import).
+1. **`pnpm seed:ph`**: Region **Philippines** (`php`), sales channel **Web PH**, stock location **Warehouse PH** (metadata `legacy_inventory_location_code`, default `WH1`), flat **Standard PH** shipping, tax region `ph`, store default currency PHP, publishable API key linked to **Web PH**. Env: `MEDUSA_SEED_LEGACY_LOCATION_CODE`, `MEDUSA_PH_FLAT_SHIPPING_MINOR` (amount in **minor** php units; default `15000` = ₱150.00).
+2. **Export legacy JSONL** (from `apparel-commerce/`): 
+ `pnpm --filter @apparel-commerce/database run export:catalog-for-medusa -- path/to/catalog.jsonl` 
+ `pnpm --filter @apparel-commerce/database run export:inventory-for-medusa -- path/to/inventory.jsonl`
+3. **`MIGRATION_CATALOG_JSONL=... pnpm import:legacy-catalog`**: Idempotent **by product `handle`** (= legacy `slug`). Creates categories from legacy `category`. See `internal/docs/migration/field-mapping.md`. Optional: `MIGRATION_SALES_CHANNEL_NAME`, `MIGRATION_CATALOG_BATCH`, `LEGACY_PRICE_ALREADY_MINOR=1` if legacy prices are already smallest-unit integers.
+4. **`MIGRATION_INVENTORY_JSONL=... pnpm import:legacy-inventory`**: Resolves stock location by **`legacy_inventory_location_code`** on the Medusa location (from `seed:ph`) or by matching **location name**. Matches SKUs to inventory items (run after catalog import).
 
 Use the default Medusa **`pnpm seed`** only for the upstream **EU** demo dataset; for Maharlika staging toward cutover, prefer a **clean DB** + **`seed:ph`** so currency/region/shipping match PH.
+
+### Database backup and restore (staging / dev)
+
+- **Backup:** use your host’s automated backups or `pg_dump` against the same `DATABASE_URL` Medusa uses (respect pooler vs direct connection policy).
+- **Restore:** restore into a clean Postgres, then run Medusa migrations as required before serving traffic; re-run `seed:ph` only on empty DB when you need the PH baseline.
+- **Dev:** snapshot before risky bulk `import:legacy-*` runs; document restore steps in incident or ops notes (`SOP-MEDUSA-ENV-AND-LEGACY` §6.3).
 
 ## Compatibility
 
