@@ -38,7 +38,7 @@ export const metadata: Metadata = {
     template: "%s | Maharlika Apparel Custom",
   },
   description:
-    "Apparel and custom pieces built for precision. Maharlika Apparel Custom: structural silhouettes, everyday craft.",
+    "Custom apparel and everyday craft. Shorts, shirts, jackets built for precision. Shop Maharlika Apparel Custom — structural silhouettes for the Philippines.",
   keywords: [
     "Maharlika Apparel Custom",
     "custom apparel Philippines",
@@ -47,8 +47,32 @@ export const metadata: Metadata = {
     "school uniforms",
     "custom jerseys",
     "Filipino apparel",
+    "Philippines clothing",
+    "custom shorts",
   ],
   applicationName: "Maharlika Apparel Custom",
+  openGraph: {
+    type: "website",
+    locale: "en_PH",
+    siteName: "Maharlika Apparel Custom",
+    title: "Maharlika Apparel Custom — Custom Apparel Philippines",
+    description:
+      "Custom shorts, shirts, and jackets. Structural silhouettes and everyday craft. Shop online with nationwide shipping.",
+    images: [{ url: "/brand/maharlika-logo-horizontal.png", alt: "Maharlika Apparel Custom" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Maharlika Apparel Custom",
+    description: "Custom apparel Philippines. Shorts, shirts, jackets.",
+  },
+  alternates: {
+    canonical: siteUrl,
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true },
+  },
   icons: {
     icon: [
       { url: "/icons/favicon-16x16.png", sizes: "16x16", type: "image/png" },
