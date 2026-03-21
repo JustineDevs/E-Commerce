@@ -3,8 +3,10 @@ import Link from "next/link";
 /** Shown for `notFound()` from PDP and other public routes; keeps nav/footer from `(public)/layout`. */
 export default function PublicNotFound() {
   return (
-    <main className="min-h-[60vh] flex flex-col items-center justify-center px-6 py-24">
-      <p className="font-label text-xs uppercase tracking-[0.2em] text-secondary mb-4">404</p>
+    <main className="storefront-page-shell flex min-h-[50vh] flex-col items-center justify-center text-center">
+      <p className="font-label text-xs uppercase tracking-[0.2em] text-secondary mb-4">
+        404
+      </p>
       <h1 className="font-headline text-3xl md:text-4xl font-bold tracking-tighter text-primary text-center mb-4">
         Page not found
       </h1>
