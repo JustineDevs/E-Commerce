@@ -8,8 +8,9 @@ type: Informational
 created: 2026-03-20
 requires tech stack:
  - Next.js App Router
- - Node.js + Express
- - PostgreSQL via Supabase
+ - Medusa 2.x (commerce engine, dedicated Postgres)
+ - Node.js + Express (minimal sidecar: health, compliance)
+ - PostgreSQL (Medusa DB + Supabase Postgres for legacy/auth/compliance)
  - Turborepo + pnpm
  - Tailwind CSS + shadcn/ui
  - NextAuth/Auth.js
@@ -19,7 +20,7 @@ requires tech stack:
 
 ## Abstract
 
-This specification defines a composable apparel commerce platform for a shorts and clothing business operating through a customer storefront, internal admin dashboard, point-of-sale terminal, and centralized order management system. The platform uses a shared monorepo and a single transactional database so that product variants, inventory, orders, payments, and shipment tracking remain consistent across both online and in-store sales. It also defines the operational flow for hosted payments, Google-based authentication, J&T Express Philippines tracking through AfterShip, and the minimum implementation boundaries required for sprint delivery.
+This specification defines a composable apparel commerce platform for a shorts and clothing business operating through a customer storefront, internal admin dashboard, point-of-sale terminal, and centralized order management. **Commerce truth for catalog, cart, checkout, orders, and payments runs on Medusa 2.x** (`apparel-commerce/apps/medusa`) with a **dedicated PostgreSQL** database. Legacy **Supabase** schema and `packages/database` remain for **staff OAuth user records**, **compliance exports**, **migration tooling**, and optional historical data; they are **not** the runtime path for new web checkout when the storefront is wired to Medusa. A small **Express** app (`apps/api`) exposes **health** (`/health`) and **internal compliance** (`/compliance`) behind an API key. **Lemon Squeezy** payment confirmation and **AfterShip** tracking updates are implemented in **Medusa** (payment modules, webhooks, subscribers). Google-based authentication uses **NextAuth** for admin and staff UI. See **`internal/docs/adr/0001-medusa-system-of-record.md`** and **`internal/docs/SOP-OPERATIONS-MEDUSA.md`** for operational authority.
 
 ## Specification
 
@@ -30,22 +31,24 @@ The platform SHALL provide two application environments:
 1. A public customer storefront for product discovery, checkout, tracking, and account access.
 2. An internal operations environment for admin analytics, inventory control, POS transactions, and order fulfillment.
 
-The platform SHALL maintain one shared source of truth for products, product variants, inventory, orders, payments, and shipments.
+The platform SHALL maintain **one operational source of truth for live commerce** for products, variants, inventory, orders, payments, and shipments: **Medusa** after cutover. **Legacy Supabase** tables may remain for migration and non-commerce app data until fully retired.
 
 ### 2. Technology Stack
 
 The implementation SHALL use the following stack:
 
-- Frontend applications: Next.js App Router
-- API server: Node.js with Express
-- Database: PostgreSQL via Supabase
+- Frontend applications: Next.js App Router (`apps/storefront`, `apps/admin`)
+- Commerce engine: **Medusa 2.x** (`apps/medusa`) with Store API and Admin API
+- Commerce database: **PostgreSQL** dedicated to Medusa (`DATABASE_URL` for Medusa only)
+- Legacy / auxiliary database: **PostgreSQL via Supabase** for OAuth-linked users, compliance tooling, and legacy schema exports (`packages/database`)
+- Minimal API server: **Node.js + Express** (`apps/api`) for health probes and compliance endpoints only (not primary commerce HTTP)
 - Monorepo orchestration: Turborepo with pnpm workspaces
 - UI layer: Tailwind CSS with shadcn/ui
-- Authentication: NextAuth/Auth.js with Google provider
-- Payments: Lemon Squeezy
-- Shipment tracking: AfterShip with J&T Express Philippines integration
+- Authentication: NextAuth/Auth.js with Google provider (staff and customer; admin UI protected by middleware on `/admin/*`)
+- Payments: Lemon Squeezy (Medusa payment module + webhooks); optional Stripe, PayPal, Paymongo, COD via Medusa modules as configured
+- Shipment tracking: AfterShip with J&T Express Philippines (Medusa subscriber + webhook hook on Medusa)
 
-Shared types, validation logic, UI primitives, and database-facing modules SHOULD be placed in reusable monorepo packages and consumed by all apps.
+Shared types, validation logic, UI primitives, and **clients** (`packages/sdk`, `packages/types`) SHOULD be placed in reusable monorepo packages and consumed by all apps.
 
 ### 3. Monorepo Structure
 
@@ -53,18 +56,19 @@ The repository SHALL be organized into application and package boundaries.
 
 #### 3.1 Applications
 
-- `apps/storefront` for the public commerce frontend
-- `apps/admin` for dashboard, POS, and fulfillment interfaces
-- `apps/api` for webhooks, background jobs, inventory services, and order services
+- `apps/storefront` for the public commerce frontend (Medusa Store API + JS SDK for catalog, checkout, tracking)
+- `apps/admin` for dashboard, POS, and fulfillment UI; Next.js **Route Handlers** under `app/api/**` proxy to Medusa where needed
+- `apps/medusa` for the **commerce backend**: cart, orders, payments, inventory locations, fulfillments, webhooks
+- `apps/api` for **health** (`/health`) and **compliance** (`/compliance`, internal key); not the primary commerce API surface
 
 #### 3.2 Shared Packages
 
 - `packages/ui` for shared components
 - `packages/types` for shared domain types
 - `packages/validation` for request and payload validation
-- `packages/database` for migrations, schema utilities, and seed files
+- `packages/database` for **Supabase legacy schema**, compliance queries, OAuth user upsert, and **export/migration scripts** (not live web checkout when Medusa-only)
 - `packages/config` for TypeScript, linting, and styling configuration
-- `packages/sdk` for internal clients and service adapters
+- `packages/sdk` for Medusa URL, keys, env assertions, and shared helpers
 
 ### 4. Functional Pages
 
@@ -219,16 +223,16 @@ Supported statuses SHALL include:
 
 ### 9. Payment Flow
 
-Payments SHALL be processed through Lemon Squeezy.
+Payments SHALL be processed through **Lemon Squeezy** (and optionally other providers registered in Medusa) via **Medusa payment sessions**.
 
 The system SHALL support:
 
-- Hosted checkout for storefront orders
-- Payment-link generation for POS orders when needed
-- Webhook-based payment confirmation
-- Payment records linked to internal orders
+- Hosted checkout for storefront orders (Medusa cart → `initiatePaymentSession` → Lemon checkout URL)
+- POS orders via Medusa **draft orders** and conversion to orders (`apps/admin` BFF → Medusa Admin API)
+- **Webhook-based payment confirmation** on **Medusa** (Lemon HMAC verification in the Medusa payment module; idempotency via dedup helpers)
+- Payment and order state in **Medusa Postgres**
 
-The API server MUST verify incoming payment webhooks before changing order or inventory state.
+The **Medusa** payment pipeline MUST verify incoming payment webhooks before changing payment or order state. The minimal Express `apps/api` does **not** host the primary Lemon webhook in the current architecture.
 
 An order MUST NOT be marked as paid solely from client-side redirect state.
 
@@ -247,7 +251,7 @@ Each shipment SHALL support:
 - Checkpoint text
 - Shipment timestamps
 
-The customer tracking page SHALL render shipment progress based on stored shipment state synchronized from provider events or polling jobs.
+The customer tracking page SHALL render shipment progress based on **Medusa** order and fulfillment state, including metadata updated from **AfterShip** webhooks processed by Medusa.
 
 Anonymous tracking SHALL use a **scoped secret** (e.g. HMAC of order id) conveyed in the URL query string so that knowledge of the order UUID alone is insufficient to read order or shipment data.
 
@@ -255,27 +259,25 @@ After checkout begins, the platform SHOULD email the buyer (when an email addres
 
 ### 11. OMS Processing Flow
 
-The standard order flow SHALL be:
+The standard **Medusa** order flow SHALL be:
 
-1. Customer or cashier selects a product variant.
-2. The system validates variant availability.
-3. The system creates or updates a stock reservation.
-4. The system creates an order in `pending_payment`.
-5. The system initiates Lemon Squeezy checkout or payment link generation.
-6. The API server verifies the payment webhook.
-7. The order status changes to `paid`.
-8. Reservation quantity is converted into committed sale movement.
-9. Fulfillment staff prepares the package.
-10. A shipment record is created and tracking is attached.
-11. The order transitions through fulfillment and delivery statuses.
+1. Customer or cashier selects a product variant (storefront cart is browser **session storage** until checkout builds a **Medusa cart**).
+2. Variant availability is enforced by **Medusa** inventory and checkout completion rules.
+3. Web checkout: Medusa cart, shipping method, payment session, then Lemon hosted payment; **POS**: draft order → convert to order via Medusa Admin API.
+4. Payment completes when **Lemon** confirms via **Medusa** webhook handling (signed, idempotent), not from client return URL alone.
+5. Order and fulfillment state live in **Medusa**; inventory movements follow Medusa workflows.
+6. Fulfillment: staff operations align with **Medusa** fulfillments; **AfterShip** registration and inbound webhooks run in **Medusa** (subscriber + hook).
+7. Customer tracking reads **Medusa** order and fulfillment data on the storefront.
 
-All inventory mutations for web and POS orders MUST pass through the same inventory service boundary.
+**Legacy Express + Supabase** reservation and checkout flows in older revisions are **not** the documented live path once the storefront and admin use Medusa only. Legacy mutation code may still exist under `packages/database` for tooling; **apps** do not import it for new commerce in the Medusa-only configuration.
+
+All inventory mutations for web and POS orders MUST pass through the **Medusa** commerce boundary for production.
 
 ### 12. SOP Requirements (Medusa implementation)
 
 **Canonical runbook:** Day-to-day operations when **Medusa** is the live system of record are defined in **`internal/docs/SOP-OPERATIONS-MEDUSA.md`**. That document is normative for **SOP-0** (preconditions) through **SOP-9** (definition of done), including catalog, stock, web orders, POS, fulfillment, health checks, access, and incidents.
 
-The implementation SHALL satisfy the following when production is configured with **`NEXT_PUBLIC_COMMERCE_SOURCE=medusa`**, **`LEGACY_COMMERCE_API_DISABLED=true`** (after cutover), and webhooks (Lemon, AfterShip) targeting **Medusa** only:
+The implementation SHALL satisfy the following when production is configured with the storefront and admin **Medusa** env vars set, **`LEGACY_COMMERCE_API_DISABLED=true`** where legacy Express commerce existed, and webhooks (Lemon, AfterShip) targeting **Medusa** only:
 
 1. **Catalog:** New products and variants are created **only** in **Medusa Admin** (handles, options, SKUs, images, inventory at **Warehouse PH**, sales channel **Web PH**); no parallel live catalog in legacy Postgres for production SKUs.
 2. **Stock:** Adjustments use **Medusa** inventory flows with audit trail; not raw SQL against production.
@@ -286,22 +288,29 @@ The implementation SHALL satisfy the following when production is configured wit
 
 **Definition of done (operational):** As in **SOP-9** of `SOP-OPERATIONS-MEDUSA.md`: every live SKU and order path runs through **Medusa**; staff can execute standard catalog through fulfillment steps without developer assistance.
 
-**Legacy stack note:** Until cutover, the Express + Supabase flows in §11 and elsewhere may still apply; after cutover, **§12** and `SOP-OPERATIONS-MEDUSA.md` supersede routine legacy OMS procedures for production.
+**Legacy stack note:** **§12** and `SOP-OPERATIONS-MEDUSA.md` supersede routine legacy OMS procedures for production. Any remaining Express + Supabase commerce flows are **out of scope** for new live traffic once Medusa-only operation is declared.
 
-### 13. API Responsibilities
+### 13. Runtime responsibilities (Medusa vs Express)
 
-The API server SHALL own the following responsibilities:
+**Medusa (`apps/medusa`)** SHALL own:
 
-- Payment webhook ingestion
-- Shipment webhook ingestion
-- Inventory mutation services
-- Order state transitions
-- Barcode lookup logic
-- Background syncs and retryable jobs
-- Low-stock detection
-- Webhook idempotency logging
+- Store and Admin HTTP APIs for commerce
+- Payment provider modules (Lemon, Stripe, PayPal, Paymongo, COD as configured) and **payment webhook verification**
+- AfterShip **inbound** webhook (`src/api/hooks/aftership`) and **fulfillment** subscriber registration with AfterShip API
+- Order, cart, inventory, and fulfillment domain logic
+- **Webhook idempotency** for Lemon (dedup helpers in the payment module)
 
-Webhook processing MUST be idempotent and persist provider event metadata for replay safety.
+**Express (`apps/api`)** SHALL own:
+
+- **`GET /health`** (and nested health routes) including optional Medusa reachability when `MEDUSA_BACKEND_URL` is set
+- **`/compliance`** routes (internal API key) for data-subject export and retention anonymization using **Supabase** via `packages/database`
+
+**Next.js (`apps/admin`, `apps/storefront`)** SHALL own:
+
+- UI, NextAuth session, **middleware** protecting `/admin/*` for staff roles
+- Server **Route Handlers** that call Medusa with secret keys (POS and order BFF patterns)
+
+Webhook processing MUST be idempotent where implemented; persist provider event metadata for replay safety per Medusa and provider docs.
 
 ### 14. Non-Functional Requirements
 
@@ -350,29 +359,31 @@ The following rows are taken from the submitted **Apparel Business Requirement F
 
 #### 15.1 As-built vs intake (explicit gaps)
 
-This repository’s **as-built** slice (Express + Supabase + Lemon Squeezy + AfterShip) **does not yet implement** every cell above. Track these deltas in backlog, not as optional “nice-to-haves” when the business has already answered **Yes**:
+This repository’s **as-built** commerce path is **Medusa + Lemon + AfterShip** (storefront and admin on Next.js). **Express** is **not** the live commerce API. **Legacy** Supabase tables and `packages/database` mutation helpers remain in the repo for **migration and compliance**; **current** applications under `apps/` import **only** compliance and OAuth user helpers from that package, not legacy checkout/order creation for new sales.
 
-- **Payments:** Production path is **Lemon Squeezy** (hosted checkout + webhook truth). PayPal, GCash/Maya manual proof, COD, and bank transfer require separate flows, risk controls, and reconciliation: not interchangeable with LS webhook semantics.
-- **Catalog:** **Material**, **condition**, **style**, and **bundle** constructs may need schema and admin UX beyond current `products` / `product_variants`.
+The **as-built** slice **does not yet implement** every stakeholder cell above. Track these deltas in backlog, not as optional “nice-to-haves” when the business has already answered **Yes**:
+
+- **Payments:** Production web path is **Lemon Squeezy** via **Medusa** (hosted checkout + webhook truth). Additional Medusa modules (Stripe, PayPal, Paymongo, COD) require configuration and testing. GCash/Maya manual proof and bank transfer require separate flows, risk controls, and reconciliation: not interchangeable with LS webhook semantics.
+- **Catalog:** **Material**, **condition**, **style**, and **bundle** constructs may need Medusa **metadata** or admin UX beyond default product fields.
 - **Pre-orders:** Requires sellable state when `available_qty = 0`, distinct reservations, and fulfillment SLAs.
 - **Shipping:** Automatic J&T rating by weight/dimensions + **zone tables** (Metro / provincial / international) and “free shipping at N pieces” need quote service + rules engine + tests.
 - **Notifications:** **Resend** (optional) sends **checkout-started** email with signed tracking link when `RESEND_*` is configured; **SMS** and full order-lifecycle alerts are not wired.
 - **Reorder / low stock:** Intake states **1000** minimum per SKU; wire to low-stock jobs and admin surfacing (see §13).
 - **Customer Google OAuth:** NextAuth exists; **account linking** and **order history by user** remain productized per §7–8.
 
-### 16. Medusa migration (program)
+### 16. Medusa as system of record (current state)
 
-The repository includes a **parallel Medusa 2.x backend** (`apparel-commerce/apps/medusa`) as the **declared future system of record** for commerce domains. The authoritative program table and ADR live in **`internal/docs/MEDUSA-MIGRATION-PROGRAM.md`** and **`internal/docs/adr/0001-medusa-system-of-record.md`**. **Operational scripts:** `seed:ph` (Philippines region, **Web PH** sales channel, default stock location + legacy location code metadata), `import:legacy-catalog`, and `import:legacy-inventory` (see `apps/medusa/README.md`, `internal/docs/migration/field-mapping.md`). Until cutover (Phase 8), the specification’s functional SHALL statements continue to be satisfied by the **legacy Express + Supabase** stack unless explicitly dual-documented.
+The repository includes **Medusa 2.x** (`apparel-commerce/apps/medusa`) as the **system of record** for live commerce domains per **`internal/docs/adr/0001-medusa-system-of-record.md`**. **Storefront** and **admin** are implemented against **Medusa** APIs for catalog, checkout, POS, and tracking. The **migration program** (`internal/docs/MEDUSA-MIGRATION-PROGRAM.md`), **field mapping** (`internal/docs/migration/field-mapping.md`), and **scripts** (`seed:ph`, `import:legacy-catalog`, `import:legacy-inventory`) support **data movement** from legacy Supabase into Medusa, not parallel live writes for the same order.
 
-After cutover, **production operations** follow **`internal/docs/SOP-OPERATIONS-MEDUSA.md`** in conjunction with **§12** above.
+**Production operations** follow **`internal/docs/SOP-OPERATIONS-MEDUSA.md`** in conjunction with **§12** above. **Cutover** and **ownership** docs (`internal/docs/exclusive/fixes/today/CUTOVER-COMMERCE-OWNERSHIP.md`, `COMMERCE-CUTOVER-PROGRAM.md`) record flags and PR sequencing for retiring legacy commerce surfaces.
 
 ## Rationale
 
-This design uses a composable architecture because the business requires both public commerce flows and internal retail operations while keeping one inventory and order truth layer. Apparel commerce also depends on variant-level stock management, which makes a normalized relational model more reliable than flat product stock tracking. A separate API server is included so webhook verification, background jobs, and logistics synchronization can run independently from page rendering and user interaction layers.
+This design uses a composable architecture because the business requires both public commerce flows and internal retail operations while keeping **one Medusa inventory and order truth layer** for live traffic. Apparel commerce depends on variant-level stock management, which Medusa models with standard fulfillment and payment modules. **Express** is retained as a **small operational** sidecar (health, compliance, internal key) rather than a second commerce engine. Page rendering and user interaction stay in **Next.js**; commerce domain logic stays in **Medusa**.
 
 ## Security Considerations
 
-Payment and shipping webhooks MUST be verified before mutating order, shipment, or inventory state. All privileged admin and POS routes MUST require authenticated staff roles, and customer routes MUST be isolated from internal operations. Sensitive credentials including OAuth secrets, payment secrets, API keys, and database connection strings MUST be stored in environment variables and never exposed in client bundles. Inventory changes SHOULD be auditable through immutable movement records and attributable to a user or system process whenever possible.
+Payment and shipping webhooks MUST be verified before mutating order, shipment, or inventory state (**Medusa** payment modules and AfterShip hook on Medusa). All privileged admin and POS routes MUST require authenticated staff roles (**NextAuth** session + middleware on `/admin/*` for UI; **requireStaffSession** in admin API routes), and customer routes MUST be isolated from internal operations. Sensitive credentials including OAuth secrets, payment secrets, API keys, and database connection strings MUST be stored in environment variables and never exposed in client bundles. Inventory changes SHOULD be auditable through immutable movement records and attributable to a user or system process whenever possible.
 
 ## Copyright
 
