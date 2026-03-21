@@ -13,18 +13,18 @@
 
 | Severity | Open | Closed this release |
 |----------|------|---------------------|
-| Critical | 0 | — |
+| Critical | 0 | - |
 | High | 0 | **ISSUE-001** |
 | Medium | 0 | **ISSUE-002**, **ISSUE-003**, **ISSUE-006** |
 | Low | 1 (**ISSUE-008** dev hygiene) | **ISSUE-004**, **ISSUE-005**, **ISSUE-007** |
 
-**ISSUE-009** (`/health` 503 when DB down): expected for probes — not a product defect.
+**ISSUE-009** (`/health` 503 when DB down): expected for probes: not a product defect.
 
 **Fixed in code (additional pass):** shop **filters + sort** (`shop-url`, `ShopSortSelect`, API `productListQuerySchema`); **live category counts** (`GET /products/categories/summary`); **`/collections`** vs duplicate nav; **policy routes** `/shipping`, `/returns`, `/terms`; footer **real links** + optional **`NEXT_PUBLIC_INSTAGRAM_URL`**; **Maharlika** home hero; **`CatalogProductCard`** (hover image rotate + sizes tooltip) on shop + home; admin BFF allows **`payments`**; POS **Generate Payment Link** → `POST /payments/pos-checkout`; PDP **size guide** + policy links; **`next.config` `images.remotePatterns`** from **`NEXT_PUBLIC_IMAGE_HOSTNAMES`** (default Supabase).
 
 ---
 
-## Route inventory — Storefront (`apps/storefront`)
+## Route inventory: Storefront (`apps/storefront`)
 
 | Route | Build | Notes |
 |-------|-------|--------|
@@ -45,7 +45,7 @@
 
 ---
 
-## Route inventory — Admin (`apps/admin`, port 3001)
+## Route inventory: Admin (`apps/admin`, port 3001)
 
 | Route | Build | Notes |
 |-------|-------|--------|
@@ -56,7 +56,7 @@
 | `/api/auth/[...nextauth]` | ƒ | |
 | `/api/backend/[...path]` | ƒ | BFF to Node API |
 
-**Dogfood gap:** Full admin pass needs **signed-in staff** session (Google) — run manually or with saved `agent-browser` auth state.
+**Dogfood gap:** Full admin pass needs **signed-in staff** session (Google): run manually or with saved `agent-browser` auth state.
 
 ---
 
@@ -64,7 +64,7 @@
 
 | Method | Path | Typical result when unauthenticated / misconfigured |
 |--------|------|------------------------------------------------------|
-| GET | `/health` | **503** if `DATABASE_URL`/Supabase fails (degraded) — expected |
+| GET | `/health` | **503** if `DATABASE_URL`/Supabase fails (degraded): expected |
 | GET | `/products`, `/products/:slug` | 200 JSON when DB OK |
 | POST | `/checkout` | 400/503 without body or LS env |
 | GET | `/orders`, `/inventory`, `/shipments/*`, `/compliance/*` | **401** without `X-Internal-Api-Key` / configured header |
@@ -76,8 +76,8 @@
 ## Automated / build signals
 
 - **`pnpm exec turbo build`** for `@apparel-commerce/storefront`, `admin`, `api`: **PASS** (2026-03-20 run).
-- **Playwright** with `PLAYWRIGHT_SKIP_WEBSERVER=1` while storefront returned **500** (API down + SSR `fetch` throwing): **2 failed** (home/shop), checkout **passed** — consistent with pre-fix behaviour.
-- **Production check:** After `rm -rf apps/storefront/.next && pnpm build`, `next start -p 3020` with **no API**: **`/` and `/shop` → 200**, empty catalog UI — confirms catalog SSR hardening.
+- **Playwright** with `PLAYWRIGHT_SKIP_WEBSERVER=1` while storefront returned **500** (API down + SSR `fetch` throwing): **2 failed** (home/shop), checkout **passed**: consistent with pre-fix behaviour.
+- **Production check:** After `rm -rf apps/storefront/.next && pnpm build`, `next start -p 3020` with **no API**: **`/` and `/shop` → 200**, empty catalog UI: confirms catalog SSR hardening.
 
 ---
 
@@ -85,9 +85,9 @@
 
 | Pillar | Assessment |
 |--------|----------------|
-| **Simplicity** | Checkout: single primary pay action — **good**. Shop page: sidebar filters + sort UI **do not appear wired** — reads as noise vs “one room at a time” (**see ISSUE-006**). Nav: **Shop** and **Collections** both go to `/shop` — duplicates intent (**ISSUE-004**). |
-| **Fluidity** | Nav/footer use `transition-opacity` / hover states; `motion-surface` on checkout — **good**. No full “tray” patterns; acceptable for MVP. |
-| **Delight** | PDP colour/size before add — **good**. Hero/shop copy still **“ARCHITECTURAL / Architectures”** while brand chrome is **Maharlika** — emotional mismatch (**ISSUE-005**). |
+| **Simplicity** | Checkout: single primary pay action: **good**. Shop page: sidebar filters + sort UI **do not appear wired**: reads as noise vs “one room at a time” (**see ISSUE-006**). Nav: **Shop** and **Collections** both go to `/shop`: duplicates intent (**ISSUE-004**). |
+| **Fluidity** | Nav/footer use `transition-opacity` / hover states; `motion-surface` on checkout: **good**. No full “tray” patterns; acceptable for MVP. |
+| **Delight** | PDP colour/size before add: **good**. Hero/shop copy still **“ARCHITECTURAL / Architectures”** while brand chrome is **Maharlika**: emotional mismatch (**ISSUE-005**). |
 
 ---
 
@@ -108,52 +108,60 @@ Use **`agent-browser` binary directly** (not `npx`) per skill. Capture **videos*
 
 ## Issues
 
-### ISSUE-001 — ~~HIGH~~ **FIXED** — SSR 500 when API unreachable (storefront home/shop/PDP)
+### ISSUE-001: ~~HIGH~~ **FIXED**: SSR 500 when API unreachable (storefront home/shop/PDP)
 
 - **Symptom:** `fetch()` to `API_URL` throws on connection errors; `/` and `/shop` returned **500** so nav never rendered; Playwright `nav-home` missing.
-- **Fix:** `apps/storefront/src/lib/catalog-fetch.ts` — central **try/catch**, empty list / `null` product instead of throw. Track page already had try/catch.
+- **Fix:** `apps/storefront/src/lib/catalog-fetch.ts`: central **try/catch**, empty list / `null` product instead of throw. Track page already had try/catch.
 - **Verify:** Build + `next start` with API stopped → `/` and `/shop` return **200**.
 
-### ISSUE-002 — ~~MEDIUM~~ **FIXED** — Missing PDP slug returned HTTP 200
+### ISSUE-002: ~~MEDIUM~~ **FIXED**: Missing PDP slug returned HTTP 200
 
 - **Symptom:** Unknown slug showed in-page “Product not found” with **200 OK** (bad for SEO/crawlers).
 - **Fix:** `notFound()` in `shop/[slug]/page.tsx` + `(public)/not-found.tsx` for branded 404 with nav/footer.
 - **Repro video:** N/A (static HTTP semantics).
 
-### ISSUE-003 — ~~MEDIUM~~ **FIXED** — Shop sidebar category counts
+### ISSUE-003: ~~MEDIUM~~ **FIXED**: Shop sidebar category counts
 
 - **Fix:** `GET /products/categories/summary` + `fetchCategorySummaries`; shop “All” total + per-category counts from API.
 
-### ISSUE-004 — ~~LOW~~ **FIXED** — Duplicate nav (Shop vs Collections)
+### ISSUE-004: ~~LOW~~ **FIXED**: Duplicate nav (Shop vs Collections)
 
 - **Fix:** **Collections** → `/collections` (featured Shorts / Shirt / Jacket → filtered `/shop`).
 
-### ISSUE-005 — ~~LOW~~ **FIXED** — Marketing voice vs Maharlika
+### ISSUE-005: ~~LOW~~ **FIXED**: Marketing voice vs Maharlika
 
 - **Fix:** Home hero and newsletter block updated for **Maharlika Grand Custom** / Maharlika Apparel Custom.
 
-### ISSUE-006 — ~~MEDIUM~~ **FIXED** — Filter / sort wiring
+### ISSUE-006: ~~MEDIUM~~ **FIXED**: Filter / sort wiring
 
 - **Fix:** Facet links + `ShopSortSelect` (client) + `shopHref` query building; API validates query via Zod.
 
-### ISSUE-007 — ~~LOW~~ **FIXED** — Footer dead anchors
+### ISSUE-007: ~~LOW~~ **FIXED**: Footer dead anchors
 
 - **Fix:** `/shipping`, `/returns`, `/terms`, `/#join-club`; Instagram only if **`NEXT_PUBLIC_INSTAGRAM_URL`** is set.
 
-### ISSUE-008 — LOW — Stale `.next` → `MODULE_NOT_FOUND` / ENOENT vendor chunks
+### ISSUE-008: LOW: Stale `.next` → `MODULE_NOT_FOUND` / ENOENT vendor chunks
 
 - **Symptom:** Intermittent **`Cannot find module './872.js'`** on `next start` or dev after dependency/clean mismatch.
 - **Mitigation:** `rm -rf apps/storefront/.next` (and siblings if needed) → `pnpm build`; avoid parallel devs on same `.next`.
 - **Repro video:** N/A.
 
-### ISSUE-009 — MEDIUM — `/health` 503 when database unavailable
+### ISSUE-009: MEDIUM: `/health` 503 when database unavailable
 
-- **Evidence:** By design `health` probes Supabase — returns **503** + `db: unavailable`.
-- **Action:** Use for load balancers / k8s; do not treat as app bug — document in runbooks.
+- **Evidence:** By design `health` probes Supabase: returns **503** + `db: unavailable`.
+- **Action:** Use for load balancers / k8s; do not treat as app bug: document in runbooks.
 - **Repro:** Stop DB → `curl localhost:4000/health`.
 - **Repro video:** N/A.
 
 ---
+
+## Layout / responsive pass (2026-03-20)
+
+- **Goal:** Align with `web-design-guidelines` + responsive rhythm: no double stacked “header offset + huge `pt-32`” on inner pages; shared horizontal padding; clamp-based hero/shop titles.
+- **`globals.css`:** CSS variables `--storefront-page-px`, `--storefront-page-pt`, `--storefront-page-pb`, `--storefront-content-max`; component classes **`.storefront-page-shell`**, **`.storefront-section-x`**, **`.storefront-content-wide`**.
+- **Pages:** All `(public)/*/page.tsx` mains migrated to `storefront-page-shell` + `max-w-*`; home hero uses **viewport-relative `min-height` + `clamp()` typography**; shop H1 scaled to match; **404** not-found uses the same shell.
+- **Nav icons:** SVG **heart / bag / person** (`NavActionIcons.tsx`) replace Material Symbols in the main nav so icons render without Google Fonts (Playwright dogfood + offline-safe).
+- **Dogfood screenshots:** `pnpm dogfood:screenshots` → `dogfood-output/screenshots/*.png` (Playwright, 11 routes). Run with storefront on `:3000` and `PLAYWRIGHT_SKIP_WEBSERVER=1` if the server is already up.
 
 ## Follow-up checklist
 
