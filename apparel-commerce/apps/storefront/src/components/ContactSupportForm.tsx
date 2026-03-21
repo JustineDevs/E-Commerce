@@ -15,10 +15,14 @@ export function ContactSupportForm() {
       setStatus("Set NEXT_PUBLIC_SUPPORT_EMAIL to enable email.");
       return;
     }
-    const encSub = encodeURIComponent(subject || "Maharlika — Customer inquiry");
+    const encSub = encodeURIComponent(
+      subject || "Maharlika Apparel Custom: Customer inquiry",
+    );
     const encBody = encodeURIComponent(body);
     window.location.href = `mailto:${email}?subject=${encSub}&body=${encBody}`;
-    setStatus("Your mail app should open. If nothing happens, copy our email from below.");
+    setStatus(
+      "Your mail app should open. If nothing happens, copy our email from below.",
+    );
   }, [email, subject, body]);
 
   return (
@@ -32,20 +36,30 @@ export function ContactSupportForm() {
         </p>
       ) : (
         <p className="text-sm text-error">
-          Customer email is not configured. Add <code className="rounded bg-surface-container-high px-1">NEXT_PUBLIC_SUPPORT_EMAIL</code> in your environment.
+          Customer email is not configured. Add{" "}
+          <code className="rounded bg-surface-container-high px-1">
+            NEXT_PUBLIC_SUPPORT_EMAIL
+          </code>{" "}
+          in your environment.
         </p>
       )}
       {phone ? (
         <p className="text-sm">
           <span className="font-medium text-primary">Phone:</span>{" "}
-          <a className="underline hover:text-primary" href={`tel:${phone.replace(/\s/g, "")}`}>
+          <a
+            className="underline hover:text-primary"
+            href={`tel:${phone.replace(/\s/g, "")}`}
+          >
             {phone}
           </a>
         </p>
       ) : null}
 
       <div>
-        <label htmlFor="contact-subject" className="mb-1 block text-xs font-bold uppercase tracking-wider text-primary">
+        <label
+          htmlFor="contact-subject"
+          className="mb-1 block text-xs font-bold uppercase tracking-wider text-primary"
+        >
           Subject
         </label>
         <input
@@ -57,7 +71,10 @@ export function ContactSupportForm() {
         />
       </div>
       <div>
-        <label htmlFor="contact-body" className="mb-1 block text-xs font-bold uppercase tracking-wider text-primary">
+        <label
+          htmlFor="contact-body"
+          className="mb-1 block text-xs font-bold uppercase tracking-wider text-primary"
+        >
           Message
         </label>
         <textarea
@@ -75,7 +92,9 @@ export function ContactSupportForm() {
       >
         Open in email app
       </button>
-      {status ? <p className="text-xs text-on-surface-variant">{status}</p> : null}
+      {status ? (
+        <p className="text-xs text-on-surface-variant">{status}</p>
+      ) : null}
     </div>
   );
 }
