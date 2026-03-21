@@ -1,3 +1,4 @@
+import { DEFAULT_PUBLIC_SITE_ORIGIN } from "@apparel-commerce/sdk";
 import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
@@ -6,7 +7,10 @@ type Props = {
   searchParams: Promise<{ orderId?: string; t?: string }>;
 };
 
-function resolveOrderAndToken(orderIdRaw: string | undefined, tRaw: string | undefined): {
+function resolveOrderAndToken(
+  orderIdRaw: string | undefined,
+  tRaw: string | undefined,
+): {
   orderId: string;
   token: string;
 } | null {
@@ -16,10 +20,13 @@ function resolveOrderAndToken(orderIdRaw: string | undefined, tRaw: string | und
 
   try {
     const base =
-      typeof process.env.NEXT_PUBLIC_SITE_URL === "string" && process.env.NEXT_PUBLIC_SITE_URL
+      typeof process.env.NEXT_PUBLIC_SITE_URL === "string" &&
+      process.env.NEXT_PUBLIC_SITE_URL
         ? process.env.NEXT_PUBLIC_SITE_URL
-        : "http://localhost:3000";
-    const u = trimmed.startsWith("http") ? new URL(trimmed) : new URL(trimmed, base);
+        : DEFAULT_PUBLIC_SITE_ORIGIN;
+    const u = trimmed.startsWith("http")
+      ? new URL(trimmed)
+      : new URL(trimmed, base);
     const m = u.pathname.match(/\/track\/([^/]+)/);
     const qp = u.searchParams.get("t");
     if (m && qp) {
@@ -38,19 +45,26 @@ export default async function TrackRedirectPage({ searchParams }: Props) {
   const sp = await searchParams;
   const resolved = resolveOrderAndToken(sp.orderId, sp.t);
   if (resolved) {
-    redirect(`/track/${encodeURIComponent(resolved.orderId)}?t=${encodeURIComponent(resolved.token)}`);
+    redirect(
+      `/track/${encodeURIComponent(resolved.orderId)}?t=${encodeURIComponent(resolved.token)}`,
+    );
   }
 
   return (
-    <main className="pt-32 pb-24 px-8 max-w-2xl mx-auto">
-      <h1 className="font-headline text-4xl font-extrabold tracking-tighter text-primary mb-2">Track Order</h1>
+    <main className="storefront-page-shell max-w-2xl">
+      <h1 className="font-headline text-4xl font-extrabold tracking-tighter text-primary mb-2">
+        Track Order
+      </h1>
       <p className="font-body text-on-surface-variant mb-12">
-        Enter your order number and tracking code from your confirmation email, or paste the full tracking link into the
-        first field.
+        Enter your order number and tracking code from your confirmation email,
+        or paste the full tracking link into the first field.
       </p>
       <form action="/track" method="GET" className="space-y-4">
         <div>
-          <label htmlFor="orderId" className="mb-1 block text-xs font-bold uppercase tracking-wider text-primary">
+          <label
+            htmlFor="orderId"
+            className="mb-1 block text-xs font-bold uppercase tracking-wider text-primary"
+          >
             Order number or full tracking link
           </label>
           <input
@@ -63,7 +77,10 @@ export default async function TrackRedirectPage({ searchParams }: Props) {
           />
         </div>
         <div>
-          <label htmlFor="t" className="mb-1 block text-xs font-bold uppercase tracking-wider text-primary">
+          <label
+            htmlFor="t"
+            className="mb-1 block text-xs font-bold uppercase tracking-wider text-primary"
+          >
             Tracking code (if not using a full link)
           </label>
           <input
