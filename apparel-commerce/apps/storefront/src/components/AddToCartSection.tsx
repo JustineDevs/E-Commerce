@@ -10,15 +10,18 @@ export function AddToCartSection({ product }: { product: Product }) {
   const router = useRouter();
   const sizes = useMemo(
     () => [...new Set(product.variants.map((v) => v.size))].sort(),
-    [product.variants]
+    [product.variants],
   );
-  const colors = useMemo(() => [...new Set(product.variants.map((v) => v.color))], [product.variants]);
+  const colors = useMemo(
+    () => [...new Set(product.variants.map((v) => v.color))],
+    [product.variants],
+  );
   const [size, setSize] = useState(sizes[0] ?? "");
   const [color, setColor] = useState(colors[0] ?? "");
 
   const variant = useMemo(
     () => product.variants.find((v) => v.size === size && v.color === color),
-    [product.variants, size, color]
+    [product.variants, size, color],
   );
 
   function handleAddToBag() {
@@ -41,7 +44,8 @@ export function AddToCartSection({ product }: { product: Product }) {
     <div className="space-y-10">
       <div className="space-y-4">
         <p className="text-xs font-label font-bold uppercase tracking-wider">
-          Color: <span className="text-secondary font-normal">{color || "—"}</span>
+          Color:{" "}
+          <span className="text-secondary font-normal">{color || "None"}</span>
         </p>
         <div className="flex flex-wrap gap-3">
           {colors.map((c) => (
@@ -50,7 +54,9 @@ export function AddToCartSection({ product }: { product: Product }) {
               type="button"
               onClick={() => setColor(c)}
               className={`w-10 h-10 rounded-full bg-surface-container-high ring-1 transition-all ${
-                color === c ? "ring-2 ring-primary scale-105" : "ring-outline-variant hover:ring-primary"
+                color === c
+                  ? "ring-2 ring-primary scale-105"
+                  : "ring-outline-variant hover:ring-primary"
               }`}
               title={c}
               aria-label={`Color ${c}`}
@@ -62,7 +68,9 @@ export function AddToCartSection({ product }: { product: Product }) {
 
       <div className="space-y-4">
         <div className="flex justify-between items-end">
-          <p className="text-xs font-label font-bold uppercase tracking-wider">Size</p>
+          <p className="text-xs font-label font-bold uppercase tracking-wider">
+            Size
+          </p>
           <span className="text-xs font-label text-secondary">Select one</span>
         </div>
         <div className="grid grid-cols-4 gap-2">
@@ -85,7 +93,11 @@ export function AddToCartSection({ product }: { product: Product }) {
       </div>
 
       <div className="flex flex-col gap-3 pt-4 min-[400px]:flex-row min-[400px]:items-stretch">
-        <WishlistToggle slug={product.slug} name={product.name} className="min-[400px]:shrink-0" />
+        <WishlistToggle
+          slug={product.slug}
+          name={product.name}
+          className="min-[400px]:shrink-0"
+        />
         <button
           type="button"
           data-testid="pdp-add-to-bag"
