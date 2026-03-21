@@ -1,6 +1,8 @@
-import { loadEnv, defineConfig } from '@medusajs/framework/utils'
+import { loadEnv, defineConfig } from "@medusajs/framework/utils";
+import { validateMedusaProcessEnv } from "./src/loaders/validate-process-env";
 
-loadEnv(process.env.NODE_ENV || 'development', process.cwd())
+loadEnv(process.env.NODE_ENV || "development", process.cwd());
+validateMedusaProcessEnv();
 
 const lemonSqueezyProvider =
   process.env.LEMONSQUEEZY_API_KEY?.trim() &&
@@ -19,7 +21,69 @@ const lemonSqueezyProvider =
           },
         },
       ]
-    : []
+    : [];
+
+const stripeProvider = process.env.STRIPE_API_KEY?.trim()
+  ? [
+      {
+        resolve: "@medusajs/payment-stripe",
+        id: "stripe",
+        options: {
+          apiKey: process.env.STRIPE_API_KEY,
+          webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+        },
+      },
+    ]
+  : [];
+
+const codProvider = [
+  {
+    resolve: "./src/modules/cod-payment",
+    id: "cod",
+    options: {},
+  },
+];
+
+const paypalProvider =
+  process.env.PAYPAL_CLIENT_ID?.trim() &&
+  process.env.PAYPAL_CLIENT_SECRET?.trim()
+    ? [
+        {
+          resolve: "./src/modules/paypal-payment",
+          id: "paypal",
+          options: {
+            clientId: process.env.PAYPAL_CLIENT_ID!,
+            clientSecret: process.env.PAYPAL_CLIENT_SECRET!,
+            sandbox:
+              process.env.PAYPAL_ENVIRONMENT === "sandbox" ||
+              process.env.NODE_ENV !== "production",
+          },
+        },
+      ]
+    : [];
+
+const paymongoProvider =
+  process.env.PAYMONGO_SECRET_KEY?.trim() &&
+  process.env.PAYMONGO_WEBHOOK_SECRET?.trim()
+    ? [
+        {
+          resolve: "./src/modules/paymongo-payment",
+          id: "paymongo",
+          options: {
+            secretKey: process.env.PAYMONGO_SECRET_KEY!,
+            webhookSecret: process.env.PAYMONGO_WEBHOOK_SECRET!,
+          },
+        },
+      ]
+    : [];
+
+const paymentProviders = [
+  ...lemonSqueezyProvider,
+  ...stripeProvider,
+  ...codProvider,
+  ...paypalProvider,
+  ...paymongoProvider,
+];
 
 module.exports = defineConfig({
   projectConfig: {
@@ -30,18 +94,18 @@ module.exports = defineConfig({
       authCors: process.env.AUTH_CORS!,
       jwtSecret: process.env.JWT_SECRET || "supersecret",
       cookieSecret: process.env.COOKIE_SECRET || "supersecret",
-    }
+    },
   },
   modules: [
-    ...(lemonSqueezyProvider.length
+    ...(paymentProviders.length
       ? [
           {
             resolve: "@medusajs/medusa/payment" as const,
             options: {
-              providers: lemonSqueezyProvider,
+              providers: paymentProviders,
             },
           },
         ]
       : []),
   ],
-})
+});
