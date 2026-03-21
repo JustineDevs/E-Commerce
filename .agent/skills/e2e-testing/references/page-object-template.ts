@@ -1,14 +1,14 @@
 /**
- * page-object-template.ts — Annotated page object class for Playwright E2E tests.
+ * page-object-template.ts: Annotated page object class for Playwright E2E tests.
  *
  * Place at: e2e/pages/users.page.ts
  *
  * This template demonstrates:
- *   - Extending a base page object for shared behavior
- *   - Declaring locators as public readonly properties
- *   - Encapsulating user actions as async methods
- *   - Internal wait handling (page objects handle waits, tests handle assertions)
- *   - Composing page objects for forms and dialogs
+ * - Extending a base page object for shared behavior
+ * - Declaring locators as public readonly properties
+ * - Encapsulating user actions as async methods
+ * - Internal wait handling (page objects handle waits, tests handle assertions)
+ * - Composing page objects for forms and dialogs
  */
 
 import { type Page, type Locator, expect } from "@playwright/test";
@@ -52,10 +52,10 @@ export abstract class BasePage {
  * Page object for the Users list page (/users).
  *
  * Usage in tests:
- *   const usersPage = new UsersPage(page);
- *   await usersPage.goto();
- *   await usersPage.searchFor("alice");
- *   const count = await usersPage.getUserCount();
+ * const usersPage = new UsersPage(page);
+ * await usersPage.goto();
+ * await usersPage.searchFor("alice");
+ * const count = await usersPage.getUserCount();
  */
 export class UsersPage extends BasePage {
   // ─── Locators (public, readonly) ──────────────────────
@@ -135,9 +135,9 @@ export class UsersPage extends BasePage {
  * Page object for the Create User dialog/form.
  *
  * Usage in tests:
- *   const dialog = new CreateUserDialog(page);
- *   await dialog.fillForm({ email: "test@example.com", displayName: "Test" });
- *   await dialog.submit();
+ * const dialog = new CreateUserDialog(page);
+ * await dialog.fillForm({ email: "test@example.com", displayName: "Test" });
+ * await dialog.submit();
  */
 export class CreateUserDialog {
   readonly dialog: Locator;
