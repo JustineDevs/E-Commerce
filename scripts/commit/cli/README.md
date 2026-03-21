@@ -4,18 +4,18 @@ Composable CLI for git commits with security checks. Commands: commit (default),
 
 ## Commands
 
-- **commit** (default) — Parallel commit with security checks
-- **security** — Scan for sensitive files only
-- **linear** — Print Linear issue trailer (requires `linear` CLI on PATH)
+- **commit** (default): Parallel commit with security checks
+- **security**: Scan for sensitive files only
+- **linear**: Print Linear issue trailer (requires `linear` CLI on PATH)
 
 ## Usage
 
 ```bash
 # From repo root (E-commerce Website/)
-npm run commit          # commit (default)
-npm run commit:dry      # commit --dry-run
-npm run security:check  # security
-npm run commit:cli      # show usage
+npm run commit # commit (default)
+npm run commit:dry # commit --dry-run
+npm run security:check # security
+npm run commit:cli # show usage
 
 # Direct CLI
 node scripts/commit/cli/index.js [command] [options]
@@ -23,10 +23,10 @@ node scripts/commit/cli/index.js [command] [options]
 
 ## Options (commit)
 
-- `--dry-run` — Preview without committing
-- `--no-security-check` — Disable security checks (not recommended)
-- `--warn-only` — Warn on sensitive files, do not fail
-- `--max <n>` — Max concurrent commits (default: 5)
+- `--dry-run`: Preview without committing
+- `--no-security-check`: Disable security checks (not recommended)
+- `--warn-only`: Warn on sensitive files, do not fail
+- `--max <n>`: Max concurrent commits (default: 5)
 
 ## Linear Integration
 
