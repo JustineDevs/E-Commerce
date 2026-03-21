@@ -6,6 +6,17 @@ Use this checklist when deploying the hardening changes to staging or production
 
 ---
 
+## Vercel (Storefront) Configuration
+
+**Root Directory:** Set to `apps/storefront` in Vercel Project Settings → General → Root Directory. This ensures:
+- `apps/storefront/vercel.json` is used (build filtered to storefront only)
+- Next.js is correctly detected
+- Medusa is excluded from the build (Medusa runs on Railway/Render/VPS, not Vercel)
+
+If Root Directory is the repo root, the root `vercel.json` limits the build to the storefront, but you should still set Root Directory to `apps/storefront` for correct Next.js deployment.
+
+---
+
 ## Pre-Deploy Checklist
 
 ### 1. Environment Variables
