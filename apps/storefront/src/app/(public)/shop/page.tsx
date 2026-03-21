@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import {
   productListQuerySchema,
   SHOP_PRODUCT_PAGE_SIZE,
@@ -13,8 +14,21 @@ import { firstCommerceFailure } from "@/lib/catalog-fetch-helpers";
 import { shopHref } from "@/lib/shop-url";
 import { ShopSortSelect } from "@/components/ShopSortSelect";
 import { StorefrontCommerceAlert } from "@/components/StorefrontCommerceAlert";
+import { canonicalUrl } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Shop — All Products",
+  description:
+    "Browse all apparel: shorts, shirts, jackets. Maharlika Apparel Custom — structural silhouettes and everyday craft. Filter by category, size, color.",
+  alternates: { canonical: canonicalUrl("/shop") },
+  openGraph: {
+    title: "Shop | Maharlika Apparel Custom",
+    description: "Browse custom apparel. Shorts, shirts, jackets.",
+    url: canonicalUrl("/shop"),
+  },
+};
 
 export default async function ShopPage({
   searchParams,
