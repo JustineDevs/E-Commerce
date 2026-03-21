@@ -12,11 +12,11 @@ Structured CO-STAR prompting for UI work: **Context, Objective, Style, Tone, Aud
 
 ## Decision: Which Mode to Use
 
-| If the user wants to… | Use | Action |
-|----------------------|-----|--------|
-| **Build or change UI** — components, pages, design system, shadcn/Magic UI/Aceternity, refactors, hero/dashboard/landing | **UI build mode** | Follow [references/co-star-prompt.md](references/co-star-prompt.md). Discovery questions first, then integration plan and code. |
-| **Create a custom CO-STAR prompt** — their own prompt, design system doc, or CO-STAR template from scratch | **Prompt creator mode** | Follow [references/co-star-creator.md](references/co-star-creator.md). Guide them through Context, Objective, Style, Tone, Audience, Response. |
-| **Unclear or mixed** | **Weigh main ask.** Implementation → prompt first; "create my prompt" → creator first. |
+| If the user wants to…                                                                                                   | Use                                                                                    | Action                                                                                                                                         |
+| ----------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Build or change UI**: components, pages, design system, shadcn/Magic UI/Aceternity, refactors, hero/dashboard/landing | **UI build mode**                                                                      | Follow [references/co-star-prompt.md](references/co-star-prompt.md). Discovery questions first, then integration plan and code.                |
+| **Create a custom CO-STAR prompt**: their own prompt, design system doc, or CO-STAR template from scratch               | **Prompt creator mode**                                                                | Follow [references/co-star-creator.md](references/co-star-creator.md). Guide them through Context, Objective, Style, Tone, Audience, Response. |
+| **Unclear or mixed**                                                                                                    | **Weigh main ask.** Implementation → prompt first; "create my prompt" → creator first. |
 
 **Signals for UI build:** build, implement, add, refactor, component, page, design system, shadcn, Tailwind, React, Next.js, hero, dashboard, landing, integrate.
 
@@ -34,11 +34,11 @@ Structured CO-STAR prompting for UI work: **Context, Objective, Style, Tone, Aud
 
 ## Flow (UI Build Mode)
 
-1. **Scoped questions first** — Framework, styling, existing tokens/components, constraints, goal (re-skin vs new theme vs one page).
-2. **Integration strategy** — Which base (e.g. shadcn + Radix), which registries (Tailark, Magic UI, Aceternity), which animation (React Bits, Anime.js) if any. Keep the set minimal.
-3. **Concrete plan** — Tokens, core components, then marketing/dashboard layers. Code sketches in the user’s stack (Tailwind, CSS modules, etc.).
-4. **Negative constraints** — No multiple full UI suites, no mixing incompatible design languages, no heavy animation everywhere. Normalize tokens when copy-pasting.
-5. **Critique loop** — List trade-offs, suggest one small first slice, ask what to tackle first.
+1. **Scoped questions first**: Framework, styling, existing tokens/components, constraints, goal (re-skin vs new theme vs one page).
+2. **Integration strategy**: Which base (e.g. shadcn + Radix), which registries (Tailark, Magic UI, Aceternity), which animation (React Bits, Anime.js) if any. Keep the set minimal.
+3. **Concrete plan**: Tokens, core components, then marketing/dashboard layers. Code sketches in the user’s stack (Tailwind, CSS modules, etc.).
+4. **Negative constraints**: No multiple full UI suites, no mixing incompatible design languages, no heavy animation everywhere. Normalize tokens when copy-pasting.
+5. **Critique loop**: List trade-offs, suggest one small first slice, ask what to tackle first.
 
 ---
 
@@ -53,5 +53,5 @@ Structured CO-STAR prompting for UI work: **Context, Objective, Style, Tone, Aud
 
 ## Resources
 
-- **references/co-star-prompt.md** — Full CO-STAR prompt for building/integrating UI (modern React ecosystem, registries, copy-paste vs npm). Read when the user is in UI build mode.
-- **references/co-star-creator.md** — Full CO-STAR prompt for Newsprint UI Creator (design system integration, tokens, primitives). Use for prompt-creator mode or for Newsprint-specific builds.
+- **references/co-star-prompt.md**: Full CO-STAR prompt for building/integrating UI (modern React ecosystem, registries, copy-paste vs npm). Read when the user is in UI build mode.
+- **references/co-star-creator.md**: Full CO-STAR prompt for Newsprint UI Creator (design system integration, tokens, primitives). Use for prompt-creator mode or for Newsprint-specific builds.
