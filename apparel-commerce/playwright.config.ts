@@ -1,5 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
+/** Local dev default. Deployed preview: https://maharlika-apparel-custom.vercel.app */
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
 
 export default defineConfig({
@@ -35,6 +36,14 @@ export default defineConfig({
         {
           command: "pnpm --filter @apparel-commerce/storefront dev",
           url: baseURL,
+          reuseExistingServer: true,
+          timeout: 120_000,
+          stdout: "pipe",
+          stderr: "pipe",
+        },
+        {
+          command: "pnpm --filter @apparel-commerce/admin dev",
+          url: "http://localhost:3001",
           reuseExistingServer: true,
           timeout: 120_000,
           stdout: "pipe",
