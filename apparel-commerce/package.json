@@ -11,13 +11,14 @@
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "db:migrate": "pnpm --filter @apparel-commerce/database migrate",
     "db:seed": "pnpm --filter @apparel-commerce/database seed",
-    "test": "pnpm --filter @apparel-commerce/database test",
+    "test": "pnpm --filter @apparel-commerce/validation test && pnpm --filter @apparel-commerce/database test && pnpm --filter medusa test:stress",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
     "dogfood:screenshots": "playwright test e2e/dogfood --project=chromium",
     "verify:public-env": "node scripts/verify-next-public-env.mjs",
-    "ci:check": "pnpm verify:public-env && pnpm exec turbo build"
+    "ci:check": "pnpm verify:public-env && pnpm exec turbo build",
+    "predeploy": "pnpm install && pnpm run build"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",
