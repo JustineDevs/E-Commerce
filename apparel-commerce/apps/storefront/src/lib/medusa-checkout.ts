@@ -24,7 +24,9 @@ export async function startMedusaLemonCheckout(input: {
   const publishableKey = getMedusaPublishableKey();
   const regionId = getMedusaRegionId();
   if (!publishableKey || !regionId) {
-    throw new Error("NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY and NEXT_PUBLIC_MEDUSA_REGION_ID are required.");
+    throw new Error(
+      "NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY and NEXT_PUBLIC_MEDUSA_REGION_ID are required.",
+    );
   }
 
   const sdk = new Medusa({ baseUrl, publishableKey });
@@ -54,7 +56,9 @@ export async function startMedusaLemonCheckout(input: {
   });
   const firstOption = shipping_options?.[0];
   if (!firstOption?.id) {
-    throw new Error("No shipping options available for this cart. Check Medusa region and shipping setup.");
+    throw new Error(
+      "No shipping options available for this cart. Check Medusa region and shipping setup.",
+    );
   }
 
   await sdk.store.cart.addShippingMethod(cartId, { option_id: firstOption.id });
@@ -63,20 +67,25 @@ export async function startMedusaLemonCheckout(input: {
     fields: "+payment_collection,*payment_collection.payment_sessions",
   } as never);
 
-  const { payment_collection } = await sdk.store.payment.initiatePaymentSession(cart, {
-    provider_id: providerId,
-    data: {},
-  });
+  const { payment_collection } = await sdk.store.payment.initiatePaymentSession(
+    cart,
+    {
+      provider_id: providerId,
+      data: {},
+    },
+  );
 
   const sessions = payment_collection?.payment_sessions ?? [];
   const session =
     sessions.find((s: { provider_id?: string }) =>
-      String(s.provider_id ?? "").includes("lemonsqueezy")
+      String(s.provider_id ?? "").includes("lemonsqueezy"),
     ) ?? sessions[0];
   const data = session?.data as Record<string, unknown> | undefined;
   const checkoutUrl = data?.checkout_url;
   if (typeof checkoutUrl !== "string" || !checkoutUrl.startsWith("https://")) {
-    throw new Error("Medusa payment session did not return a Lemon Squeezy checkout URL.");
+    throw new Error(
+      "Medusa payment session did not return a Lemon Squeezy checkout URL.",
+    );
   }
 
   return { checkoutUrl, cartId };
