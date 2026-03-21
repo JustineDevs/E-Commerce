@@ -1,5 +1,8 @@
 import Medusa from "@medusajs/js-sdk";
-import { getMedusaPublishableKey, getMedusaStoreBaseUrl } from "./storefront-medusa-env";
+import {
+  getMedusaPublishableKey,
+  getMedusaStoreBaseUrl,
+} from "./storefront-medusa-env";
 
 export function createStorefrontMedusaSdk(): Medusa {
   const baseUrl = getMedusaStoreBaseUrl();
