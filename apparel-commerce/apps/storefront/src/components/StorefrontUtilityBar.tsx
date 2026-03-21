@@ -6,7 +6,7 @@ const linkClass =
 export function StorefrontUtilityBar() {
   return (
     <div className="border-b border-on-primary/15 bg-primary text-on-primary">
-      <div className="mx-auto flex w-full max-w-[1600px] flex-wrap items-center justify-center gap-x-3 gap-y-1 px-[clamp(0.75rem,3vw,2rem)] py-1.5 sm:justify-end sm:gap-x-5">
+      <div className="mx-auto flex w-full max-w-[1600px] flex-wrap items-center justify-center gap-x-3 gap-y-0.5 px-[clamp(0.75rem,3vw,2rem)] py-1 sm:justify-end sm:gap-x-4 sm:gap-y-0">
         <span className="sr-only">Utility links</span>
         <Link href="/track" className={linkClass}>
           Track order
@@ -20,8 +20,14 @@ export function StorefrontUtilityBar() {
         <Link href="/contact" className={linkClass}>
           Contact
         </Link>
-        <Link href="/search" className={`inline-flex items-center gap-0.5 ${linkClass}`}>
-          <span className="material-symbols-outlined text-[14px] sm:text-base" aria-hidden>
+        <Link
+          href="/search"
+          className={`inline-flex items-center gap-0.5 ${linkClass}`}
+        >
+          <span
+            className="material-symbols-outlined text-[14px] sm:text-base"
+            aria-hidden
+          >
             search
           </span>
           Search
