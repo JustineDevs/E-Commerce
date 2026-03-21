@@ -1,69 +1,83 @@
-Here is a clean production-ready blueprint for your shorts/apparel business sprint, built around one shared monorepo, one transactional Postgres database, hosted payments, and carrier-based tracking for J&T Express Philippines. Use Next.js App Router for the storefront and internal surfaces, a separate Node API for webhooks and background jobs, Supabase Postgres as the source of truth, and Turborepo with pnpm workspaces for shared packages and predictable delivery flow. [nextjs](https://nextjs.org/docs/app)
+## Current architecture (aligned with repo)
+
+**Live commerce** runs on **Medusa 2.x** (`apparel-commerce/apps/medusa`) with a **dedicated Postgres** (`DATABASE_URL` for Medusa only). The **storefront** uses the Medusa **Store API** (`@medusajs/js-sdk`) for catalog, checkout (cart → payment session → Lemon URL), and tracking. The **admin** app uses **NextAuth** (`middleware` on `/admin/*` for `admin`/`staff` roles) and **Next.js Route Handlers** under `app/api/pos/medusa/**` and `app/api/medusa/**` to call Medusa with server-side secrets.
+
+**Express** (`apparel-commerce/apps/api`) is **minimal**: **`/health`** (including optional Medusa probe) and **`/compliance`** (internal API key) for GDPR-style export and anonymization via **Supabase** through `packages/database`. It is **not** the primary payment or catalog API.
+
+**Legacy Supabase** schema and `packages/database` query modules (orders, checkout, inventory) **still exist** for **migration scripts**, **compliance**, and **OAuth user upsert**; **no** `apps/*` commerce route imports legacy checkout/order creation for new sales in the Medusa-only configuration. See `internal/docs/adr/0001-medusa-system-of-record.md` and `internal/docs/exclusive/fixes/today/CUTOVER-COMMERCE-OWNERSHIP.md`.
+
+---
 
 ## Stack
 
-The goal is one catalog, one inventory ledger, and one order pipeline for both web and POS sales. [supabase](https://supabase.com/docs)
-
 | Layer | Technology | Purpose |
 |---|---|---|
-| Frontend | Next.js App Router  [nextjs](https://nextjs.org/docs/app) | Storefront, account pages, admin, and POS UI in one React-based routing model. [nextjs](https://nextjs.org/docs/app) |
-| API / Jobs | Node.js + Express  [docs.lemonsqueezy](https://docs.lemonsqueezy.com/api/webhooks/create-webhook) | Handles Lemon Squeezy webhooks, AfterShip syncs, barcode actions, and long-running background jobs. [docs.lemonsqueezy](https://docs.lemonsqueezy.com/api/webhooks/create-webhook) |
-| Database | Supabase Postgres  [supabase](https://supabase.com/docs) | Single source of truth for products, variants, orders, inventory, shipments, and auth-linked app data. [supabase](https://supabase.com/docs) |
-| Monorepo | Turborepo + pnpm workspaces  [turborepo](https://turborepo.dev) | Shares types, UI, validation, and API clients across storefront, admin, and server packages. [turborepo](https://turborepo.dev) |
-| UI | Tailwind CSS + shadcn/ui  [tailwindcss](https://tailwindcss.com) | Fast UI development with composable, customizable components for both customer and internal screens. [tailwindcss](https://tailwindcss.com) |
-| Payments | Lemon Squeezy server SDK + Lemon.js  [npmjs](https://www.npmjs.com/package/@lemonsqueezy/lemonsqueezy.js?activeTab=readme) | Hosted checkout, payment links, tax handling, and signed payment webhooks. [docs.lemonsqueezy](https://docs.lemonsqueezy.com/api/webhooks/create-webhook) |
-| Shipping | AfterShip Tracking + linked J&T account  [aftership](https://www.aftership.com/carriers/jtexpress-ph/api) | Tracking creation, normalized shipment statuses, and J&T Express Philippines support. [aftership](https://www.aftership.com/carriers/jtexpress-ph/api) |
-| Auth | NextAuth/Auth.js + Google provider  [next-auth.js](https://next-auth.js.org/providers/google) | Google sign-in for staff and customers, with role-based access to admin and POS surfaces. [next-auth.js](https://next-auth.js.org/providers/google) |
+| Storefront / Admin UI | Next.js App Router | Public shop, account pages, staff dashboard, POS UI. |
+| Commerce engine | **Medusa 2.x** | Catalog, cart, orders, payments, inventory locations, fulfillments, Store + Admin APIs. |
+| Commerce DB | **PostgreSQL** (Medusa) | System of record for live commerce data. |
+| Legacy / auxiliary DB | **Supabase Postgres** | OAuth-linked users, compliance exports, legacy schema for migration tooling. |
+| Sidecar API | **Node.js + Express** | Health and compliance endpoints only; not primary webhooks for Lemon/AfterShip. |
+| Monorepo | Turborepo + pnpm | Shared `packages/types`, `packages/sdk`, `packages/validation`, etc. |
+| UI | Tailwind CSS + shadcn/ui | Customer and internal screens. |
+| Payments | **Lemon Squeezy** (Medusa module) + optional Stripe, PayPal, Paymongo, COD in Medusa | Hosted checkout; webhooks verified inside Medusa. |
+| Shipping | **AfterShip** + J&T (Medusa subscriber + webhook on Medusa) | Tracking registration and order metadata updates. |
+| Auth | NextAuth + Google | Staff and customers; admin routes gated by middleware. |
 
-## Data model
+---
 
-Use one canonical `user` model for both staff and customers, then connect provider accounts, sessions, orders, and addresses to that single identity record. Keep `product_variants` as the sellable unit, because apparel stock lives at the size-and-color level rather than the parent product level. [supabase](https://supabase.com/features/postgres-database)
+## Data model (two layers)
 
-| Table | Purpose | Key fields |
-|---|---|---|
-| `users`  [next-auth.js](https://next-auth.js.org/providers/google) | Canonical identity for staff and customers. [next-auth.js](https://next-auth.js.org/providers/google) | `id`, `email`, `name`, `role`, `image`, `created_at`. [next-auth.js](https://next-auth.js.org/providers/google) |
-| `accounts`  [next-auth.js](https://next-auth.js.org/providers/google) | OAuth provider links. [next-auth.js](https://next-auth.js.org/providers/google) | `user_id`, `provider`, `provider_account_id`, `access_token`. [next-auth.js](https://next-auth.js.org/providers/google) |
-| `sessions`  [next-auth.js](https://next-auth.js.org/providers/google) | Login session state. [next-auth.js](https://next-auth.js.org/providers/google) | `user_id`, `token`, `expires_at`. [next-auth.js](https://next-auth.js.org/providers/google) |
-| `products`  [supabase](https://supabase.com/docs) | Parent catalog item. [supabase](https://supabase.com/docs) | `id`, `slug`, `name`, `description`, `category`, `status`. [supabase](https://supabase.com/docs) |
-| `product_variants`  [supabase](https://supabase.com/docs) | Sellable apparel SKU by size and color. [supabase](https://supabase.com/docs) | `product_id`, `sku`, `size`, `color`, `barcode`, `price`. [supabase](https://supabase.com/docs) |
-| `inventory_locations`  [supabase](https://supabase.com/docs) | Stock buckets such as warehouse, store, returns, and damaged. [supabase](https://supabase.com/docs) | `id`, `name`, `type`. [supabase](https://supabase.com/docs) |
-| `inventory_movements`  [supabase](https://supabase.com/docs) | Immutable stock ledger for receive, reserve, sale, return, and adjustment events. [supabase](https://supabase.com/docs) | `variant_id`, `location_id`, `qty_delta`, `reason`, `reference_type`, `reference_id`. [supabase](https://supabase.com/docs) |
-| `stock_reservations`  [supabase](https://supabase.com/docs) | Temporary holds during cart and checkout flow. [supabase](https://supabase.com/docs) | `variant_id`, `order_id`, `qty`, `expires_at`, `status`. [supabase](https://supabase.com/docs) |
-| `orders`  [supabase](https://supabase.com/docs) | OMS header for web and POS sales. [supabase](https://supabase.com/docs) | `id`, `customer_id`, `channel`, `status`, `currency`, `subtotal`, `shipping_fee`, `total`. [supabase](https://supabase.com/docs) |
-| `order_items`  [supabase](https://supabase.com/docs) | Immutable purchase snapshot of each variant sold. [supabase](https://supabase.com/docs) | `order_id`, `variant_id`, `sku_snapshot`, `size_snapshot`, `color_snapshot`, `unit_price`, `qty`. [supabase](https://supabase.com/docs) |
-| `payments`  [docs.lemonsqueezy](https://docs.lemonsqueezy.com/guides/developer-guide/getting-started) | Payment state and external references from Lemon Squeezy. [docs.lemonsqueezy](https://docs.lemonsqueezy.com/guides/developer-guide/getting-started) | `order_id`, `provider`, `checkout_id`, `external_order_id`, `status`, `paid_at`. [docs.lemonsqueezy](https://docs.lemonsqueezy.com/guides/developer-guide/getting-started) |
-| `shipments`  [aftership](https://www.aftership.com/carriers/jtexpress-ph/api) | Shipping state for J&T via AfterShip. [aftership](https://www.aftership.com/carriers/jtexpress-ph/api) | `order_id`, `carrier_slug`, `tracking_number`, `aftership_tracking_id`, `label_url`, `status`. [aftership](https://www.aftership.com/carriers/jtexpress-ph/api) |
-| `webhook_events`  [docs.lemonsqueezy](https://docs.lemonsqueezy.com/api/webhooks/create-webhook) | Idempotent webhook log for payments and tracking updates. [docs.lemonsqueezy](https://docs.lemonsqueezy.com/api/webhooks/create-webhook) | `provider`, `event_id`, `event_type`, `payload`, `processed_at`, `status`. [docs.lemonsqueezy](https://docs.lemonsqueezy.com/api/webhooks/create-webhook) |
+### A. Medusa (authoritative for live commerce)
 
-## OMS flow
+Product, variant, cart, order, payment collection, fulfillment, and inventory for **production** traffic are modeled in **Medusa’s database** (Medusa migrations). Staff create and edit catalog in **Medusa Admin** (or via Admin API). **Do not** treat legacy Supabase `products` / `orders` tables as the live source after Medusa cutover.
 
-Run both storefront checkout and POS sales through the same order service so every sale touches the same inventory and order state machine. Use signed Lemon Squeezy webhooks as the payment truth source and AfterShip as the shipment truth source for tracking updates. [aftership](https://www.aftership.com/carriers/jtexpress-ph/api)
+### B. Supabase legacy schema (retained for migration and tooling)
 
-1. Publish a product, then create size-and-color variants with unique SKU and barcode values, and load opening stock into inventory locations. [supabase](https://supabase.com/docs)
-2. When a shopper adds to cart or a cashier scans a barcode, create or update a stock reservation for the selected variant before payment finalization. [supabase](https://supabase.com/docs)
-3. Create an order in `PENDING_PAYMENT`, attach line-item snapshots, and send the buyer to hosted checkout or a POS payment link through Lemon Squeezy. [docs.lemonsqueezy](https://docs.lemonsqueezy.com/api/webhooks/create-webhook)
-4. After a verified payment webhook arrives, mark the order `PAID`, convert reservations into committed inventory movements, and write the provider references into `payments`. [npmjs](https://www.npmjs.com/package/@lemonsqueezy/lemonsqueezy.js?activeTab=readme)
-5. When fulfillment starts, create a shipment record, store the AfterShip and J&T tracking references, and update the tracking page from shipment status events. [github](https://github.com/AfterShip/tracking-sdk-nodejs)
+The following tables remain documented for **historical** and **migration** context; **runtime** web and POS flows target **Medusa** instead:
+
+| Table | Purpose |
+|---|---|
+| `users` | Canonical identity for staff/customers via OAuth upsert (`packages/database`). |
+| `accounts`, `sessions` | NextAuth provider links and sessions. |
+| `products`, `product_variants`, `inventory_*`, `orders`, `order_items`, `payments`, `shipments`, `stock_reservations` | **Legacy** OMS; mutation helpers still in `packages/database` for scripts—not used by current Medusa-first apps for new checkout. |
+| Compliance-related reads/writes | Via `packages/database` compliance queries and Express `/compliance` routes. |
+
+---
+
+## OMS flow (Medusa)
+
+1. **Catalog:** Create products and variants in **Medusa Admin** (region, sales channel, inventory locations such as Warehouse PH).
+2. **Web:** Shopper browses via Store API; cart is **session storage** until checkout creates a **Medusa cart**, adds shipping, starts **payment session**, redirects to **Lemon**.
+3. **Payment truth:** **Lemon** webhook hits **Medusa**; signature verified; payment session completes; order **not** paid on client redirect alone.
+4. **POS:** Staff uses admin UI → **Route Handlers** → Medusa **Admin API** (lookup, draft order, convert to order).
+5. **Fulfillment:** Pick/pack in **Medusa**; **AfterShip** registration from fulfillment subscriber; inbound AfterShip webhook updates **order metadata** on Medusa.
+6. **Tracking:** Storefront reads **Medusa** order and fulfillment data for `/track`.
+
+---
 
 ## SOP
 
-Keep SOPs short and operational so staff can follow the same flow in web, warehouse, and POS contexts.
+Normative runbook: **`internal/docs/SOP-OPERATIONS-MEDUSA.md`**. Short reminders:
 
-- Catalog SOP: Create the parent product first, add all size/color variants next, assign SKU and barcode per variant, then load opening stock by location before publishing. [supabase](https://supabase.com/features/postgres-database)
-- Web order SOP: Reserve stock at checkout start, create the pending order, wait for a signed Lemon Squeezy payment webhook, then mark paid and release fulfillment only after webhook confirmation. [docs.lemonsqueezy](https://docs.lemonsqueezy.com/help/lemonjs)
-- POS SOP: Scan barcode, confirm size/color and quantity, create a `POS` order, collect payment through the same payment service or approved in-store flow, and deduct stock through the same inventory service used by web orders. [docs.lemonsqueezy](https://docs.lemonsqueezy.com/api/webhooks/create-webhook)
-- Fulfillment SOP: Pack by variant SKU, create the J&T shipment through AfterShip-connected workflow, save the tracking number, mark shipped, and reconcile failed labels or exceptions from the orders queue daily. [aftership](https://www.aftership.com/carriers/jtexpress-ph)
+- **Catalog SOP:** Medusa Admin for products, variants, options, SKUs, images, and stock locations.
+- **Web order SOP:** Medusa cart → Lemon checkout → webhook on Medusa → paid order.
+- **POS SOP:** Medusa draft order / convert; staff auth via NextAuth + middleware.
+- **Fulfillment SOP:** Medusa fulfillments + carrier tracking; AfterShip aligned with Medusa order id in custom fields.
 
-## Sprint plan
+---
 
-Run the sprint in small PR-sized slices inside your usual feature-branch to `development` to `main` flow so deployment stays clean and testable in the monorepo.
+## Sprint plan (historical bootstrap)
 
-| Day | Deliverable |
+The table below reflects an **early** monorepo bootstrap. **Current** delivery follows **Medusa** ownership, **cutover** PRs (`internal/docs/exclusive/fixes/today/COMMERCE-CUTOVER-PROGRAM.md`), and the ADR—not a seven-day Express-first build.
+
+| Day | Deliverable (historical) |
 |---|---|
-| Day 1 | Repo bootstrap, pnpm workspace, Turbo pipelines, env setup, Supabase schema, seed data, Google auth base. [turborepo](https://turborepo.dev) |
-| Day 2 | Product catalog APIs, variant management, inventory locations, movement ledger, barcode model, admin inventory UI. [supabase](https://supabase.com/docs) |
-| Day 3 | Storefront home, shop grid, PDP, cart, stock reservation flow, checkout handoff to Lemon Squeezy. [nextjs](https://nextjs.org/docs/app) |
-| Day 4 | Payment webhook ingestion, order state machine, POS terminal, barcode lookup, shared order service for web and POS. [docs.lemonsqueezy](https://docs.lemonsqueezy.com/api/webhooks/create-webhook) |
-| Day 5 | Orders hub, shipment records, AfterShip tracking integration, customer tracking page, low-stock alerts. [aftership](https://www.aftership.com/carriers/jtexpress-ph/api) |
-| Day 6 | QA, webhook replay tests, role checks, staging deploy, branch merge to `development`. [docs.lemonsqueezy](https://docs.lemonsqueezy.com/api/webhooks/create-webhook) |
-| Day 7 | UAT, production deploy, branch merge to `main`, SOP handoff, and launch checklist. |
+| Day 1 | Repo bootstrap, pnpm workspace, Turbo pipelines, env setup, Supabase schema, seed data, Google auth base. |
+| Day 2 | Legacy catalog APIs and admin inventory (superseded by Medusa for live catalog). |
+| Day 3 | Storefront home, shop, PDP, cart, checkout handoff to Lemon Squeezy. |
+| Day 4 | Payment webhooks and POS (superseded by Medusa modules and admin BFF). |
+| Day 5 | Orders hub, shipment records, AfterShip, tracking page. |
+| Day 6 | QA, webhook tests, role checks, staging deploy. |
+| Day 7 | UAT, production deploy, launch checklist. |
+
+**Current milestone themes:** Medusa-only env, webhook URLs per provider, retire legacy Express commerce imports, `packages/database` boundary cleanup per `internal/docs/exclusive/fixes/package-boundary-cleanup.md`.
