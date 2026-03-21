@@ -12,7 +12,9 @@ function imageRemotePatterns() {
     }));
 }
 
+const path = require("path");
 const nextConfig = {
+  outputFileTracingRoot: path.join(__dirname, "../.."),
   transpilePackages: ["@apparel-commerce/ui", "@apparel-commerce/types", "@apparel-commerce/sdk"],
   images: {
     remotePatterns: imageRemotePatterns(),
