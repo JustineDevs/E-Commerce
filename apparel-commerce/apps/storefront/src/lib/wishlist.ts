@@ -28,7 +28,8 @@ export function getWishlist(): WishlistEntry[] {
     out.push({
       slug: o.slug,
       name: o.name,
-      addedAt: typeof o.addedAt === "string" ? o.addedAt : new Date().toISOString(),
+      addedAt:
+        typeof o.addedAt === "string" ? o.addedAt : new Date().toISOString(),
     });
   }
   return out;
@@ -43,7 +44,9 @@ export function wishlistContains(slug: string): boolean {
   return getWishlist().some((e) => e.slug === slug);
 }
 
-export function toggleWishlist(entry: Pick<WishlistEntry, "slug" | "name">): boolean {
+export function toggleWishlist(
+  entry: Pick<WishlistEntry, "slug" | "name">,
+): boolean {
   const list = getWishlist();
   const i = list.findIndex((e) => e.slug === entry.slug);
   if (i >= 0) {
