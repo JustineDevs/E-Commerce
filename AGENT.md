@@ -6,8 +6,8 @@ You are working on the **Apparel Commerce Platform**, a composable commerce syst
 
 - **Purpose**: Unified online and in-store sales for a shorts/apparel retail business in the Philippines.
 - **Architecture**: Monorepo (Turborepo + pnpm) with one shared source of truth for products, variants, inventory, orders, payments, and shipments.
-- **Apps**: `apparel-commerce/apps/storefront`, `apparel-commerce/apps/admin`, `apparel-commerce/apps/api`.
-- **Packages**: `ui`, `types`, `validation`, `database`, `config`, `sdk`.
+- **Apps**: `apps/storefront`, `apps/admin`, `apps/api`, `apps/medusa`.
+- **Packages**: `types`, `validation`, `rate-limits`, `database`, `config`, `sdk`.
 
 ## Canonical Documentation
 
@@ -57,12 +57,13 @@ For doc context commands, use **internal/docs** and **.cursor/llm** as canonical
 ## Project Structure Reference
 
 ```
-apparel-commerce/
-├── apps/storefront   # Home, shop, PDP, cart, checkout, track, account
-├── apps/admin        # Dashboard, inventory, orders, POS
-├── apps/api          # Webhooks, inventory, orders, barcode, background jobs
-└── packages/
-    ├── ui, types, validation, database, config, sdk
+apps/
+├── storefront   # Home, shop, PDP, cart, checkout, track, account
+├── admin        # Dashboard, inventory, orders, POS
+├── api          # Health, compliance (internal key)
+└── medusa       # Commerce backend (Medusa 2)
+packages/
+├── types, validation, rate-limits, database, config, sdk
 ```
 
 ## Skills (when relevant)
