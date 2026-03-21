@@ -23,11 +23,13 @@ function resolveJsonlPath(): string {
     return argvTail[argvTail.length - 1];
   }
   throw new Error(
-    "Set MIGRATION_INVENTORY_JSONL to a readable .jsonl path, or pass a .jsonl path as the last CLI argument."
+    "Set MIGRATION_INVENTORY_JSONL to a readable .jsonl path, or pass a .jsonl path as the last CLI argument.",
   );
 }
 
-export default async function importLegacyInventoryJsonl({ container }: ExecArgs) {
+export default async function importLegacyInventoryJsonl({
+  container,
+}: ExecArgs) {
   const logger = container.resolve(ContainerRegistrationKeys.LOGGER);
   const inventoryModuleService = container.resolve(Modules.INVENTORY);
   const stockLocationModuleService = container.resolve(Modules.STOCK_LOCATION);
@@ -37,17 +39,17 @@ export default async function importLegacyInventoryJsonl({ container }: ExecArgs
 
   const medusaLocations = await stockLocationModuleService.listStockLocations(
     {},
-    { take: 500 }
+    { take: 500 },
   );
 
   function resolveLocationId(
-    loc: InventoryRow["location"]
+    loc: InventoryRow["location"],
   ): string | undefined {
     const code = loc?.code != null ? String(loc.code).trim() : "";
     const byMeta = medusaLocations.find(
       (s) =>
         s.metadata?.[LEGACY_LOC_META_KEY] != null &&
-        String(s.metadata[LEGACY_LOC_META_KEY]) === code
+        String(s.metadata[LEGACY_LOC_META_KEY]) === code,
     );
     if (byMeta) {
       return byMeta.id;
@@ -79,7 +81,10 @@ export default async function importLegacyInventoryJsonl({ container }: ExecArgs
     stocked_quantity: number;
   }[] = [];
 
-  const batchSize = Math.max(50, Number(process.env.MIGRATION_INVENTORY_BATCH ?? 200));
+  const batchSize = Math.max(
+    50,
+    Number(process.env.MIGRATION_INVENTORY_BATCH ?? 200),
+  );
 
   const flushWorkflows = async () => {
     if (!toCreate.length && !toUpdate.length) {
@@ -115,7 +120,7 @@ export default async function importLegacyInventoryJsonl({ container }: ExecArgs
     const locationId = resolveLocationId(row.location);
     if (!locationId) {
       logger.warn(
-        `Line ${lineNo}: no Medusa stock location for legacy location code=${String(row.location?.code)} name=${String(row.location?.name)} — set stock location metadata ${LEGACY_LOC_META_KEY} or align names.`
+        `Line ${lineNo}: no Medusa stock location for legacy location code=${String(row.location?.code)} name=${String(row.location?.name)}: set stock location metadata ${LEGACY_LOC_META_KEY} or align names.`,
       );
       skipped += 1;
       continue;
@@ -131,7 +136,7 @@ export default async function importLegacyInventoryJsonl({ container }: ExecArgs
     const item = items[0];
     if (!item) {
       logger.warn(
-        `Line ${lineNo}: no inventory item for SKU ${sku} — import catalog first.`
+        `Line ${lineNo}: no inventory item for SKU ${sku}: import catalog first.`,
       );
       skipped += 1;
       continue;
@@ -167,6 +172,6 @@ export default async function importLegacyInventoryJsonl({ container }: ExecArgs
   await flushWorkflows();
 
   logger.info(
-    `Inventory import finished: levels_created=${created} levels_updated=${updated} skipped=${skipped} lines=${lineNo}`
+    `Inventory import finished: levels_created=${created} levels_updated=${updated} skipped=${skipped} lines=${lineNo}`,
   );
 }
