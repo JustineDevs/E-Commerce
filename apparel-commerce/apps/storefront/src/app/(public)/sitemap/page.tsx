@@ -30,16 +30,25 @@ const links: { href: string; label: string }[] = [
 
 export default function SitemapPage() {
   return (
-    <main className="mx-auto max-w-2xl px-[clamp(0.75rem,4vw,2rem)] pb-24 pt-24 sm:pt-32">
-      <h1 className="font-headline text-3xl font-bold text-primary sm:text-4xl">Site map</h1>
-      <p className="mt-3 text-sm text-on-surface-variant">Structured list of main storefront pages.</p>
+    <main className="storefront-page-shell max-w-2xl">
+      <h1 className="font-headline text-3xl font-bold text-primary sm:text-4xl">
+        Site map
+      </h1>
+      <p className="mt-3 text-sm text-on-surface-variant">
+        Structured list of main storefront pages.
+      </p>
       <ul className="mt-8 grid list-none grid-cols-1 gap-2 sm:grid-cols-2">
         {links.map((l) => (
           <li key={l.href}>
-            <Link href={l.href} className="text-sm text-primary underline hover:opacity-80">
+            <Link
+              href={l.href}
+              className="text-sm text-primary underline hover:opacity-80"
+            >
               {l.label}
             </Link>
-            <span className="ml-2 text-xs text-on-surface-variant">{l.href}</span>
+            <span className="ml-2 text-xs text-on-surface-variant">
+              {l.href}
+            </span>
           </li>
         ))}
       </ul>
