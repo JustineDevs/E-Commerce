@@ -1,23 +1,24 @@
 import Image from "next/image";
 import Link from "next/link";
+import { IconBag, IconHeart, IconPerson } from "./NavActionIcons";
 import { StorefrontMainNav } from "./StorefrontMainNav";
 
 export function StorefrontNav() {
   return (
-    <nav className="relative flex w-full min-w-0 max-w-full items-center justify-between gap-2 px-[clamp(0.75rem,3vw,2rem)] py-3 font-headline tracking-tight shadow-[0px_8px_24px_rgba(0,0,0,0.06)] sm:gap-3 sm:py-4">
+    <nav className="relative flex w-full min-w-0 max-w-full items-center justify-between gap-2 px-[clamp(0.75rem,3vw,2rem)] py-1.5 font-headline tracking-tight shadow-[0px_8px_24px_rgba(0,0,0,0.06)] sm:gap-3 sm:py-2">
       <Link
         href="/"
-        className="relative flex h-8 w-[min(180px,38vw)] shrink-0 items-center transition-opacity duration-200 hover:opacity-85 xs:h-9 md:h-11 md:w-[min(200px,42vw)]"
+        className="relative flex aspect-square h-10 w-10 shrink-0 items-center justify-center transition-opacity duration-200 hover:opacity-85 xs:h-11 xs:w-11 sm:h-12 sm:w-12 md:h-12 md:w-12"
         data-testid="nav-home"
-        aria-label="Maharlika — Grand Custom, home"
+        aria-label="Maharlika Apparel Custom, home"
       >
         <Image
-          src="/brand/maharlika-logo-horizontal.png"
-          alt="Maharlika — Grand Custom"
-          width={320}
-          height={214}
-          className="h-full w-full object-contain object-left"
-          sizes="(max-width: 768px) 42vw, 200px"
+          src="/brand/maharlika-logo-abstract.png"
+          alt="Maharlika Apparel Custom"
+          width={512}
+          height={512}
+          className="h-full w-full object-contain object-center"
+          sizes="(max-width: 640px) 44px, (max-width: 1024px) 52px, 56px"
           priority
         />
       </Link>
@@ -28,7 +29,7 @@ export function StorefrontNav() {
           className="text-primary transition-transform duration-200 hover:scale-95"
           aria-label="Wishlist"
         >
-          <span className="material-symbols-outlined text-[22px] sm:text-[24px]">favorite</span>
+          <IconHeart />
         </Link>
         <Link
           href="/checkout"
@@ -36,7 +37,7 @@ export function StorefrontNav() {
           className="text-primary transition-transform duration-200 hover:scale-95"
           aria-label="Shopping bag"
         >
-          <span className="material-symbols-outlined text-[22px] sm:text-[24px]">shopping_bag</span>
+          <IconBag />
         </Link>
         <Link
           href="/account"
@@ -44,7 +45,7 @@ export function StorefrontNav() {
           className="text-primary transition-transform duration-200 hover:scale-95"
           aria-label="Account"
         >
-          <span className="material-symbols-outlined text-[22px] sm:text-[24px]">person</span>
+          <IconPerson />
         </Link>
       </div>
     </nav>
