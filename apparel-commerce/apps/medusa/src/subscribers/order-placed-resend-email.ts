@@ -51,7 +51,7 @@ export default async function orderPlacedResendEmail({
   const orderModule = container.resolve(Modules.ORDER);
   const order = await orderModule.retrieveOrder(data.id, {
     relations: ["customer"],
-  });
+  }) as { email?: string; id?: string; display_id?: number; customer?: { email?: string } | null };
 
   const emailRaw =
     (typeof order.email === "string" && order.email.trim()) ||
@@ -59,8 +59,8 @@ export default async function orderPlacedResendEmail({
     typeof order.customer === "object" &&
     order.customer !== null &&
     "email" in order.customer &&
-    typeof (order.customer as { email?: string }).email === "string"
-      ? (order.customer as { email: string }).email.trim()
+    typeof order.customer.email === "string"
+      ? order.customer.email.trim()
       : "") ||
     "";
 
