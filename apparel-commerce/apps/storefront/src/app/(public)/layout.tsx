@@ -1,3 +1,4 @@
+import { GlobalRouteMotion } from "../../components/GlobalRouteMotion";
 import { StorefrontFooter } from "../../components/StorefrontFooter";
 import { StorefrontHeader } from "../../components/StorefrontHeader";
 
@@ -9,8 +10,8 @@ export default function PublicLayout({
   return (
     <>
       <StorefrontHeader />
-      <div className="mx-auto w-full min-w-0 max-w-[100vw] pt-[5.75rem] xs:pt-[6rem] sm:pt-[6.5rem] md:pt-[7rem]">
-        {children}
+      <div className="mx-auto w-full min-w-0 max-w-[100vw] pt-[5.875rem] xs:pt-24 sm:pt-[6.125rem] md:pt-[6.25rem]">
+        <GlobalRouteMotion>{children}</GlobalRouteMotion>
       </div>
       <StorefrontFooter />
     </>
