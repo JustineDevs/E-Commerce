@@ -1,7 +1,12 @@
 import type { Request } from "express";
 
-export function logSecurityEvent(event: string, req: Request | undefined, meta?: Record<string, unknown>): void {
-  const ua = req && typeof req.get === "function" ? req.get("user-agent") : undefined;
+export function logSecurityEvent(
+  event: string,
+  req: Request | undefined,
+  meta?: Record<string, unknown>,
+): void {
+  const ua =
+    req && typeof req.get === "function" ? req.get("user-agent") : undefined;
   const line = {
     type: "security_event",
     event,
