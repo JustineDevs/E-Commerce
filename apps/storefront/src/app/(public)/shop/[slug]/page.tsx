@@ -1,16 +1,56 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { AddToCartSection } from "@/components/AddToCartSection";
 import { StorefrontCommerceAlert } from "@/components/StorefrontCommerceAlert";
 import { fetchProductBySlug } from "@/lib/catalog-fetch";
+import {
+  buildJsonLdProduct,
+  buildJsonLdBreadcrumb,
+  canonicalUrl,
+} from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 
-export default async function ProductPage({
-  params,
-}: {
+type Props = {
   params: Promise<{ slug: string }>;
-}) {
+};
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { slug } = await params;
+  const res = await fetchProductBySlug(slug, 60);
+  if (res.kind !== "ok") {
+    return { title: "Product" };
+  }
+  const { product } = res;
+  const minPrice = Math.min(...product.variants.map((v) => v.price));
+  const image = product.images[0]?.imageUrl;
+  const desc =
+    product.description?.slice(0, 155) ??
+    `${product.name} — PHP ${minPrice.toLocaleString("en-PH")}. ${product.category ?? "Apparel"} from Maharlika Apparel Custom.`;
+
+  return {
+    title: product.name,
+    description: desc,
+    alternates: { canonical: canonicalUrl(`/shop/${slug}`) },
+    openGraph: {
+      title: product.name,
+      description: desc,
+      url: canonicalUrl(`/shop/${slug}`),
+      siteName: "Maharlika Apparel Custom",
+      type: "website",
+      images: image ? [{ url: image, alt: product.name }] : undefined,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: product.name,
+      description: desc,
+      images: image ? [image] : undefined,
+    },
+  };
+}
+
+export default async function ProductPage({ params }: Props) {
   const { slug } = await params;
   const res = await fetchProductBySlug(slug, 60);
 
@@ -37,7 +77,27 @@ export default async function ProductPage({
     .filter(Boolean)
     .sort();
 
+  const productJsonLd = buildJsonLdProduct(product);
+  const breadcrumbJsonLd = buildJsonLdBreadcrumb([
+    { name: "Home", href: "/" },
+    { name: "Shop", href: "/shop" },
+    { name: product.name, href: `/shop/${slug}` },
+  ]);
+
   return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(productJsonLd),
+        }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(breadcrumbJsonLd),
+        }}
+      />
     <main className="storefront-page-shell max-w-[1600px]">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 lg:gap-24">
         <div className="lg:col-span-7 flex flex-col md:flex-row-reverse gap-6">
@@ -185,5 +245,6 @@ export default async function ProductPage({
         </div>
       </div>
     </main>
+    </>
   );
 }
