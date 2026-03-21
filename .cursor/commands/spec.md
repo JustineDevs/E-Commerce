@@ -22,7 +22,7 @@ NON-NEGOTIABLE RULES
 6. Never claim completion unless the code path, runtime behavior, and validation all exist.
 7. If a feature is only partial, label it NOT DONE, not “mostly done.”
 8. If a feature exists only behind fallback/dev mode and not as the primary production path, label it NOT DONE.
-9. If you are uncertain, say BLOCKED or NOT DONE — never invent completion.
+9. If you are uncertain, say BLOCKED or NOT DONE: never invent completion.
 10. Preserve all already-completed hardening and do not regress existing behavior.
 
 REQUIRED OUTPUT FORMAT
