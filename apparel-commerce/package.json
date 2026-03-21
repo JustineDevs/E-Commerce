@@ -14,7 +14,10 @@
     "test": "pnpm --filter @apparel-commerce/database test",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:headed": "playwright test --headed"
+    "test:e2e:headed": "playwright test --headed",
+    "dogfood:screenshots": "playwright test e2e/dogfood --project=chromium",
+    "verify:public-env": "node scripts/verify-next-public-env.mjs",
+    "ci:check": "pnpm verify:public-env && pnpm exec turbo build"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",
