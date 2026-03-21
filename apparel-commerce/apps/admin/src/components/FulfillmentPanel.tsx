@@ -39,7 +39,7 @@ export function FulfillmentPanel({
     setErr(null);
     setMsg(null);
     setLoading("shipment");
-    const res = await fetch("/api/backend/shipments", {
+    const res = await fetch("/api/medusa/shipments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -65,12 +65,18 @@ export function FulfillmentPanel({
     setErr(null);
     setMsg(null);
     setLoading(`status:${next}`);
-    const res = await fetch(`/api/backend/orders/${orderId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: next }),
-    });
-    const data = (await res.json().catch(() => ({}))) as { error?: string; status?: string };
+    const res = await fetch(
+      `/api/medusa/orders/${encodeURIComponent(orderId)}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: next }),
+      },
+    );
+    const data = (await res.json().catch(() => ({}))) as {
+      error?: string;
+      status?: string;
+    };
     setLoading(null);
     if (!res.ok) {
       setErr(data.error ?? `Request failed (${res.status})`);
@@ -97,7 +103,10 @@ export function FulfillmentPanel({
           Fulfillment
         </h3>
         <p className="text-sm text-on-surface-variant mb-4">
-          Current status: <span className="font-medium text-primary">{status.replace(/_/g, " ")}</span>
+          Current status:{" "}
+          <span className="font-medium text-primary">
+            {status.replace(/_/g, " ")}
+          </span>
         </p>
         {err && (
           <p className="text-sm text-red-600 mb-3" role="alert">
@@ -111,7 +120,10 @@ export function FulfillmentPanel({
         )}
 
         {canShip && (
-          <form onSubmit={(e) => void addShipment(e)} className="space-y-4 mb-6">
+          <form
+            onSubmit={(e) => void addShipment(e)}
+            className="space-y-4 mb-6"
+          >
             <div>
               <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-on-surface-variant">
                 Tracking number
@@ -150,7 +162,7 @@ export function FulfillmentPanel({
               disabled={loading !== null}
               className="rounded bg-primary px-4 py-2 text-sm font-bold uppercase tracking-widest text-on-primary hover:opacity-90 disabled:opacity-50"
             >
-              {loading === "shipment" ? "Saving…" : "Save shipment"}
+              {loading === "shipment" ? "Saving\u2026" : "Save shipment"}
             </button>
           </form>
         )}
@@ -194,17 +206,30 @@ export function FulfillmentPanel({
           Shipments
         </h3>
         {initialShipments.length === 0 ? (
-          <p className="text-sm text-on-surface-variant">No shipments yet. AfterShip webhooks will also update this list.</p>
+          <p className="text-sm text-on-surface-variant">
+            No shipments yet. AfterShip webhooks will also update this list.
+          </p>
         ) : (
           <ul className="space-y-3">
             {initialShipments.map((s) => (
-              <li key={s.id} className="rounded border border-outline-variant/20 p-4 text-sm">
-                <p className="font-medium text-primary">{s.tracking_number ?? "—"}</p>
+              <li
+                key={s.id}
+                className="rounded border border-outline-variant/20 p-4 text-sm"
+              >
+                <p className="font-medium text-primary">
+                  {s.tracking_number ?? "None"}
+                </p>
                 <p className="text-on-surface-variant">
-                  {s.carrier_slug ?? "carrier"} · {(s.status ?? "").replace(/_/g, " ")}
+                  {s.carrier_slug ?? "carrier"} &middot;{" "}
+                  {(s.status ?? "").replace(/_/g, " ")}
                 </p>
                 {s.label_url ? (
-                  <a href={s.label_url} className="text-primary text-xs underline mt-1 inline-block" target="_blank" rel="noreferrer">
+                  <a
+                    href={s.label_url}
+                    className="text-primary text-xs underline mt-1 inline-block"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
                     Label
                   </a>
                 ) : null}
