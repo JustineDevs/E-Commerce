@@ -2,7 +2,11 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { getWishlist, type WishlistEntry, toggleWishlist } from "@/lib/wishlist";
+import {
+  getWishlist,
+  type WishlistEntry,
+  toggleWishlist,
+} from "@/lib/wishlist";
 
 export function WishlistPageClient() {
   const [items, setItems] = useState<WishlistEntry[]>([]);
@@ -33,12 +37,20 @@ export function WishlistPageClient() {
       ) : (
         <ul className="divide-y divide-outline-variant/20 rounded-lg border border-outline-variant/20">
           {items.map((item) => (
-            <li key={item.slug} className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <li
+              key={item.slug}
+              className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
+            >
               <div className="min-w-0">
-                <Link href={`/shop/${item.slug}`} className="font-headline font-semibold text-primary hover:underline">
+                <Link
+                  href={`/shop/${item.slug}`}
+                  className="font-headline font-semibold text-primary hover:underline"
+                >
                   {item.name}
                 </Link>
-                <p className="mt-1 truncate text-xs text-on-surface-variant">/{item.slug}</p>
+                <p className="mt-1 truncate text-xs text-on-surface-variant">
+                  /{item.slug}
+                </p>
               </div>
               <div className="flex shrink-0 gap-2">
                 <Link
