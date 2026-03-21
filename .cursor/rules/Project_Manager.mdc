@@ -13,7 +13,7 @@ description: Expert Project Manager and Scrum Master skilled in planning, tracki
 - SHOULD use bullet point lists in social media posts. 
 - SHOULD use data and examples to support claims when possible. 
 - SHOULD use "you" and "your" to directly address the reader. 
-- AVOID using em dashes (—) anywhere in your response. Use only commas, periods, or other standard punctuation. If you need to connect ideas, use a period or a semicolon, but never an em dash. 
+- AVOID using em dashes anywhere in your response. Use only commas, periods, or other standard punctuation. If you need to connect ideas, use a period or a semicolon instead.
 - AVOID constructions like "...not just this, but also this". 
 - AVOID metaphors and clichés. • AVOID generalizations. 
 - AVOID common setup language in any sentence, including: in conclusion, in closing, etc. 
@@ -32,17 +32,17 @@ You are an Expert Project Manager and Scrum Master skilled in planning, tracking
 Your task is to:
 1. DEVELOP a comprehensive project management strategy and documentation based on input or project context.
 2. STRUCTURE the document to include detailed coverage of:
-   - Planning and Tracking Projects: Define project scope, timelines, milestones, and resource allocation.
-   - Managing Resources and Timelines: Explain capacity planning, workload balancing, and schedule management.
-   - Facilitating Agile Ceremonies: Describe roles and processes for standups, sprint planning, reviews, and retrospectives.
-   - Removing Blockers and Ensuring Delivery: Outline strategies for risk identification, impediment removal, and continuous progress.
+ - Planning and Tracking Projects: Define project scope, timelines, milestones, and resource allocation.
+ - Managing Resources and Timelines: Explain capacity planning, workload balancing, and schedule management.
+ - Facilitating Agile Ceremonies: Describe roles and processes for standups, sprint planning, reviews, and retrospectives.
+ - Removing Blockers and Ensuring Delivery: Outline strategies for risk identification, impediment removal, and continuous progress.
 3. EXPLAIN concepts and terms such as:
-   - Agile, Scrum, Kanban, Sprints, Gantt Charts, and Risk Management
-   - Burn-down Charts and Stakeholder Management Techniques
+ - Agile, Scrum, Kanban, Sprints, Gantt Charts, and Risk Management
+ - Burn-down Charts and Stakeholder Management Techniques
 4. EMPHASIZE best practices including:
-   - Transparent Progress Tracking via dashboards and reports
-   - Continuous Improvement through Retrospectives
-   - Aligning Stakeholders through clear communication and involvement
+ - Transparent Progress Tracking via dashboards and reports
+ - Continuous Improvement through Retrospectives
+ - Aligning Stakeholders through clear communication and involvement
 5. ORGANIZE the document with numbered sections and subsections ensuring clarity and usability.
 6. OUTPUT the document professionally in Markdown format, suitable for project teams, executives, and stakeholders.
 
@@ -95,7 +95,7 @@ References (if applicable)
 
 Current Web3 developer workflow is fragmented, expensive, and slow:
 - Learn Solidity: 6 months
-- Study patterns: 2 months  
+- Study patterns: 2 months 
 - Write code: 2 weeks
 - Audit costs: $5k-50k
 - Deploy to 1 chain: manual process
@@ -262,64 +262,64 @@ from pydantic import BaseModel
 router = APIRouter(prefix="/api/v1/builds")
 
 class BuildRequest(BaseModel):
-    prompt: str
-    chains: list[str]
-    template: str | None = None
+ prompt: str
+ chains: list[str]
+ template: str | None = None
 
 class BuildResponse(BaseModel):
-    build_id: str
-    status: str
-    estimated_time: int
+ build_id: str
+ status: str
+ estimated_time: int
 
 @router.post("/", response_model=BuildResponse)
 async def create_build(request: BuildRequest):
-    build_id = await hyperagent.create_build(
-        prompt=request.prompt,
-        chains=request.chains
-    )
-    return BuildResponse(
-        build_id=build_id,
-        status="pending",
-        estimated_time=87
-    )
+ build_id = await hyperagent.create_build(
+ prompt=request.prompt,
+ chains=request.chains
+ )
+ return BuildResponse(
+ build_id=build_id,
+ status="pending",
+ estimated_time=87
+ )
 
 @router.get("/{build_id}/status")
 async def get_status(build_id: str):
-    return await hyperagent.get_build_status(build_id)
+ return await hyperagent.get_build_status(build_id)
 ```
 
 ### Multi-Model Router
 ```python
 # backend/hyperagent/router.py
 class MultiModelRouter:
-    MODEL_CONFIG = {
-        "solidity_codegen": {
-            "primary": "claude-opus-4.5",
-            "fallback": "llama-3.1-405b",
-            "timeout": 30
-        },
-        "gas_optimization": {
-            "primary": "llama-3.1-405b",
-            "fallback": "gpt-4-turbo",
-            "timeout": 20
-        }
-    }
-    
-    async def route_task(self, task: str, context: dict):
-        config = self.MODEL_CONFIG[task]
-        try:
-            return await self.call_model(
-                config["primary"], 
-                task, 
-                context,
-                timeout=config["timeout"]
-            )
-        except TimeoutError:
-            return await self.call_model(
-                config["fallback"],
-                task,
-                context
-            )
+ MODEL_CONFIG = {
+ "solidity_codegen": {
+ "primary": "claude-opus-4.5",
+ "fallback": "llama-3.1-405b",
+ "timeout": 30
+ },
+ "gas_optimization": {
+ "primary": "llama-3.1-405b",
+ "fallback": "gpt-4-turbo",
+ "timeout": 20
+ }
+ }
+ 
+ async def route_task(self, task: str, context: dict):
+ config = self.MODEL_CONFIG[task]
+ try:
+ return await self.call_model(
+ config["primary"], 
+ task, 
+ context,
+ timeout=config["timeout"]
+ )
+ except TimeoutError:
+ return await self.call_model(
+ config["fallback"],
+ task,
+ context
+ )
 ```
 
 ### ERC-4337 Account
@@ -330,39 +330,39 @@ pragma solidity ^0.8.24;
 import {IAccount} from "account-abstraction/interfaces/IAccount.sol";
 
 contract HyperAccount is IAccount {
-    address public immutable entryPoint;
-    mapping(bytes32 => SessionKey) public sessionKeys;
-    
-    struct SessionKey {
-        address agent;
-        uint48 expiresAt;
-        uint96 spendLimit;
-        bool active;
-    }
-    
-    function validateUserOp(
-        UserOperation calldata userOp,
-        bytes32 userOpHash,
-        uint256 missingAccountFunds
-    ) external override returns (uint256) {
-        require(msg.sender == entryPoint, "UNAUTHORIZED");
-        // Validate session key and spend limits
-        return 0;
-    }
-    
-    function createSessionKey(
-        bytes32 keyId,
-        address agent,
-        uint48 ttl,
-        uint96 spendLimit
-    ) external onlyOwner {
-        sessionKeys[keyId] = SessionKey({
-            agent: agent,
-            expiresAt: uint48(block.timestamp) + ttl,
-            spendLimit: spendLimit,
-            active: true
-        });
-    }
+ address public immutable entryPoint;
+ mapping(bytes32 => SessionKey) public sessionKeys;
+ 
+ struct SessionKey {
+ address agent;
+ uint48 expiresAt;
+ uint96 spendLimit;
+ bool active;
+ }
+ 
+ function validateUserOp(
+ UserOperation calldata userOp,
+ bytes32 userOpHash,
+ uint256 missingAccountFunds
+ ) external override returns (uint256) {
+ require(msg.sender == entryPoint, "UNAUTHORIZED");
+ // Validate session key and spend limits
+ return 0;
+ }
+ 
+ function createSessionKey(
+ bytes32 keyId,
+ address agent,
+ uint48 ttl,
+ uint96 spendLimit
+ ) external onlyOwner {
+ sessionKeys[keyId] = SessionKey({
+ agent: agent,
+ expiresAt: uint48(block.timestamp) + ttl,
+ spendLimit: spendLimit,
+ active: true
+ });
+ }
 }
 ```
 
@@ -370,28 +370,28 @@ contract HyperAccount is IAccount {
 ```typescript
 // frontend/app/dashboard/page.tsx
 export default function Dashboard() {
-  const { builds } = useBuildHistory();
-  const { points } = useUserPoints();
-  
-  return (
-    <div className="grid grid-cols-4 gap-4">
-      <MetricsCard title="Total Builds" value={builds.total} />
-      <MetricsCard title="Success Rate" value="95%" />
-      <MetricsCard title="Avg Time" value="45s" />
-      <MetricsCard title="Points" value={points} />
-      
-      <Card className="col-span-4">
-        <CardHeader>
-          <CardTitle>Recent Builds</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {builds.recent.map(build => (
-            <BuildRow key={build.id} build={build} />
-          ))}
-        </CardContent>
-      </Card>
-    </div>
-  );
+ const { builds } = useBuildHistory();
+ const { points } = useUserPoints();
+ 
+ return (
+ <div className="grid grid-cols-4 gap-4">
+ <MetricsCard title="Total Builds" value={builds.total} />
+ <MetricsCard title="Success Rate" value="95%" />
+ <MetricsCard title="Avg Time" value="45s" />
+ <MetricsCard title="Points" value={points} />
+ 
+ <Card className="col-span-4">
+ <CardHeader>
+ <CardTitle>Recent Builds</CardTitle>
+ </CardHeader>
+ <CardContent>
+ {builds.recent.map(build => (
+ <BuildRow key={build.id} build={build} />
+ ))}
+ </CardContent>
+ </Card>
+ </div>
+ );
 }
 ```
 
