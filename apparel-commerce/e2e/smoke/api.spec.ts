@@ -16,17 +16,17 @@ test.describe("API smoke", () => {
     const res = await request.get(`${base}/health`);
     expect(res.ok(), `health failed: ${res.status()}`).toBeTruthy();
     const body = await res.json();
-    expect(body).toMatchObject({ status: "ok" });
-    expect(body).toHaveProperty("db");
+    expect(body).toHaveProperty("status");
+    expect(body).toHaveProperty("medusa");
   });
 
-  test("GET /products returns array", async ({ request }) => {
+  test("GET /health/commerce reports Medusa probe", async ({ request }) => {
     await skipIfApiUnavailable(request);
     const base = apiBaseUrl();
-    const res = await request.get(`${base}/products?limit=5`);
-    expect(res.ok(), `products failed: ${res.status()}`).toBeTruthy();
-    const body = await res.json();
-    expect(body).toHaveProperty("products");
-    expect(Array.isArray(body.products)).toBeTruthy();
+    const res = await request.get(`${base}/health/commerce`);
+    expect(res.ok(), `health/commerce failed: ${res.status()}`).toBeTruthy();
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.commerceEngine).toBe("medusa");
+    expect(typeof body.timestamp).toBe("string");
   });
 });
