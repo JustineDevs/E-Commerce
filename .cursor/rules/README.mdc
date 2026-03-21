@@ -2,14 +2,14 @@
 alwaysApply: true
 description: Professional README Standards for GitHub OSS Projects - Design, Structure, and Best Practices
 globs:
-  - "README.md"
-  - "README.mdx"
-  - "*/README.md"
+ - "README.md"
+ - "README.mdx"
+ - "*/README.md"
 ---
 
 # Professional README Standards for GitHub OSS Projects
 
-This ruleset establishes comprehensive standards for creating professional, visually appealing, and effective README files for open-source projects on GitHub. A README is the front door to your project—it determines whether visitors stay to explore or leave. This guide ensures READMEs are clear, welcoming, and conversion-focused.
+This ruleset establishes comprehensive standards for creating professional, visually appealing, and effective README files for open-source projects on GitHub. A README is the front door to your project-it determines whether visitors stay to explore or leave. This guide ensures READMEs are clear, welcoming, and conversion-focused.
 
 ---
 
@@ -52,7 +52,7 @@ According to GitHub, a README typically includes information about:
 GitHub automatically recognizes and displays README files in the following priority order:
 
 1. `.github/README.md` (hidden directory)
-2. `README.md` (root directory) — **Recommended location**
+2. `README.md` (root directory): **Recommended location**
 3. `docs/README.md` (documentation directory)
 
 **Best Practice**: Place your main README.md in the repository root for maximum visibility. This is the standard location developers expect.
@@ -109,7 +109,7 @@ Order matters. Visitors make quick decisions about whether to engage with your p
 
 ### 2. Badges & Shields (Optional but Recommended)
 
-Badges provide at-a-glance information about project status, health, and key metrics. Use sparingly—2-5 badges maximum.
+Badges provide at-a-glance information about project status, health, and key metrics. Use sparingly-2-5 badges maximum.
 
 **Recommended Badge Categories**:
 
@@ -291,10 +291,10 @@ markdown-toc -i README.md
 repository-root/
 ├── README.md
 ├── assets/
-│   └── images/
-│       ├── dashboard.png
-│       ├── audit-flow.gif
-│       └── architecture.png
+│ └── images/
+│ ├── dashboard.png
+│ ├── audit-flow.gif
+│ └── architecture.png
 ```
 
 ### 7. Quick Start / Installation
@@ -322,29 +322,29 @@ repository-root/
 ### Installation
 
 1. **Clone the repository**
-   ```bash
-   git clone https://github.com/username/hyperkit.git
-   cd hyperkit
-   ```
+ ```bash
+ git clone https://github.com/username/hyperkit.git
+ cd hyperkit
+ ```
 
 2. **Install dependencies**
-   ```bash
-   npm install
-   ```
+ ```bash
+ npm install
+ ```
 
 3. **Set up environment variables**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your configuration
-   ```
+ ```bash
+ cp .env.example .env
+ # Edit .env with your configuration
+ ```
 
 4. **Start development server**
-   ```bash
-   npm run dev
-   ```
+ ```bash
+ npm run dev
+ ```
 
 5. **Verify installation**
-   Open http://localhost:3000 in your browser. You should see the Hyperkit dashboard.
+ Open http://localhost:3000 in your browser. You should see the Hyperkit dashboard.
 
 For detailed setup instructions, see [Installation Guide](./docs/installation.md).
 ```
@@ -381,8 +381,8 @@ from hyperkit import SmartContractAuditor
 
 # Initialize auditor
 auditor = SmartContractAuditor(
-    model="gpt-4",
-    chains=["ethereum", "polygon"]
+ model="gpt-4",
+ chains=["ethereum", "polygon"]
 )
 
 # Audit a contract
@@ -390,26 +390,26 @@ results = auditor.audit("path/to/contract.sol")
 
 # View findings
 for finding in results.vulnerabilities:
-    print(f"[{finding.severity}] {finding.title}")
-    print(f"  Details: {finding.description}")
+ print(f"[{finding.severity}] {finding.title}")
+ print(f" Details: {finding.description}")
 ```
 
 Output:
 ```
 [HIGH] Unprotected reentrancy attack
-  Details: Function transfers funds before updating state...
+ Details: Function transfers funds before updating state...
 
 [MEDIUM] Missing input validation
-  Details: Function accepts user input without validation...
+ Details: Function accepts user input without validation...
 ```
 
 ### Multi-Chain Deployment
 
 ```bash
 hyperkit deploy \
-  --contract=./contracts/Token.sol \
-  --networks=ethereum,polygon,avalanche \
-  --report=detailed
+ --contract=./contracts/Token.sol \
+ --networks=ethereum,polygon,avalanche \
+ --report=detailed
 ```
 
 ### Integration with Existing Tools
@@ -513,10 +513,10 @@ If you use Hyperkit in your research, please cite:
 
 ```bibtex
 @software{hyperkit2025,
-  author = {Your Name},
-  title = {Hyperkit: AI-Powered Smart Contract Auditing},
-  year = {2025},
-  url = {https://github.com/username/hyperkit}
+ author = {Your Name},
+ title = {Hyperkit: AI-Powered Smart Contract Auditing},
+ year = {2025},
+ url = {https://github.com/username/hyperkit}
 }
 ```
 
@@ -559,7 +559,7 @@ See [CONTRIBUTORS.md](./CONTRIBUTORS.md) for a full list of contributors.
 
 **Correct Structure**:
 ```
-# Title (H1) — One per document
+# Title (H1): One per document
 ## Major Section (H2)
 ### Subsection (H3)
 #### Details (H4)
@@ -590,17 +590,17 @@ See [CONTRIBUTORS.md](./CONTRIBUTORS.md) for a full list of contributors.
 ### Installation Steps
 
 1. Clone the repository
-   - Using HTTPS: `git clone https://...`
-   - Using SSH: `git clone git@...`
+ - Using HTTPS: `git clone https://...`
+ - Using SSH: `git clone git@...`
 
 2. Install dependencies
-   ```bash
-   npm install
-   ```
+ ```bash
+ npm install
+ ```
 
 3. Configure environment
-   - Copy `.env.example` to `.env`
-   - Update with your settings
+ - Copy `.env.example` to `.env`
+ - Update with your settings
 ```
 
 ### Code Blocks
@@ -692,11 +692,11 @@ repository-root/
 ├── docs/
 ├── src/
 └── assets/
-    ├── images/
-    │   ├── demo-screenshot.png
-    │   ├── architecture.png
-    │   └── workflow.gif
-    └── videos/ (optional)
+ ├── images/
+ │ ├── demo-screenshot.png
+ │ ├── architecture.png
+ │ └── workflow.gif
+ └── videos/ (optional)
 ```
 
 **Image Implementation**:
@@ -706,9 +706,9 @@ repository-root/
 
 <!-- HTML image with size control (recommended) -->
 <img src="./assets/images/demo.png" 
-     alt="Dashboard showing smart contract audit results" 
-     width="800" 
-     height="auto">
+ alt="Dashboard showing smart contract audit results" 
+ width="800" 
+ height="auto">
 ```
 
 **Image Specifications**:
