@@ -170,9 +170,15 @@ export function HomeScrollExperience({ products }: Props) {
             ref={leadRef}
             className="mb-8 max-w-md font-body text-base leading-relaxed text-on-surface-variant sm:mb-10 sm:text-lg"
           >
-            Shorts, shirts, and jackets with quiet silhouettes and honest
-            fabrics from Maharlika Apparel Custom, tailored for everyday wear in
-            the Philippines and beyond.
+            <strong>Maharlika Apparel Custom</strong> is an online store for
+            custom shorts, shirts, and jackets. Browse, order, and track
+            shipments.{" "}
+            <Link
+              href="/privacy"
+              className="font-medium text-primary underline underline-offset-4 hover:no-underline"
+            >
+              Privacy policy
+            </Link>
           </p>
           <Link
             ref={ctaRef}
