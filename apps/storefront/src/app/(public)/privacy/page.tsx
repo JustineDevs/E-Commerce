@@ -1,8 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { canonicalUrl } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "Privacy policy",
+  description:
+    "Maharlika Apparel Custom privacy policy. How we collect, use, and protect your data. PDPA and GDPR aligned.",
+  alternates: { canonical: canonicalUrl("/privacy") },
 };
 
 export default function PrivacyPage() {
