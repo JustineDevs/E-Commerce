@@ -26,7 +26,7 @@ export function readCart(): CartLine[] {
       typeof row === "object" &&
       row !== null &&
       typeof (row as CartLine).variantId === "string" &&
-      typeof (row as CartLine).quantity === "number"
+      typeof (row as CartLine).quantity === "number",
   );
 }
 
@@ -52,7 +52,9 @@ export function updateLineQuantity(variantId: string, quantity: number): void {
     writeCart(cur.filter((c) => c.variantId !== variantId));
     return;
   }
-  writeCart(cur.map((c) => (c.variantId === variantId ? { ...c, quantity } : c)));
+  writeCart(
+    cur.map((c) => (c.variantId === variantId ? { ...c, quantity } : c)),
+  );
 }
 
 export function clearCart(): void {
