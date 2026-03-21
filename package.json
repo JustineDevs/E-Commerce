@@ -2,17 +2,35 @@
   "name": "e-commerce-website",
   "private": true,
   "scripts": {
-    "dev": "pnpm -C apparel-commerce dev",
-    "kill-ports": "pnpm -C apparel-commerce kill-ports",
+    "dev": "pnpm exec turbo dev",
+    "kill-ports": "npx --yes kill-port@2.0.1 3000 3001 4000",
     "commit": "node scripts/commit/cli/index.js commit",
     "commit:dry": "node scripts/commit/cli/index.js commit --dry-run",
     "commit:cli": "node scripts/commit/cli/index.js help",
     "commit:sh": "bash scripts/commit/parallel-commit.sh",
     "commit:sh:dry": "bash scripts/commit/parallel-commit.sh --dry-run",
     "commit:all": "git add -A && git commit -m \"chore: update project files\"",
-    "security:check": "node scripts/commit/cli/index.js security"
+    "security:check": "node scripts/commit/cli/index.js security",
+    "build": "pnpm exec turbo build",
+    "lint": "pnpm exec turbo lint",
+    "db:migrate": "pnpm --filter @apparel-commerce/database migrate",
+    "db:seed": "pnpm --filter @apparel-commerce/database seed",
+    "test": "pnpm --filter @apparel-commerce/validation test && pnpm --filter @apparel-commerce/rate-limits test && pnpm --filter @apparel-commerce/api test && pnpm --filter @apparel-commerce/database test && pnpm --filter medusa test:stress",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "dogfood:screenshots": "playwright test e2e/dogfood --project=chromium",
+    "predeploy": "pnpm install && pnpm run build"
   },
   "dependencies": {
     "vercel": "^32.3.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "prettier": "^3.2.5",
+    "turbo": "^2.3.0"
+  },
+  "packageManager": "pnpm@10.15.1",
+  "engines": {
+    "node": "20"
   }
 }
