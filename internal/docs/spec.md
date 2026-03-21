@@ -63,9 +63,9 @@ The repository SHALL be organized into application and package boundaries.
 
 #### 3.2 Shared Packages
 
-- `packages/ui` for shared components
-- `packages/types` for shared domain types
-- `packages/validation` for request and payload validation
+- `packages/types` for shared domain types (Product, variants, images)
+- `packages/validation` for shared Zod schemas (shop query params, order status, roles); storefront `/shop` uses these for URL/query validation
+- `packages/rate-limits` for env-driven Express rate-limit presets (wired to `apps/api` compliance routes; Medusa store limits stay in `apps/medusa`)
 - `packages/database` for **Supabase legacy schema**, compliance queries, OAuth user upsert, and **export/migration scripts** (not live web checkout when Medusa-only)
 - `packages/config` for TypeScript, linting, and styling configuration
 - `packages/sdk` for Medusa URL, keys, env assertions, and shared helpers
