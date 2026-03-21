@@ -1,9 +1,18 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { StorefrontCommerceAlert } from "@/components/StorefrontCommerceAlert";
 import { fetchCategorySummaries } from "@/lib/catalog-fetch";
 import { shopHref } from "@/lib/shop-url";
+import { canonicalUrl } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Collections",
+  description:
+    "Shop by category: Shorts, Shirts, Jackets. Maharlika Apparel Custom — curated collections of custom apparel for the Philippines.",
+  alternates: { canonical: canonicalUrl("/collections") },
+};
 
 /** Curated category entry points; API summaries fill counts when those categories exist. */
 const FEATURED_LABELS = ["Shorts", "Shirt", "Jacket"] as const;
