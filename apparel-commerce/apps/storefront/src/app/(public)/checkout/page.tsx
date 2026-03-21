@@ -2,12 +2,18 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { readCart, updateLineQuantity, clearCart, type CartLine } from "@/lib/cart";
-import { getCommerceSource } from "@/lib/commerce-source";
+import { DEFAULT_PUBLIC_SITE_ORIGIN } from "@apparel-commerce/sdk";
+import {
+  readCart,
+  updateLineQuantity,
+  clearCart,
+  type CartLine,
+} from "@/lib/cart";
 import { startMedusaLemonCheckout } from "@/lib/medusa-checkout";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
-const SITE_ORIGIN = (process.env.NEXT_PUBLIC_SITE_URL ?? "").replace(/\/$/, "");
+const SITE_ORIGIN = (
+  process.env.NEXT_PUBLIC_SITE_URL ?? DEFAULT_PUBLIC_SITE_ORIGIN
+).replace(/\/$/, "");
 
 export default function CheckoutPage() {
   const [lines, setLines] = useState<CartLine[]>([]);
@@ -17,8 +23,6 @@ export default function CheckoutPage() {
   const [pendingPayment, setPendingPayment] = useState<{
     checkoutUrl: string;
     trackingPageUrl: string;
-    orderNumber?: string;
-    medusaCart?: boolean;
   } | null>(null);
   const [copyDone, setCopyDone] = useState(false);
 
@@ -39,66 +43,25 @@ export default function CheckoutPage() {
     setLoading(true);
     setError(null);
 
-    if (getCommerceSource() === "medusa") {
-      try {
-        const { checkoutUrl, cartId } = await startMedusaLemonCheckout({
-          lines: lines.map((l) => ({ variantId: l.variantId, quantity: l.quantity })),
-          email: email.trim() || undefined,
-        });
-        const path = `/track/${encodeURIComponent(cartId)}`;
-        const trackingPageUrl = SITE_ORIGIN ? `${SITE_ORIGIN}${path}` : path;
-        setPendingPayment({
-          checkoutUrl,
-          trackingPageUrl,
-          medusaCart: true,
-        });
-        setCopyDone(false);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Medusa checkout failed");
-      }
-      setLoading(false);
-      return;
-    }
-
-    const intentRes = await fetch(`${API_BASE}/checkout/intent`, { method: "GET" });
-    const intentData = await intentRes.json().catch(() => ({}));
-    if (!intentRes.ok || typeof intentData.intentToken !== "string") {
-      setLoading(false);
-      setError(intentData.error ?? "Could not start checkout session");
-      return;
-    }
-    const payload = {
-      intentToken: intentData.intentToken as string,
-      email: email.trim() || undefined,
-      items: lines.map((l) => ({ variantId: l.variantId, quantity: l.quantity })),
-    };
-    const res = await fetch(`${API_BASE}/checkout`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json().catch(() => ({}));
-    setLoading(false);
-    if (!res.ok) {
-      setError(data.error ?? `Checkout failed (${res.status})`);
-      return;
-    }
-    if (
-      typeof data.checkoutUrl === "string" &&
-      typeof data.orderId === "string" &&
-      typeof data.trackingToken === "string"
-    ) {
-      const path = `/track/${encodeURIComponent(data.orderId)}?t=${encodeURIComponent(data.trackingToken)}`;
+    try {
+      const { checkoutUrl, cartId } = await startMedusaLemonCheckout({
+        lines: lines.map((l) => ({
+          variantId: l.variantId,
+          quantity: l.quantity,
+        })),
+        email: email.trim() || undefined,
+      });
+      const path = `/track/${encodeURIComponent(cartId)}`;
       const trackingPageUrl = SITE_ORIGIN ? `${SITE_ORIGIN}${path}` : path;
       setPendingPayment({
-        checkoutUrl: data.checkoutUrl,
+        checkoutUrl,
         trackingPageUrl,
-        orderNumber: typeof data.orderNumber === "string" ? data.orderNumber : undefined,
       });
       setCopyDone(false);
-      return;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Checkout failed");
     }
-    setError("Invalid checkout response");
+    setLoading(false);
   }
 
   function continueToHostedCheckout() {
@@ -108,7 +71,8 @@ export default function CheckoutPage() {
   }
 
   async function copyTrackingLink() {
-    if (!pendingPayment || typeof navigator.clipboard?.writeText !== "function") return;
+    if (!pendingPayment || typeof navigator.clipboard?.writeText !== "function")
+      return;
     try {
       await navigator.clipboard.writeText(pendingPayment.trackingPageUrl);
       setCopyDone(true);
@@ -118,12 +82,13 @@ export default function CheckoutPage() {
   }
 
   return (
-    <main className="pt-32 pb-24 px-8 max-w-4xl mx-auto motion-surface">
+    <main className="storefront-page-shell motion-surface max-w-4xl">
       <h1 className="font-headline text-4xl font-extrabold tracking-tighter text-primary mb-2">
         Checkout
       </h1>
       <p className="font-body text-on-surface-variant mb-12 max-w-lg">
-        Review your bag. Payment runs on Lemon Squeezy. Stock is reserved while you complete checkout.
+        Review your bag. Payment runs on Lemon Squeezy. Stock is reserved while
+        you complete checkout.
       </p>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
@@ -132,7 +97,9 @@ export default function CheckoutPage() {
             <h2 className="font-headline text-sm font-bold uppercase tracking-widest text-primary mb-4">
               Contact
             </h2>
-            <label className="block text-xs font-medium text-on-surface-variant mb-2">Email for receipt</label>
+            <label className="block text-xs font-medium text-on-surface-variant mb-2">
+              Email for receipt
+            </label>
             <input
               type="email"
               value={email}
@@ -147,7 +114,8 @@ export default function CheckoutPage() {
               Shipping
             </h2>
             <p className="text-sm text-on-surface-variant">
-              You will enter the full shipping address on the payment page after continuing.
+              You will enter the full shipping address on the payment page after
+              continuing.
             </p>
           </section>
         </div>
@@ -160,7 +128,9 @@ export default function CheckoutPage() {
 
             {lines.length === 0 ? (
               <div className="space-y-4 text-center py-8">
-                <p className="text-on-surface-variant text-sm">Your bag is empty.</p>
+                <p className="text-on-surface-variant text-sm">
+                  Your bag is empty.
+                </p>
                 <Link
                   href="/shop"
                   className="inline-flex items-center justify-center text-primary font-medium text-sm hover:opacity-80 transition-opacity"
@@ -171,7 +141,10 @@ export default function CheckoutPage() {
             ) : (
               <ul className="space-y-4 text-sm">
                 {lines.map((l) => (
-                  <li key={l.variantId} className="flex justify-between gap-4 border-b border-surface-container-high pb-4">
+                  <li
+                    key={l.variantId}
+                    className="flex justify-between gap-4 border-b border-surface-container-high pb-4"
+                  >
                     <div>
                       <p className="font-medium text-primary">{l.name}</p>
                       <p className="text-on-surface-variant text-xs mt-1">
@@ -189,7 +162,9 @@ export default function CheckoutPage() {
                         >
                           −
                         </button>
-                        <span className="w-6 text-center text-xs font-bold">{l.quantity}</span>
+                        <span className="w-6 text-center text-xs font-bold">
+                          {l.quantity}
+                        </span>
                         <button
                           type="button"
                           className="w-8 h-8 rounded bg-surface-container-high text-sm"
@@ -238,19 +213,17 @@ export default function CheckoutPage() {
                 role="region"
                 aria-label="Save your tracking link"
               >
-                <p className="text-xs font-bold uppercase tracking-widest text-primary mb-2">Before you pay</p>
-                <p className="text-sm text-on-surface-variant mb-3">
-                  Save this page or copy your tracking link. After payment you can return here without digging through
-                  email
-                  {pendingPayment.orderNumber ? ` (order ${pendingPayment.orderNumber})` : ""}.
-                  {pendingPayment.medusaCart ? (
-                    <>
-                      {" "}
-                      For Medusa checkout, tracking updates when your cart completes to an order after payment.
-                    </>
-                  ) : null}
+                <p className="text-xs font-bold uppercase tracking-widest text-primary mb-2">
+                  Before you pay
                 </p>
-                <p className="font-mono text-[11px] break-all text-primary mb-3">{pendingPayment.trackingPageUrl}</p>
+                <p className="text-sm text-on-surface-variant mb-3">
+                  Save this page or copy your tracking link. After payment you
+                  can return here without digging through email. Tracking updates
+                  when your cart completes to an order after payment.
+                </p>
+                <p className="font-mono text-[11px] break-all text-primary mb-3">
+                  {pendingPayment.trackingPageUrl}
+                </p>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <button
                     type="button"
@@ -272,8 +245,8 @@ export default function CheckoutPage() {
                   </button>
                 </div>
                 <p className="text-xs text-on-surface-variant mt-2">
-                  Start over only if you are abandoning this checkout. Your reserved stock may still expire per store
-                  policy.
+                  Start over only if you are abandoning this checkout. Your
+                  reserved stock may still expire per store policy.
                 </p>
               </div>
             )}
@@ -281,11 +254,17 @@ export default function CheckoutPage() {
             <button
               type="button"
               data-testid="checkout-submit-pay"
-              disabled={lines.length === 0 || loading || Boolean(pendingPayment)}
+              disabled={
+                lines.length === 0 || loading || Boolean(pendingPayment)
+              }
               onClick={handlePay}
               className="w-full mt-6 py-4 bg-primary text-on-primary font-headline font-bold text-sm uppercase tracking-widest rounded hover:opacity-90 active:scale-[0.99] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {loading ? "Starting checkout…" : pendingPayment ? "Checkout started — see above" : "Continue to secure payment"}
+              {loading
+                ? "Starting checkout…"
+                : pendingPayment
+                  ? "Checkout started: see above"
+                  : "Continue to secure payment"}
             </button>
 
             {pendingPayment && (
@@ -300,7 +279,8 @@ export default function CheckoutPage() {
             )}
 
             <p className="text-xs text-on-surface-variant mt-4 text-center">
-              One primary action on this screen. You can still adjust quantities above.
+              One primary action on this screen. You can still adjust quantities
+              above.
             </p>
           </div>
         </div>
