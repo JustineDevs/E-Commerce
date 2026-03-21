@@ -13,7 +13,7 @@ function imageRemotePatterns() {
 }
 
 const nextConfig = {
-  transpilePackages: ["@apparel-commerce/ui", "@apparel-commerce/types", "@apparel-commerce/validation", "@apparel-commerce/sdk"],
+  transpilePackages: ["@apparel-commerce/ui", "@apparel-commerce/types", "@apparel-commerce/sdk"],
   images: {
     remotePatterns: imageRemotePatterns(),
   },
