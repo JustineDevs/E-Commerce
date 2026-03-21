@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AddToCartSection } from "@/components/AddToCartSection";
+import { StorefrontCommerceAlert } from "@/components/StorefrontCommerceAlert";
 import { fetchProductBySlug } from "@/lib/catalog-fetch";
 
 export const dynamic = "force-dynamic";
@@ -11,19 +12,33 @@ export default async function ProductPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const product = await fetchProductBySlug(slug, 60);
+  const res = await fetchProductBySlug(slug, 60);
 
-  if (!product) {
+  if (res.kind === "misconfigured" || res.kind === "service_error") {
+    return (
+      <main className="storefront-page-shell max-w-[1600px]">
+        <div className="mx-auto max-w-2xl pt-8">
+          <StorefrontCommerceAlert failure={res} />
+        </div>
+      </main>
+    );
+  }
+
+  if (res.kind === "not_found") {
     notFound();
   }
+
+  const { product } = res;
 
   const images = product.images;
   const mainImage = images[0];
   const minPrice = Math.min(...product.variants.map((v) => v.price));
-  const sizeRun = [...new Set(product.variants.map((v) => v.size))].filter(Boolean).sort();
+  const sizeRun = [...new Set(product.variants.map((v) => v.size))]
+    .filter(Boolean)
+    .sort();
 
   return (
-    <main className="pt-32 pb-24 px-6 md:px-12 lg:px-24 max-w-[1600px] mx-auto">
+    <main className="storefront-page-shell max-w-[1600px]">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 lg:gap-24">
         <div className="lg:col-span-7 flex flex-col md:flex-row-reverse gap-6">
           <div className="flex-1 overflow-hidden bg-surface-container-low">
@@ -74,7 +89,10 @@ export default async function ProductPage({
             <AddToCartSection product={product} />
 
             <div className="space-y-0 pt-8 border-t border-outline-variant/20">
-              <details className="group py-5 border-b border-outline-variant/20" open>
+              <details
+                className="group py-5 border-b border-outline-variant/20"
+                open
+              >
                 <summary className="flex justify-between items-center cursor-pointer list-none">
                   <span className="text-sm font-bold uppercase tracking-wider">
                     Size guide
@@ -85,12 +103,17 @@ export default async function ProductPage({
                 </summary>
                 <div className="pt-4 text-sm leading-relaxed text-on-surface-variant font-body space-y-3">
                   <p>
-                    <strong>In-stock sizes:</strong> {sizeRun.length ? sizeRun.join(" · ") : "See variants above."}
+                    <strong>In-stock sizes:</strong>{" "}
+                    {sizeRun.length
+                      ? sizeRun.join(" · ")
+                      : "See variants above."}
                   </p>
                   <p>
-                    Maharlika Apparel Custom publishes detailed measurements with new runs. If your size is between two
-                    options, size up for a relaxed fit or down for a closer silhouette. Eligible size exchanges may be
-                    requested within <strong>7 days</strong> of delivery for unworn items—see{" "}
+                    Maharlika Apparel Custom publishes detailed measurements
+                    with new runs. If your size is between two options, size up
+                    for a relaxed fit or down for a closer silhouette. Eligible
+                    size exchanges may be requested within{" "}
+                    <strong>7 days</strong> of delivery for unworn items-see{" "}
                     <Link href="/returns" className="text-primary underline">
                       Returns &amp; exchanges
                     </Link>
@@ -99,7 +122,10 @@ export default async function ProductPage({
                 </div>
               </details>
               {product.description ? (
-                <details className="group py-5 border-b border-outline-variant/20" open>
+                <details
+                  className="group py-5 border-b border-outline-variant/20"
+                  open
+                >
                   <summary className="flex justify-between items-center cursor-pointer list-none">
                     <span className="text-sm font-bold uppercase tracking-wider">
                       Description
@@ -123,8 +149,9 @@ export default async function ProductPage({
                   </span>
                 </summary>
                 <div className="pt-4 text-sm leading-relaxed text-on-surface-variant font-body">
-                  Fabric notes appear in the description when provided. Unless the sewn-in label states otherwise, machine
-                  cold wash with like colors and dry flat in shade to preserve shape and print.
+                  Fabric notes appear in the description when provided. Unless
+                  the sewn-in label states otherwise, machine cold wash with
+                  like colors and dry flat in shade to preserve shape and print.
                 </div>
               </details>
               <details className="group py-5">
@@ -138,8 +165,9 @@ export default async function ProductPage({
                 </summary>
                 <div className="pt-4 text-sm leading-relaxed text-on-surface-variant font-body space-y-3">
                   <p>
-                    We ship nationwide via trusted couriers (including J&amp;T). Pickup from Cavite can be arranged for
-                    qualifying orders—details on your confirmation.
+                    We ship nationwide via trusted couriers (including J&amp;T).
+                    Pickup from Cavite can be arranged for qualifying
+                    orders-details on your confirmation.
                   </p>
                   <p>
                     <Link href="/shipping" className="text-primary underline">
