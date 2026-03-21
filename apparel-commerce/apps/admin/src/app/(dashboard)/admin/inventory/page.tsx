@@ -1,29 +1,9 @@
-import { getApiUrl, getInternalApiHeaders } from "@apparel-commerce/sdk";
+import { fetchMedusaInventoryForAdmin } from "@/lib/medusa-inventory-bridge";
 
 export const dynamic = "force-dynamic";
 
-type InventoryRow = {
-  variantId: string;
-  productName: string;
-  sku: string;
-  size: string;
-  color: string;
-  available: number;
-};
-
-async function fetchInventory(): Promise<InventoryRow[]> {
-  const base = process.env.API_URL ?? getApiUrl();
-  const res = await fetch(`${base}/inventory`, {
-    cache: "no-store",
-    headers: { ...getInternalApiHeaders() },
-  });
-  if (!res.ok) return [];
-  const data = await res.json();
-  return data.inventory ?? [];
-}
-
 export default async function InventoryPage() {
-  const inventory = await fetchInventory();
+  const inventory = await fetchMedusaInventoryForAdmin();
 
   return (
     <main className="min-h-screen p-8 lg:p-12">
@@ -33,13 +13,9 @@ export default async function InventoryPage() {
             Inventory
           </h2>
           <p className="text-on-surface-variant mt-2 font-body text-sm">
-            Manage stock levels and movements.
+            Live stock from Medusa. {inventory.length} variants tracked.
           </p>
         </div>
-        <button className="px-6 py-2.5 bg-primary text-on-primary font-medium text-xs rounded flex items-center gap-2">
-          <span className="material-symbols-outlined text-sm">add</span>
-          Add Stock
-        </button>
       </header>
       <div className="bg-surface-container-lowest rounded shadow-[0px_20px_40px_rgba(0,0,0,0.02)] overflow-hidden">
         <table className="w-full">
@@ -65,18 +41,34 @@ export default async function InventoryPage() {
           <tbody>
             {inventory.length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-16 text-center text-on-surface-variant">
-                  No inventory data.
+                <td
+                  colSpan={5}
+                  className="py-16 text-center text-on-surface-variant"
+                >
+                  No inventory data. Seed products in Medusa first.
                 </td>
               </tr>
             ) : (
               inventory.map((row) => (
-                <tr key={row.variantId} className="border-b border-surface-container-high/50">
-                  <td className="py-4 px-6 font-medium text-primary">{row.productName}</td>
-                  <td className="py-4 px-6 text-on-surface-variant text-sm">{row.sku}</td>
-                  <td className="py-4 px-6 text-on-surface-variant text-sm">{row.size}</td>
-                  <td className="py-4 px-6 text-on-surface-variant text-sm">{row.color}</td>
-                  <td className="py-4 px-6 text-right font-medium">{row.available}</td>
+                <tr
+                  key={row.variantId}
+                  className="border-b border-surface-container-high/50"
+                >
+                  <td className="py-4 px-6 font-medium text-primary">
+                    {row.productName}
+                  </td>
+                  <td className="py-4 px-6 text-on-surface-variant text-sm">
+                    {row.sku}
+                  </td>
+                  <td className="py-4 px-6 text-on-surface-variant text-sm">
+                    {row.size}
+                  </td>
+                  <td className="py-4 px-6 text-on-surface-variant text-sm">
+                    {row.color}
+                  </td>
+                  <td className="py-4 px-6 text-right font-medium">
+                    {row.available}
+                  </td>
                 </tr>
               ))
             )}
