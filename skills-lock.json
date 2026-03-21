@@ -51,6 +51,11 @@
       "sourceType": "github",
       "computedHash": "589373c5db3a01dcb5dfdd22b8fa7a07ee4b6650056c08742227d5e8996eaa03"
     },
+    "find-skills": {
+      "source": "vercel-labs/skills",
+      "sourceType": "github",
+      "computedHash": "645b891da1edbae76ab79c7b088d4e73397464f8396edaf773c0e01971ce75d6"
+    },
     "lemonsqueezy-ui-skills": {
       "source": "ihlamury/design-skills",
       "sourceType": "github",
@@ -60,6 +65,11 @@
       "source": "hoodini/ai-agents-skills",
       "sourceType": "github",
       "computedHash": "880d7aa73b001e7e28b9562639defeff11c073d958fe5a253eeea572539439a2"
+    },
+    "programmatic-seo": {
+      "source": "coreyhaines31/marketingskills",
+      "sourceType": "github",
+      "computedHash": "c6384f24bb0203f8aa98b23b55d35b9e6721b94532a0e7965215c340ae96f1e0"
     },
     "responsive-design": {
       "source": "supercent-io/skills-template",
