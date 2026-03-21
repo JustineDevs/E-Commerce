@@ -35,19 +35,19 @@ Configure `NEXT_PUBLIC_SITE_URL` and related env vars to this origin when deploy
 ## Project Structure
 
 ```
-apparel-commerce/
-├── apps/
-│   ├── storefront/   # Public customer storefront
-│   ├── admin/        # Dashboard, POS, fulfillment
-│   └── api/          # Webhooks, background jobs, services
-├── packages/
-│   ├── ui/           # Shared components
-│   ├── types/        # Domain types
-│   ├── validation/   # Request validation
-│   ├── database/     # Migrations, schema, seed
-│   ├── config/       # TypeScript, ESLint, Tailwind
-│   └── sdk/          # Internal clients (Lemon Squeezy, AfterShip)
-└── internal/docs/   # Spec, blueprint, privacy-terms
+apps/
+├── storefront/   # Public customer storefront
+├── admin/        # Dashboard, POS, fulfillment
+├── api/          # Health, compliance (internal API key)
+└── medusa/       # Medusa 2 commerce backend
+packages/
+├── types/        # Domain types (Product, variants)
+├── validation/   # Zod schemas (shop query, order status, roles)
+├── rate-limits/  # Env-driven rate-limit presets (Express API)
+├── database/     # Supabase legacy, compliance, OAuth upsert
+├── config/       # TypeScript, ESLint, Tailwind
+└── sdk/          # Medusa env helpers, shared constants
+internal/docs/     # Spec, blueprint, privacy-terms
 ```
 
 ## Getting Started
@@ -63,7 +63,6 @@ apparel-commerce/
 ### Install
 
 ```bash
-cd apparel-commerce
 pnpm install
 ```
 
