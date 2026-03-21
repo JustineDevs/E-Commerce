@@ -1,20 +1,20 @@
 ---
 title: Apparel Commerce Platform
 description: A composable commerce system for apparel sales across storefront, POS, and fulfillment.
-author: PC Gaming18
-website-to: https://your-domain.com
+author: @Justinedevs
+website-to: https://maharlika-apparel-custom.vercel.app
 status: Draft
 type: Informational
 created: 2026-03-20
 requires tech stack:
-  - Next.js App Router
-  - Node.js + Express
-  - PostgreSQL via Supabase
-  - Turborepo + pnpm
-  - Tailwind CSS + shadcn/ui
-  - NextAuth/Auth.js
-  - Lemon Squeezy
-  - AfterShip
+ - Next.js App Router
+ - Node.js + Express
+ - PostgreSQL via Supabase
+ - Turborepo + pnpm
+ - Tailwind CSS + shadcn/ui
+ - NextAuth/Auth.js
+ - Lemon Squeezy
+ - AfterShip
 ---
 
 ## Abstract
@@ -82,7 +82,7 @@ The internal application SHALL include the following pages:
 - `/admin` Dashboard
 - `/admin/inventory` Inventory management
 - `/admin/orders` Order fulfillment hub
-- `/admin/orders/[orderId]` Order detail — line items, staff shipment registration, mark shipped / delivered
+- `/admin/orders/[orderId]` Order detail: line items, staff shipment registration, mark shipped / delivered
 - `/admin/pos` POS terminal
 
 ### 5. Catalog and Variant Model
@@ -271,44 +271,22 @@ The standard order flow SHALL be:
 
 All inventory mutations for web and POS orders MUST pass through the same inventory service boundary.
 
-### 12. SOP Requirements
+### 12. SOP Requirements (Medusa implementation)
 
-The implementation SHALL support the following operational procedures.
+**Canonical runbook:** Day-to-day operations when **Medusa** is the live system of record are defined in **`internal/docs/SOP-OPERATIONS-MEDUSA.md`**. That document is normative for **SOP-0** (preconditions) through **SOP-9** (definition of done), including catalog, stock, web orders, POS, fulfillment, health checks, access, and incidents.
 
-#### 12.1 Catalog SOP
+The implementation SHALL satisfy the following when production is configured with **`NEXT_PUBLIC_COMMERCE_SOURCE=medusa`**, **`LEGACY_COMMERCE_API_DISABLED=true`** (after cutover), and webhooks (Lemon, AfterShip) targeting **Medusa** only:
 
-- Create a parent product
-- Add all size and color variants
-- Assign SKU and barcode per variant
-- Upload product images
-- Load stock into a location
-- Publish the product
+1. **Catalog:** New products and variants are created **only** in **Medusa Admin** (handles, options, SKUs, images, inventory at **Warehouse PH**, sales channel **Web PH**); no parallel live catalog in legacy Postgres for production SKUs.
+2. **Stock:** Adjustments use **Medusa** inventory flows with audit trail; not raw SQL against production.
+3. **Web orders:** Checkout and payment confirmation run through **Medusa** + Lemon as configured; support looks up orders in **Medusa Admin**; tracking UX reads **Medusa** fulfillment data in production.
+4. **POS:** In-store sales use **Medusa** draft-order / POS or **Medusa APIs only**; not legacy Express `POST /orders` in production.
+5. **Fulfillment:** Pick/pack/ship and tracking align **Medusa** fulfillments with carrier and **AfterShip** as integrated; customer track page does not depend on legacy Express in production.
+6. **Health:** Daily checks cover Medusa, storefront, webhook error rates, and stuck orders per **SOP-6** in the runbook.
 
-#### 12.2 Web Order SOP
+**Definition of done (operational):** As in **SOP-9** of `SOP-OPERATIONS-MEDUSA.md`: every live SKU and order path runs through **Medusa**; staff can execute standard catalog through fulfillment steps without developer assistance.
 
-- Reserve stock at checkout start
-- Create pending payment order
-- Wait for verified payment webhook
-- Convert reservation to sale
-- Queue for fulfillment
-
-#### 12.3 POS SOP
-
-- Scan barcode or search SKU
-- Confirm selected variant and quantity
-- Create POS order
-- Collect payment through approved flow
-- Commit inventory movement
-- Print or issue receipt reference if configured
-
-#### 12.4 Fulfillment SOP
-
-- Pick item by variant SKU
-- Pack by order reference
-- Create shipment
-- Save tracking number
-- Mark order as shipped
-- Monitor exceptions and failed deliveries
+**Legacy stack note:** Until cutover, the Express + Supabase flows in §11 and elsewhere may still apply; after cutover, **§12** and `SOP-OPERATIONS-MEDUSA.md` supersede routine legacy OMS procedures for production.
 
 ### 13. API Responsibilities
 
@@ -353,16 +331,16 @@ The following rows are taken from the submitted **Apparel Business Requirement F
 | Additional services | **Custom printing**; **bulk orders**; **uniform orders** |
 | Admin / POS users | Owner; sales clerk; accountant |
 | Minimum reorder level | **1000** per SKU (stated in form) |
-| Customer Google login | **Yes** — faster checkout |
+| Customer Google login | **Yes**: faster checkout |
 | Pre-orders when out of stock | **Yes** |
 | Payment methods (desired) | PayPal; GCash/Maya with **manual receipt upload**; **COD**; **bank transfer** |
 | Promo codes / vouchers | **Yes** |
 | Size guide on PDP | **Yes** |
 | Return / exchange | Flexibility level **3** (scale in form); details in `internal/docs/Exchange Policy Details.md` |
 | J&T pickup address | B16 L45 ACM Paramount Homes, Brgy. Navarro, General Trias, Cavite |
-| J&T rate calculation at checkout | **Yes** — by weight / dimensions |
-| Tracking notifications | **Yes** — automated SMS **and** email |
-| Average parcel weight | **5 kg** (per form; validate with ops — may be ~0.5 kg in practice) |
+| J&T rate calculation at checkout | **Yes**: by weight / dimensions |
+| Tracking notifications | **Yes**: automated SMS **and** email |
+| Average parcel weight | **5 kg** (per form; validate with ops: may be ~0.5 kg in practice) |
 | Typical parcel dimensions | 10 × 10 × 10 (units assumed cm) |
 | Shipping zones | **Separate rules** for Metro Manila, provincial, **international** |
 | Business permits (payments) | **Processing** (DTI/SEC + BIR 2303 path in progress) |
@@ -374,7 +352,7 @@ The following rows are taken from the submitted **Apparel Business Requirement F
 
 This repository’s **as-built** slice (Express + Supabase + Lemon Squeezy + AfterShip) **does not yet implement** every cell above. Track these deltas in backlog, not as optional “nice-to-haves” when the business has already answered **Yes**:
 
-- **Payments:** Production path is **Lemon Squeezy** (hosted checkout + webhook truth). PayPal, GCash/Maya manual proof, COD, and bank transfer require separate flows, risk controls, and reconciliation — not interchangeable with LS webhook semantics.
+- **Payments:** Production path is **Lemon Squeezy** (hosted checkout + webhook truth). PayPal, GCash/Maya manual proof, COD, and bank transfer require separate flows, risk controls, and reconciliation: not interchangeable with LS webhook semantics.
 - **Catalog:** **Material**, **condition**, **style**, and **bundle** constructs may need schema and admin UX beyond current `products` / `product_variants`.
 - **Pre-orders:** Requires sellable state when `available_qty = 0`, distinct reservations, and fulfillment SLAs.
 - **Shipping:** Automatic J&T rating by weight/dimensions + **zone tables** (Metro / provincial / international) and “free shipping at N pieces” need quote service + rules engine + tests.
@@ -385,6 +363,8 @@ This repository’s **as-built** slice (Express + Supabase + Lemon Squeezy + Aft
 ### 16. Medusa migration (program)
 
 The repository includes a **parallel Medusa 2.x backend** (`apparel-commerce/apps/medusa`) as the **declared future system of record** for commerce domains. The authoritative program table and ADR live in **`internal/docs/MEDUSA-MIGRATION-PROGRAM.md`** and **`internal/docs/adr/0001-medusa-system-of-record.md`**. **Operational scripts:** `seed:ph` (Philippines region, **Web PH** sales channel, default stock location + legacy location code metadata), `import:legacy-catalog`, and `import:legacy-inventory` (see `apps/medusa/README.md`, `internal/docs/migration/field-mapping.md`). Until cutover (Phase 8), the specification’s functional SHALL statements continue to be satisfied by the **legacy Express + Supabase** stack unless explicitly dual-documented.
+
+After cutover, **production operations** follow **`internal/docs/SOP-OPERATIONS-MEDUSA.md`** in conjunction with **§12** above.
 
 ## Rationale
 
