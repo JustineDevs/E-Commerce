@@ -35,6 +35,9 @@ importers:
       '@apparel-commerce/validation':
         specifier: workspace:*
         version: link:../../packages/validation
+      '@medusajs/js-sdk':
+        specifier: 2.13.1
+        version: 2.13.1
       next:
         specifier: ^15.0.0
         version: 15.5.14(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -87,6 +90,9 @@ importers:
       '@apparel-commerce/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@apparel-commerce/rate-limits':
+        specifier: workspace:*
+        version: link:../../packages/rate-limits
       '@apparel-commerce/sdk':
         specifier: workspace:*
         version: link:../../packages/sdk
@@ -111,6 +117,12 @@ importers:
       helmet:
         specifier: ^7.1.0
         version: 7.2.0
+      ioredis:
+        specifier: ^5.4.1
+        version: 5.10.1
+      rate-limit-redis:
+        specifier: ^4.2.0
+        version: 4.3.1(express-rate-limit@8.3.1(express@4.22.1))
       resend:
         specifier: ^4.0.0
         version: 4.8.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -157,6 +169,18 @@ importers:
       '@medusajs/medusa':
         specifier: 2.13.1
         version: 2.13.1(@medusajs/admin-sdk@2.13.1)(@medusajs/cli@2.13.1(@types/node@20.19.37))(@medusajs/framework@2.13.1(@medusajs/cli@2.13.1(@types/node@20.19.37))(@types/node@20.19.37)(ioredis@5.10.1)(vite@5.4.21(@types/node@20.19.37))(zod@3.25.76))(@medusajs/icons@2.13.1(react@18.3.1))(@medusajs/test-utils@2.13.1)(@medusajs/ui@4.1.1(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.9.3))(@swc/core@1.15.18)(@types/node@20.19.37)(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(awilix@8.0.1)(posthog-node@5.28.4(rxjs@7.8.2))(react-dom@18.3.1(react@18.3.1))(react-router-dom@6.30.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)(typescript@5.9.3)(yalc@1.0.0-pre.53)
+      '@medusajs/payment-stripe':
+        specifier: 2.13.1
+        version: 2.13.1(@medusajs/framework@2.13.1(@medusajs/cli@2.13.1(@types/node@20.19.37))(@types/node@20.19.37)(ioredis@5.10.1)(vite@5.4.21(@types/node@20.19.37))(zod@3.25.76))
+      pg:
+        specifier: ^8.13.1
+        version: 8.20.0
+      resend:
+        specifier: ^4.0.0
+        version: 4.8.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
     devDependencies:
       '@medusajs/test-utils':
         specifier: 2.13.1
@@ -173,6 +197,9 @@ importers:
       '@types/node':
         specifier: ^20.12.11
         version: 20.19.37
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.18.0
       '@types/react':
         specifier: ^18.3.2
         version: 18.3.28
@@ -221,6 +248,9 @@ importers:
       '@medusajs/js-sdk':
         specifier: 2.13.1
         version: 2.13.1
+      gsap:
+        specifier: ^3.14.2
+        version: 3.14.2
       lenis:
         specifier: ^1.3.19
         version: 1.3.19(react@18.3.1)
@@ -305,11 +335,23 @@ importers:
         specifier: ^5.6.0
         version: 5.9.3
 
+  packages/rate-limits:
+    devDependencies:
+      '@apparel-commerce/config-typescript':
+        specifier: workspace:*
+        version: link:../config/typescript
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+
   packages/sdk:
     dependencies:
       '@apparel-commerce/types':
         specifier: workspace:*
         version: link:../types
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
     devDependencies:
       '@apparel-commerce/config-typescript':
         specifier: workspace:*
@@ -5572,6 +5614,9 @@ packages:
     resolution: {integrity: sha512-gGgrVCoDKlIZ8fIqXBBb0pPKqDgki0Z/FSKNiQzSGj2uEYHr1tq5wmBegGwJx6QB5S5cM0khSBpi/JFHMCvsmQ==}
     engines: {node: ^12.22.0 || ^14.16.0 || ^16.0.0 || >=17.0.0}
 
+  gsap@3.14.2:
+    resolution: {integrity: sha512-P8/mMxVLU7o4+55+1TCnQrPmgjPKnwkzkXOK1asnR9Jg2lna4tEY5qBJjMmAaOBDDZWtlRjBXjLa0w53G/uBLA==}
+
   has-flag@4.0.0:
     resolution: {integrity: sha512-EykJT/Q1KjTWctppgIAgfSO0tKVuZUjhgMr17kqTumMl6Afv3EISleU7qZUzoXDFTAHTDC4NOoG/ZxU3EvlMPQ==}
     engines: {node: '>=8'}
@@ -6902,6 +6947,12 @@ packages:
   range-parser@1.2.1:
     resolution: {integrity: sha512-Hrgsx+orqoygnmhFbKaHE6c296J+HTAQXoxEF6gNupROmmGJRoyzfG3ccAveqCBrwr/2yxQ5BVd/GTl5agOwSg==}
     engines: {node: '>= 0.6'}
+
+  rate-limit-redis@4.3.1:
+    resolution: {integrity: sha512-+a1zU8+D7L8siDK9jb14refQXz60vq427VuiplgnaLk9B2LnvGe/APLTfhwb4uNIL7eWVknh8GnRp/unCj+lMA==}
+    engines: {node: '>= 16'}
+    peerDependencies:
+      express-rate-limit: '>= 6'
 
   raw-body@2.5.3:
     resolution: {integrity: sha512-s4VSOf6yN0rvbRZGxs8Om5CWj6seneMwK3oDb4lWDH0UPhWcxwOWw5+qk24bxq87szX1ydrwylIOp2uG1ojUpA==}
@@ -14498,6 +14549,8 @@ snapshots:
 
   graphql@16.13.1: {}
 
+  gsap@3.14.2: {}
+
   has-flag@4.0.0: {}
 
   has-symbols@1.1.0: {}
@@ -15925,7 +15978,7 @@ snapshots:
       '@protobufjs/path': 1.1.2
       '@protobufjs/pool': 1.1.0
       '@protobufjs/utf8': 1.1.0
-      '@types/node': 20.19.37
+      '@types/node': 22.19.15
       long: 5.3.2
 
   proxy-addr@2.0.7:
@@ -16006,6 +16059,10 @@ snapshots:
   random-bytes@1.0.0: {}
 
   range-parser@1.2.1: {}
+
+  rate-limit-redis@4.3.1(express-rate-limit@8.3.1(express@4.22.1)):
+    dependencies:
+      express-rate-limit: 8.3.1(express@4.22.1)
 
   raw-body@2.5.3:
     dependencies:
@@ -16540,7 +16597,7 @@ snapshots:
 
   stripe@15.12.0:
     dependencies:
-      '@types/node': 20.19.37
+      '@types/node': 22.19.15
       qs: 6.14.2
 
   stripe@19.1.0(@types/node@20.19.37):
