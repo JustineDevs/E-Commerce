@@ -73,9 +73,10 @@ export default async function ShopPage({
     );
   }
 
-  const { products, total } = pageRes;
-  const categories = catRes.summaries;
-  const facets = facetRes.facets;
+  const okPage = pageRes as Extract<typeof pageRes, { kind: "ok" }>;
+  const { products, total } = okPage;
+  const categories = (catRes as Extract<typeof catRes, { kind: "ok" }>).summaries;
+  const facets = (facetRes as Extract<typeof facetRes, { kind: "ok" }>).facets;
 
   const totalActive = categories.reduce((s, c) => s + c.count, 0);
   const hasMore = offset + products.length < total;
