@@ -94,6 +94,9 @@ importers:
       '@apparel-commerce/rate-limits':
         specifier: workspace:*
         version: link:../../packages/rate-limits
+      '@apparel-commerce/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
       cors:
         specifier: ^2.8.5
         version: 2.8.6
