@@ -1,5 +1,6 @@
 import type { SubscriberArgs, SubscriberConfig } from "@medusajs/framework";
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils";
+import { buildTrackingUrl } from "@apparel-commerce/sdk";
 import { Resend } from "resend";
 
 function escapeHtml(s: string): string {
@@ -71,7 +72,12 @@ export default async function orderPlacedResendEmail({
 
   const orderNumber =
     order.display_id != null ? String(order.display_id) : (order.id ?? data.id);
-  const trackingUrl = `${storefrontBase.replace(/\/$/, "")}/track/${encodeURIComponent(String(order.id))}`;
+
+  const orderId = String(order.id ?? data.id);
+  const url = buildTrackingUrl(storefrontBase, orderId);
+  const trackingUrl =
+    url ??
+    `${storefrontBase.replace(/\/$/, "")}/track/${encodeURIComponent(orderId)}`;
 
   const resend = new Resend(key);
   const { error } = await resend.emails.send({
