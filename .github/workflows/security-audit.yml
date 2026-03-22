@@ -21,5 +21,5 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
       - name: Install
         run: pnpm install --frozen-lockfile
-      - name: Audit (high+)
-        run: pnpm audit --audit-level=high
+      - name: Audit (triage check)
+        run: node scripts/check-audit-triage.js
