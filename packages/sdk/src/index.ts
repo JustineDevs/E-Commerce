@@ -8,6 +8,12 @@ export {
 } from "./medusa-env";
 
 export {
+  generateTrackingToken,
+  verifyTrackingToken,
+  buildTrackingUrl,
+} from "./tracking-token";
+
+export {
   listMissingMedusaStorefrontEnv,
   assertMedusaStorefrontEnvProduction,
 } from "./env/medusa-storefront";
