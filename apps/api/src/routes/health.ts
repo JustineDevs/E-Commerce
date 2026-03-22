@@ -1,11 +1,18 @@
 import { Router } from "express";
-import { getMedusaStoreBaseUrl } from "@apparel-commerce/sdk";
 import { createSupabaseClient } from "@apparel-commerce/database";
 
 export const healthRouter: ReturnType<typeof Router> = Router();
 
+function getMedusaBaseUrl(): string {
+  const url =
+    process.env.MEDUSA_BACKEND_URL ??
+    process.env.NEXT_PUBLIC_MEDUSA_URL ??
+    "http://localhost:9000";
+  return url.replace(/\/$/, "");
+}
+
 async function checkMedusa(): Promise<{ url: string; ok: boolean }> {
-  const base = getMedusaStoreBaseUrl().replace(/\/$/, "");
+  const base = getMedusaBaseUrl();
   try {
     const r = await fetch(`${base}/health`);
     return { url: base, ok: r.ok };
@@ -17,7 +24,7 @@ async function checkMedusa(): Promise<{ url: string; ok: boolean }> {
 async function checkSupabase(): Promise<boolean> {
   try {
     const sb = createSupabaseClient();
-    const { error } = await sb.from("users").select("count").limit(1);
+    const { error } = await sb.from("users").select("id").limit(1);
     return !error;
   } catch {
     return false;
