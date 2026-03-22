@@ -28,7 +28,8 @@ The platform uses a shared monorepo and a single transactional database so that 
 
 ## Live preview
 
-**Storefront (Vercel):** https://maharlika-apparel-custom.vercel.app
+**Storefront (Vercel):** https://maharlika-apparel-custom.vercel.app — see [VERCEL.md](VERCEL.md)  
+**Medusa backend (Fly.io):** See [FLY.md](FLY.md) for deploy instructions.
 
 Configure `NEXT_PUBLIC_SITE_URL` and related env vars to this origin when deploying.
 
