@@ -53,6 +53,12 @@ function buildPaymentProviderIdsForSeed(): string[] {
   ) {
     ids.push("pp_paymongo_paymongo");
   }
+  if (
+    process.env.MAYA_SECRET_KEY?.trim() &&
+    process.env.MAYA_WEBHOOK_SECRET?.trim()
+  ) {
+    ids.push("pp_maya_maya");
+  }
   return [...new Set(ids)];
 }
 
