@@ -1,3 +1,10 @@
+import { config } from "dotenv";
+import { resolve, dirname } from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+config({ path: resolve(__dirname, "../../../.env") });
+
 import "express-async-errors";
 import express from "express";
 import cors from "cors";
@@ -10,6 +17,7 @@ import { requireInternalApiKey } from "./lib/requireInternalApiKey.js";
 import { logStartup } from "./lib/logger.js";
 import rateLimit from "express-rate-limit";
 import { expressComplianceApiRateLimitOptions } from "@apparel-commerce/rate-limits";
+import { shouldFailBootForMissingInternalKey } from "./lib/checkProductionInternalApiKey.js";
 
 const app = express();
 const PORT = process.env.PORT ?? 4000;
@@ -19,7 +27,7 @@ app.set(
   process.env.TRUST_PROXY === "1" || process.env.TRUST_PROXY === "true",
 );
 
-if (process.env.NODE_ENV === "production" && !process.env.INTERNAL_API_KEY) {
+if (shouldFailBootForMissingInternalKey()) {
   console.error("FATAL: INTERNAL_API_KEY must be set in production");
   process.exit(1);
 }
