@@ -11,13 +11,15 @@
   },
   "scripts": {
     "lint": "eslint src --ext .ts",
-    "test": "node --import tsx/esm --test \"src/**/*.test.ts\""
+    "test": "node --import tsx/esm --test src/shop-catalog.contract.test.ts src/validation.stress.test.ts"
   },
   "dependencies": {
     "zod": "^3.23.0"
   },
   "devDependencies": {
+    "@apparel-commerce/config-eslint": "workspace:*",
     "@apparel-commerce/config-typescript": "workspace:*",
+    "eslint": "^9.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0"
   }
