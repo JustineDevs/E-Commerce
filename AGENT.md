@@ -27,7 +27,7 @@ For doc context commands, use **internal/docs** and **.cursor/llm** as canonical
 | API | Node.js + Express |
 | Database | PostgreSQL via Supabase |
 | Auth | NextAuth/Auth.js with Google provider |
-| Payments | Lemon Squeezy (hosted checkout, webhooks) |
+| Payments | Lemon Squeezy, Stripe, PayPal, Paymongo (GCash), Maya |
 | Shipping | AfterShip + J&T Express Philippines |
 
 ## Critical Rules
@@ -66,9 +66,19 @@ packages/
 ├── types, validation, rate-limits, database, config, sdk
 ```
 
+## MCP (Model Context Protocol)
+
+- **Stripe** – Payments, subscriptions, refunds, docs search. Use for Stripe/Lemon Squeezy card flows.
+- **PayPal** – Orders, refunds, disputes, subscriptions. Use for PayPal/Lemon Squeezy flows.
+- **Supabase** – Database, migrations, Edge Functions. See `mcp_supabase_*` tools.
+
+Ensure Stripe and PayPal MCP servers are enabled in Cursor when working on payment integrations.
+
 ## Skills (when relevant)
 
 - **storefront-best-practices** – E-commerce storefronts, checkout, cart, product pages.
 - **building-admin-dashboard-customizations** – Admin UI, widgets, forms, tables.
 - **authentication-setup** – Login, JWT, OAuth, session, RBAC.
 - **design-with-taste** – Simplicity, fluidity, delight in UI.
+- **stripe-integration** (skills-lock) – Stripe setup, webhooks, Lemon Squeezy integration.
+- **paypal-integration** (skills-lock) – PayPal setup, webhooks, Lemon Squeezy integration.
