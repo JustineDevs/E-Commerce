@@ -1,5 +1,28 @@
 # Vercel Deployment (Storefront)
 
+## Required Environment Variables
+
+Set these in Vercel → Project → Settings → Environment Variables. Without them, the storefront shows "Catalog service unavailable" or "Invalid URL".
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `NEXT_PUBLIC_MEDUSA_URL` | Medusa backend base URL (HTTPS in production) | `https://your-medusa.fly.dev` |
+| `NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY` | Medusa publishable API key | From `medusa seed:ph` output |
+| `NEXT_PUBLIC_MEDUSA_REGION_ID` | Medusa region ID | From Medusa admin or seed |
+
+Alternative: use `MEDUSA_BACKEND_URL`, `MEDUSA_PUBLISHABLE_API_KEY`, `MEDUSA_REGION_ID` (server-side only).
+
+Do not leave these empty. Empty values cause "Invalid URL" errors.
+
+---
+
+## Node.js Version
+
+The project requires Node 20. Set in Vercel: **Settings → General → Node.js Version → 20.x**.  
+The storefront has `engines.node: "20.x"` and `.nvmrc`; Vercel should pick 20.x. If builds still use Node 24, set it explicitly in the dashboard.
+
+---
+
 ## Required Settings
 
 ### 1. Root Directory
