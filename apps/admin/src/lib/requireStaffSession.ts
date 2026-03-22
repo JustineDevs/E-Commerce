@@ -1,30 +1,29 @@
 import { getServerSession } from "next-auth/next";
 import { NextResponse } from "next/server";
 import { authOptions } from "./auth";
+import { checkStaffRole } from "@apparel-commerce/database";
 
 export async function requireStaffSession(): Promise<
   | { ok: true }
   | { ok: false; response: NextResponse }
 > {
   const session = await getServerSession(authOptions);
-  if (!session?.user) {
+  const result = checkStaffRole(session);
+  if (result.ok) return { ok: true };
+  if (result.status === 401) {
     return {
       ok: false,
       response: NextResponse.json(
-        { error: "Unauthorized", code: "NO_SESSION" },
+        { error: "Unauthorized", code: result.code },
         { status: 401 },
       ),
     };
   }
-  const role = session.user.role;
-  if (role !== "admin" && role !== "staff") {
-    return {
-      ok: false,
-      response: NextResponse.json(
-        { error: "Forbidden", code: "NOT_STAFF" },
-        { status: 403 },
-      ),
-    };
-  }
-  return { ok: true };
+  return {
+    ok: false,
+    response: NextResponse.json(
+      { error: "Forbidden", code: result.code },
+      { status: 403 },
+    ),
+  };
 }
