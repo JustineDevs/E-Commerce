@@ -42,6 +42,7 @@ NEXTAUTH_URL=           # Full URL of the storefront (e.g. https://store.example
 
 # Medusa (apps/medusa) — payment providers validated at boot
 LEMONSQUEEZY_WEBHOOK_SECRET=   # Required when LEMONSQUEEZY_API_KEY is set
+TRACKING_HMAC_SECRET=          # For signed tracking URLs; must match storefront
 PAYPAL_CLIENT_SECRET=          # Required when PAYPAL_CLIENT_ID is set
 STRIPE_WEBHOOK_SECRET=         # Required when STRIPE_API_KEY is set
 PAYMONGO_WEBHOOK_SECRET=       # Required when PAYMONGO_SECRET_KEY is set
@@ -51,6 +52,15 @@ SUPABASE_SERVICE_ROLE_KEY=     # Required in production (anon key fallback disab
 
 # Express API (apps/api)
 INTERNAL_API_KEY=              # Set this to protect compliance endpoints
+
+# Admin (apps/admin)
+NEXTAUTH_SECRET=               # Required in production (validated at boot)
+GOOGLE_CLIENT_ID=              # Required for OAuth
+GOOGLE_CLIENT_SECRET=          # Required for OAuth
+NEXTAUTH_URL=                  # Full URL of the admin (e.g. https://admin.example.com)
+
+# Tracking links (spec compliance) — set when using Resend for order emails
+TRACKING_LINK_SECRET=          # Same value in Medusa and storefront. Generate: openssl rand -hex 32
 ```
 
 ### 2. Database Migrations
@@ -118,6 +128,16 @@ DELETE FROM lemon_webhook_dedup WHERE created_at < NOW() - INTERVAL '30 days';
 DELETE FROM paymongo_webhook_dedup WHERE created_at < NOW() - INTERVAL '30 days';
 DELETE FROM aftership_webhook_dedup WHERE created_at < NOW() - INTERVAL '30 days';
 ```
+
+---
+
+## Tracking Link Secret (2026-03-22)
+
+When `TRACKING_LINK_SECRET` is set:
+- Medusa order confirmation emails include `?t=<hmac>` in tracking links.
+- Storefront validates `t` before showing order data for `order_` IDs.
+- Use the same secret in both Medusa and storefront env.
+- If unset: emails and track page work as before (no token validation).
 
 ---
 
