@@ -77,12 +77,28 @@ const paymongoProvider =
       ]
     : [];
 
+const mayaProvider =
+  process.env.MAYA_SECRET_KEY?.trim() && process.env.MAYA_WEBHOOK_SECRET?.trim()
+    ? [
+        {
+          resolve: "./src/modules/maya-payment",
+          id: "maya",
+          options: {
+            secretKey: process.env.MAYA_SECRET_KEY!,
+            webhookSecret: process.env.MAYA_WEBHOOK_SECRET!,
+            sandbox: process.env.MAYA_SANDBOX === "true",
+          },
+        },
+      ]
+    : [];
+
 const paymentProviders = [
   ...lemonSqueezyProvider,
   ...stripeProvider,
   ...codProvider,
   ...paypalProvider,
   ...paymongoProvider,
+  ...mayaProvider,
 ];
 
 module.exports = defineConfig({
