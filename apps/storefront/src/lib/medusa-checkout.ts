@@ -11,11 +11,28 @@ export type MedusaCheckoutLine = { variantId: string; quantity: number };
 export type MedusaCheckoutResult = {
   checkoutUrl: string;
   cartId: string;
+  providerLabel: string;
 };
 
-export async function startMedusaLemonCheckout(input: {
+/** Provider IDs from Medusa (pp_{module}_{id}). */
+export const PAYMENT_PROVIDER_IDS = {
+  LEMONSQUEEZY: "pp_lemonsqueezy_lemonsqueezy",
+  PAYMONGO: "pp_paymongo_paymongo",
+  MAYA: "pp_maya_maya",
+} as const;
+
+export type PaymentProviderKey = keyof typeof PAYMENT_PROVIDER_IDS;
+
+export const PAYMENT_PROVIDER_LABELS: Record<PaymentProviderKey, string> = {
+  LEMONSQUEEZY: "Lemon Squeezy (Card, Stripe, PayPal)",
+  PAYMONGO: "GCash / PayMongo",
+  MAYA: "Maya (GCash, cards, e-wallets)",
+};
+
+export async function startMedusaCheckout(input: {
   lines: MedusaCheckoutLine[];
   email?: string;
+  providerId?: string;
 }): Promise<MedusaCheckoutResult> {
   if (typeof window === "undefined") {
     throw new Error("Medusa checkout must run in the browser.");
@@ -30,7 +47,8 @@ export async function startMedusaLemonCheckout(input: {
   }
 
   const sdk = new Medusa({ baseUrl, publishableKey });
-  const providerId = getMedusaPaymentProviderId();
+  const providerId =
+    input.providerId?.trim() || getMedusaPaymentProviderId();
 
   const { cart: created } = await sdk.store.cart.create({
     region_id: regionId,
@@ -77,16 +95,34 @@ export async function startMedusaLemonCheckout(input: {
 
   const sessions = payment_collection?.payment_sessions ?? [];
   const session =
-    sessions.find((s: { provider_id?: string }) =>
-      String(s.provider_id ?? "").includes("lemonsqueezy"),
+    sessions.find(
+      (s: { provider_id?: string }) => s.provider_id === providerId,
     ) ?? sessions[0];
   const data = session?.data as Record<string, unknown> | undefined;
   const checkoutUrl = data?.checkout_url;
   if (typeof checkoutUrl !== "string" || !checkoutUrl.startsWith("https://")) {
     throw new Error(
-      "Medusa payment session did not return a Lemon Squeezy checkout URL.",
+      "Medusa payment session did not return a checkout URL. Check provider configuration.",
     );
   }
 
-  return { checkoutUrl, cartId };
+  const entry = Object.entries(PAYMENT_PROVIDER_IDS).find(
+    ([, id]) => id === providerId,
+  );
+  const providerLabel = entry
+    ? PAYMENT_PROVIDER_LABELS[entry[0] as PaymentProviderKey]
+    : "Payment";
+
+  return { checkoutUrl, cartId, providerLabel };
+}
+
+/** @deprecated Use startMedusaCheckout with providerId */
+export async function startMedusaLemonCheckout(input: {
+  lines: MedusaCheckoutLine[];
+  email?: string;
+}): Promise<MedusaCheckoutResult> {
+  return startMedusaCheckout({
+    ...input,
+    providerId: PAYMENT_PROVIDER_IDS.LEMONSQUEEZY,
+  });
 }
