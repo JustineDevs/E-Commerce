@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "dotenv": "^16.4.0",
     "@medusajs/js-sdk": "2.13.1",
     "@apparel-commerce/database": "workspace:*",
     "@apparel-commerce/types": "workspace:*",
