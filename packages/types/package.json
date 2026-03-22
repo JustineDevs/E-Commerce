@@ -12,7 +12,9 @@
     "lint": "eslint src --ext .ts"
   },
   "devDependencies": {
+    "@apparel-commerce/config-eslint": "workspace:*",
     "@apparel-commerce/config-typescript": "workspace:*",
+    "eslint": "^9.0.0",
     "typescript": "^5.6.0"
   }
 }
