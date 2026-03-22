@@ -1,4 +1,8 @@
 /** @type {import('next').NextConfig} */
+const path = require("path");
+// Load root .env so NEXTAUTH_* and GOOGLE_* are available (storefront has no local .env)
+require("dotenv").config({ path: path.join(__dirname, "../../.env") });
+
 function imageRemotePatterns() {
   const raw = process.env.NEXT_PUBLIC_IMAGE_HOSTNAMES ?? "*.supabase.co,**.supabase.co";
   return raw
@@ -12,7 +16,6 @@ function imageRemotePatterns() {
     }));
 }
 
-const path = require("path");
 const nextConfig = {
   outputFileTracingRoot: path.join(__dirname, "../.."),
   transpilePackages: [
