@@ -65,6 +65,24 @@ function productionLemonSqueezySchema() {
     );
 }
 
+function productionMayaSchema() {
+  return z
+    .object({
+      MAYA_SECRET_KEY: z.string().optional(),
+      MAYA_WEBHOOK_SECRET: z.string().optional(),
+    })
+    .refine(
+      (d) => {
+        if (!d.MAYA_SECRET_KEY?.trim()) return true;
+        return Boolean(d.MAYA_WEBHOOK_SECRET?.trim());
+      },
+      {
+        message:
+          "MAYA_WEBHOOK_SECRET is required in production when MAYA_SECRET_KEY is set",
+      },
+    );
+}
+
 function productionPayPalSchema() {
   return z
     .object({
@@ -162,12 +180,26 @@ export function validateMedusaProcessEnv(): void {
         `Medusa: ${paypal.error.issues[0]?.message ?? "PayPal env invalid"}`,
       );
     }
+
+    const maya = productionMayaSchema().safeParse(process.env);
+    if (!maya.success) {
+      throw new Error(
+        `Medusa: ${maya.error.issues[0]?.message ?? "Maya env invalid"}`,
+      );
+    }
   }
 
-  warnPartialOptionalProvider("Resend", [
-    "RESEND_API_KEY",
-    "RESEND_FROM_EMAIL",
-  ], process.env as Record<string, string | undefined>);
+  const resendKeys = ["RESEND_API_KEY", "RESEND_FROM_EMAIL"];
+  warnPartialOptionalProvider("Resend", resendKeys, process.env as Record<string, string | undefined>);
+  if (
+    process.env.NODE_ENV === "production" &&
+    resendKeys.every((k) => process.env[k]?.trim()) &&
+    !process.env.TRACKING_LINK_SECRET?.trim()
+  ) {
+    console.warn(
+      "[env] Resend is configured but TRACKING_LINK_SECRET is not set — order confirmation emails will send tracking links without scoped tokens; set TRACKING_LINK_SECRET for spec compliance",
+    );
+  }
 
   warnPartialOptionalProvider("AfterShip", [
     "AFTERSHIP_API_KEY",
