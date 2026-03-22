@@ -1,0 +1,10 @@
+# Medusa backend for Fly.io — build from monorepo root
+FROM node:20-slim AS base
+RUN corepack enable && corepack prepare pnpm@9 --activate
+WORKDIR /app
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/medusa ./apps/medusa
+RUN pnpm install --frozen-lockfile
+RUN pnpm exec turbo run build --filter=medusa
+WORKDIR /app/apps/medusa
+CMD ["pnpm", "run", "start"]
