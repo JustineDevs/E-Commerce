@@ -2,6 +2,9 @@
   "name": "@apparel-commerce/storefront",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "dev": "next dev --port 3000",
     "build": "next build",
