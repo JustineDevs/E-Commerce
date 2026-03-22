@@ -32,7 +32,7 @@ import {
   PaymentSessionStatus,
 } from "@medusajs/framework/utils";
 import crypto from "node:crypto";
-import { buildPaymongoWebhookDedupId, claimPaymongoWebhookDedup } from "../../lib/paymongo-webhook-dedup.js";
+import { buildPaymongoWebhookDedupId, claimPaymongoWebhookDedup } from "../../lib/paymongo-webhook-dedup";
 
 const PAYMONGO_API = "https://api.paymongo.com/v1";
 
