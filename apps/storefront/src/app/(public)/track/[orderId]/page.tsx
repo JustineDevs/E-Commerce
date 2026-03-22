@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { verifyTrackingToken } from "@apparel-commerce/sdk";
 import {
   fetchMedusaTrackByCartId,
   fetchMedusaTrackByOrderId,
@@ -44,11 +45,19 @@ export default async function TrackPage({
   const { orderId: rawOrderId } = await params;
   const { t } = await searchParams;
   const orderId = decodeURIComponent(rawOrderId.trim());
+  const token = t?.trim();
 
-  const medusaNoTokenOk =
-    (orderId.startsWith("order_") || orderId.startsWith("cart_")) && !t?.trim();
+  const secretSet = Boolean(process.env.TRACKING_HMAC_SECRET?.trim());
+  const hasValidToken =
+    Boolean(token) &&
+    (orderId.startsWith("order_") || orderId.startsWith("cart_")) &&
+    verifyTrackingToken(orderId, token!);
 
-  if (!t?.trim() && !medusaNoTokenOk) {
+  const legacyNoTokenOk =
+    !secretSet &&
+    (orderId.startsWith("order_") || orderId.startsWith("cart_"));
+
+  if (!hasValidToken && !legacyNoTokenOk) {
     return (
       <main className="storefront-page-shell max-w-2xl text-center">
         <h1 className="font-headline text-2xl font-bold text-primary mb-4">
