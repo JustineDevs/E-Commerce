@@ -11,9 +11,19 @@ Use this checklist when deploying the hardening changes to staging or production
 **Root Directory:** Set to `apps/storefront` in Vercel Project Settings → General → Root Directory. This ensures:
 - `apps/storefront/vercel.json` is used (build filtered to storefront only)
 - Next.js is correctly detected
-- Medusa is excluded from the build (Medusa runs on Railway/Render/VPS, not Vercel)
+- Medusa is excluded from the build (Medusa runs on Fly.io/Railway/VPS, not Vercel)
 
 If Root Directory is the repo root, the root `vercel.json` limits the build to the storefront, but you should still set Root Directory to `apps/storefront` for correct Next.js deployment.
+
+---
+
+## Fly.io (Medusa Backend) Configuration
+
+See [FLY.md](../../../FLY.md) for full setup. Quick reference:
+
+- **Internal port:** `9000` (Medusa default; do not use 8080)
+- **Machine:** `shared-cpu-1x`, `512mb` for MVP
+- **Build:** Uses `Dockerfile.medusa` from repo root; deploy with `fly deploy`
 
 ---
 
