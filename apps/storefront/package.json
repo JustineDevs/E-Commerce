@@ -10,6 +10,7 @@
     "generate:icons": "python scripts/generate-favicons.py"
   },
   "dependencies": {
+    "dotenv": "^16.4.0",
     "@apparel-commerce/sdk": "workspace:*",
     "@apparel-commerce/types": "workspace:*",
     "@apparel-commerce/validation": "workspace:*",
