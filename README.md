@@ -1,5 +1,7 @@
 <div align="center">
-  <img src="public/Maharlika%20Logo%20Design.png" alt="MAHARLIKA GRAND CUSTOMS" width="800" style="background-color: white; padding: 20px; border-radius: 4px;" />
+  <div style="background-color: white; padding: 24px; border-radius: 8px; display: inline-block;">
+    <img src="public/Maharlika%20Logo%20Design.png" alt="MAHARLIKA GRAND CUSTOMS" width="800" />
+  </div>
 </div>
 
 # Apparel Commerce Platform
