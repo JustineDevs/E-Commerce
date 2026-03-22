@@ -1,13 +1,20 @@
 /**
  * Shared Medusa URL and publishable env for storefront, admin server routes, and tooling.
  * Reads MEDUSA_* and NEXT_PUBLIC_MEDUSA_* per SOP-MEDUSA-ENV-AND-LEGACY.
+ * Treats empty or whitespace-only values as unset (prevents "Invalid URL" when env is "").
  */
 export function getMedusaStoreBaseUrl(): string {
-  const fromEnv =
-    process.env.MEDUSA_BACKEND_URL ??
-    process.env.NEXT_PUBLIC_MEDUSA_URL ??
-    "http://localhost:9000";
-  return fromEnv.replace(/\/$/, "");
+  const a = process.env.MEDUSA_BACKEND_URL?.trim() || undefined;
+  const b = process.env.NEXT_PUBLIC_MEDUSA_URL?.trim() || undefined;
+  const raw = a ?? b ?? "http://localhost:9000";
+  const url = raw.replace(/\/$/, "");
+  if (!url) return "http://localhost:9000";
+  try {
+    new URL(url);
+    return url;
+  } catch {
+    return "http://localhost:9000";
+  }
 }
 
 export function getMedusaSecretApiKey(): string | undefined {
