@@ -1,6 +1,6 @@
 # ADR 0001: Medusa 2.x as commerce system of record
 
-## Status
+## Status | Deprecated
 
 Accepted: program start (`2026-03-20`).
 
