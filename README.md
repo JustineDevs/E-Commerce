@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="public/Maharlika%20Logo%20Design.png" alt="MAHARLIKA GRAND CUSTOMS" width="800" style="background-color: white; padding: 20px; border-radius: 4px;" />
+</div>
+
 # Apparel Commerce Platform
 
 A composable commerce system for apparel sales across storefront, POS, and fulfillment. Built for a shorts and clothing business operating through a customer storefront, internal admin dashboard, point-of-sale terminal, and centralized order management system.
