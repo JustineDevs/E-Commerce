@@ -2,8 +2,8 @@
   "name": "e-commerce-website",
   "private": true,
   "scripts": {
-    "dev": "pnpm exec turbo dev",
-    "kill-ports": "npx --yes kill-port@2.0.1 3000 3001 4000",
+    "dev": "pnpm kill-ports && pnpm exec turbo dev",
+    "kill-ports": "node scripts/kill-project-ports.js",
     "commit": "node scripts/commit/cli/index.js commit",
     "commit:dry": "node scripts/commit/cli/index.js commit --dry-run",
     "commit:cli": "node scripts/commit/cli/index.js help",
@@ -15,7 +15,11 @@
     "lint": "pnpm exec turbo lint",
     "db:migrate": "pnpm --filter @apparel-commerce/database migrate",
     "db:seed": "pnpm --filter @apparel-commerce/database seed",
-    "test": "pnpm --filter @apparel-commerce/validation test && pnpm --filter @apparel-commerce/rate-limits test && pnpm --filter @apparel-commerce/api test && pnpm --filter @apparel-commerce/database test && pnpm --filter medusa test:stress",
+    "test": "pnpm --filter @apparel-commerce/platform-data test && pnpm --filter @apparel-commerce/sdk test && pnpm --filter @apparel-commerce/validation test && pnpm --filter @apparel-commerce/rate-limits test && pnpm --filter @apparel-commerce/api test && pnpm --filter @apparel-commerce/database test && pnpm --filter medusa test:stress",
+    "stress-test": "node scripts/stress-test.js",
+    "stress-test:quick": "node scripts/stress-test.js --no-e2e --no-dogfood",
+    "release-gate": "node scripts/release-gate.js",
+    "release-gate:full": "node scripts/release-gate.js --include-e2e",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "dogfood:screenshots": "playwright test e2e/dogfood --project=chromium",
@@ -26,6 +30,9 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^9.0.0",
+    "globals": "^15.15.0",
     "prettier": "^3.2.5",
     "turbo": "^2.3.0"
   },
