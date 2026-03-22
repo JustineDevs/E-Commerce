@@ -61,6 +61,19 @@ internal/docs/     # Spec, blueprint, privacy-terms
 - Lemon Squeezy and AfterShip API credentials
 - Google OAuth client (for NextAuth)
 
+### Local development ports
+
+| Port | Service |
+|------|---------|
+| 3000 | Storefront |
+| 3001 | Admin dashboard |
+| 4000 | Express API (health, compliance) |
+| 9000 | Medusa commerce backend |
+
+- **Storefront** (3000): http://localhost:3000 — shop, cart, checkout, sign-in
+- **Admin** (3001): http://localhost:3001/admin — dashboard, orders, POS
+- **Medusa** (9000): http://localhost:9000/health — commerce API
+
 ### Install
 
 ```bash
@@ -74,7 +87,7 @@ Copy `.env.example` to `.env` and configure:
 - `DATABASE_URL` – Supabase Postgres connection string
 - `NEXTAUTH_SECRET`, `NEXTAUTH_URL` – NextAuth configuration
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` – Google OAuth
-- Lemon Squeezy API key and webhook secret
+- See `apps/medusa/.env.template` for Lemon Squeezy, Stripe, PayPal, Paymongo, Maya credentials
 - AfterShip API key
 
 ### Database
@@ -100,6 +113,7 @@ pnpm build
 
 ## Documentation
 
+- [Payment Integration](internal/docs/runbooks/PAYMENT-INTEGRATION.md) – Lemon Squeezy, Stripe, PayPal, Paymongo (GCash), Maya setup
 - [Specification](internal/docs/spec.md) – System scope, tech stack, functional requirements
 - [Blueprint](internal/docs/blueprint.md) – Sprint plan, data model, OMS flow
 - [Privacy & Terms](internal/docs/privacy-terms.md) – PRD, service agreement, GDPR/PDPA
