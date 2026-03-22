@@ -2,7 +2,7 @@ import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http";
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils";
 import { capturePaymentWorkflow } from "@medusajs/medusa/core-flows";
 import crypto from "node:crypto";
-import { buildAftershipWebhookDedupId, claimAftershipWebhookDedup } from "../../../lib/aftership-webhook-dedup.js";
+import { buildAftershipWebhookDedupId, claimAftershipWebhookDedup } from "../../../lib/aftership-webhook-dedup";
 
 function verifyAftershipHmac(
   rawBody: Buffer,
