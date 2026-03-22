@@ -43,9 +43,7 @@ This app lives under **`apparel-commerce/apps/medusa`**. Migration phases, ADR, 
 From this directory, with `apps/medusa/.env` created from `.env.template` (commerce DB + Lemon/AfterShip/Resend are documented only here; root `.env` is for Next/Express/legacy DB):
 
 1. **`pnpm seed:ph`**: Region **Philippines** (`php`), sales channel **Web PH**, stock location **Warehouse PH** (metadata `legacy_inventory_location_code`, default `WH1`), flat **Standard PH** shipping, tax region `ph`, store default currency PHP, publishable API key linked to **Web PH**. Env: `MEDUSA_SEED_LEGACY_LOCATION_CODE`, `MEDUSA_PH_FLAT_SHIPPING_MINOR` (amount in **minor** php units; default `15000` = ₱150.00).
-2. **Export legacy JSONL** (from `apparel-commerce/`): 
- `pnpm --filter @apparel-commerce/database run export:catalog-for-medusa -- path/to/catalog.jsonl` 
- `pnpm --filter @apparel-commerce/database run export:inventory-for-medusa -- path/to/inventory.jsonl`
+2. **Export legacy JSONL:** use `internal/docs/migration/` tooling or custom scripts (contact platform team).
 3. **`MIGRATION_CATALOG_JSONL=... pnpm import:legacy-catalog`**: Idempotent **by product `handle`** (= legacy `slug`). Creates categories from legacy `category`. See `internal/docs/migration/field-mapping.md`. Optional: `MIGRATION_SALES_CHANNEL_NAME`, `MIGRATION_CATALOG_BATCH`, `LEGACY_PRICE_ALREADY_MINOR=1` if legacy prices are already smallest-unit integers.
 4. **`MIGRATION_INVENTORY_JSONL=... pnpm import:legacy-inventory`**: Resolves stock location by **`legacy_inventory_location_code`** on the Medusa location (from `seed:ph`) or by matching **location name**. Matches SKUs to inventory items (run after catalog import).
 
