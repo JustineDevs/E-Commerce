@@ -9,7 +9,12 @@ import {
   clearCart,
   type CartLine,
 } from "@/lib/cart";
-import { startMedusaLemonCheckout } from "@/lib/medusa-checkout";
+import {
+  startMedusaCheckout,
+  PAYMENT_PROVIDER_IDS,
+  PAYMENT_PROVIDER_LABELS,
+  type PaymentProviderKey,
+} from "@/lib/medusa-checkout";
 
 const SITE_ORIGIN = (
   process.env.NEXT_PUBLIC_SITE_URL ?? DEFAULT_PUBLIC_SITE_ORIGIN
@@ -20,9 +25,11 @@ export default function CheckoutPage() {
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentProviderKey>("LEMONSQUEEZY");
   const [pendingPayment, setPendingPayment] = useState<{
     checkoutUrl: string;
     trackingPageUrl: string;
+    providerLabel: string;
   } | null>(null);
   const [copyDone, setCopyDone] = useState(false);
 
@@ -44,18 +51,29 @@ export default function CheckoutPage() {
     setError(null);
 
     try {
-      const { checkoutUrl, cartId } = await startMedusaLemonCheckout({
+      const { checkoutUrl, cartId, providerLabel } = await startMedusaCheckout({
         lines: lines.map((l) => ({
           variantId: l.variantId,
           quantity: l.quantity,
         })),
         email: email.trim() || undefined,
+        providerId: PAYMENT_PROVIDER_IDS[paymentMethod],
       });
-      const path = `/track/${encodeURIComponent(cartId)}`;
-      const trackingPageUrl = SITE_ORIGIN ? `${SITE_ORIGIN}${path}` : path;
+      const res = await fetch("/api/tracking-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cartId }),
+      });
+      const data = (await res.json()) as { trackingPageUrl?: string };
+      const trackingPageUrl =
+        data.trackingPageUrl ??
+        (SITE_ORIGIN
+          ? `${SITE_ORIGIN}/track/${encodeURIComponent(cartId)}`
+          : `/track/${encodeURIComponent(cartId)}`);
       setPendingPayment({
         checkoutUrl,
         trackingPageUrl,
+        providerLabel,
       });
       setCopyDone(false);
     } catch (e) {
@@ -87,12 +105,37 @@ export default function CheckoutPage() {
         Checkout
       </h1>
       <p className="font-body text-on-surface-variant mb-12 max-w-lg">
-        Review your bag. Payment runs on Lemon Squeezy. Stock is reserved while
+        Review your bag. Choose a payment method below. Stock is reserved while
         you complete checkout.
       </p>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
         <div className="space-y-8">
+          <section>
+            <h2 className="font-headline text-sm font-bold uppercase tracking-widest text-primary mb-4">
+              Payment method
+            </h2>
+            <div className="space-y-2">
+              {(Object.keys(PAYMENT_PROVIDER_IDS) as PaymentProviderKey[]).map(
+                (key) => (
+                  <label
+                    key={key}
+                    className="flex items-center gap-3 cursor-pointer"
+                  >
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      checked={paymentMethod === key}
+                      onChange={() => setPaymentMethod(key)}
+                      className="w-4 h-4 accent-primary"
+                    />
+                    <span className="text-sm">{PAYMENT_PROVIDER_LABELS[key]}</span>
+                  </label>
+                ),
+              )}
+            </div>
+          </section>
+
           <section>
             <h2 className="font-headline text-sm font-bold uppercase tracking-widest text-primary mb-4">
               Contact
@@ -270,11 +313,11 @@ export default function CheckoutPage() {
             {pendingPayment && (
               <button
                 type="button"
-                data-testid="checkout-continue-lemonsqueezy"
+                data-testid="checkout-continue-payment"
                 onClick={continueToHostedCheckout}
                 className="w-full mt-3 py-4 border-2 border-primary text-primary font-headline font-bold text-sm uppercase tracking-widest rounded hover:bg-primary hover:text-on-primary transition-all"
               >
-                Open Lemon Squeezy checkout
+                Open {pendingPayment.providerLabel} checkout
               </button>
             )}
 
