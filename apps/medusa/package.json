@@ -1,6 +1,7 @@
 {
   "name": "medusa",
   "version": "0.0.1",
+  "type": "module",
   "description": "A starter for Medusa projects.",
   "author": "Medusa (https://medusajs.com)",
   "license": "MIT",
@@ -23,9 +24,10 @@
     "test:integration:http": "TEST_TYPE=integration:http NODE_OPTIONS=--experimental-vm-modules jest --silent=false --runInBand --forceExit",
     "test:integration:modules": "TEST_TYPE=integration:modules NODE_OPTIONS=--experimental-vm-modules jest --silent=false --runInBand --forceExit",
     "test:unit": "TEST_TYPE=unit NODE_OPTIONS=--experimental-vm-modules jest --silent --runInBand --forceExit",
-    "test:stress": "node --import tsx/esm --test \"src/**/*.stress.test.ts\""
+    "test:stress": "node --import tsx/esm --test src/lib/aftership-webhook-dedup.stress.test.ts src/lib/lemon-webhook-dedup.stress.test.ts src/lib/lemon-webhook-dedup-failclosed.stress.test.ts src/lib/paymongo-webhook-dedup.stress.test.ts src/loaders/validate-process-env.stress.test.ts"
   },
   "dependencies": {
+    "@apparel-commerce/sdk": "workspace:*",
     "zod": "^3.23.8",
     "@medusajs/payment-stripe": "2.13.1",
     "pg": "^8.13.1",
