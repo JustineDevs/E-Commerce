@@ -4,12 +4,13 @@ import { defineConfig, devices } from "@playwright/test";
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
 
 export default defineConfig({
-  testDir: "./e2e",
+  testDir: "./stress-test/e2e",
+  outputDir: "./stress-test/test-results",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 2 : undefined,
-  reporter: [["html", { open: "never" }], ["list"]],
+  reporter: [["html", { open: "never", outputFolder: "stress-test/playwright-report" }], ["list"]],
   use: {
     baseURL,
     trace: "on-first-retry",
@@ -26,12 +27,23 @@ export default defineConfig({
     ? undefined
     : [
         {
+          command: "pnpm --filter medusa dev",
+          url: process.env.PLAYWRIGHT_MEDUSA_URL ?? "http://localhost:9000/health",
+          reuseExistingServer: true,
+          timeout: 180_000,
+          stdout: "pipe",
+          stderr: "pipe",
+        },
+        {
           command: "pnpm --filter @apparel-commerce/api dev",
           url: process.env.PLAYWRIGHT_API_URL ?? "http://localhost:4000/health",
           reuseExistingServer: true,
           timeout: 120_000,
           stdout: "pipe",
           stderr: "pipe",
+          env: {
+            INTERNAL_API_KEY: process.env.INTERNAL_API_KEY ?? "e2e-internal-key",
+          },
         },
         {
           command: "pnpm --filter @apparel-commerce/storefront dev",
