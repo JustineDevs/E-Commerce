@@ -44,7 +44,7 @@ Default payment method. Customers select **"Lemon Squeezy (Card, Stripe, PayPal)
 
 ### Webhooks
 
-Register webhook URL in Lemon Squeezy: `https://your-medusa-backend.fly.dev/hooks/payment/lemonsqueezy`
+Register webhook URL in Lemon Squeezy: `https://your-medusa-backend.onrender.com/hooks/payment/lemonsqueezy`
 
 ---
 
@@ -78,7 +78,7 @@ Customers select **"GCash / PayMongo"** on checkout. They are redirected to Paym
 
 ### Webhooks
 
-Register: `https://your-medusa-backend.fly.dev/hooks/payment/paymongo`
+Register: `https://your-medusa-backend.onrender.com/hooks/payment/paymongo`
 
 ---
 
@@ -110,7 +110,7 @@ Customers select **"Maya (GCash, cards, e-wallets)"** on checkout. They are redi
 
 ### Webhooks
 
-Register: `https://your-medusa-backend.fly.dev/hooks/payment/maya`
+Register: `https://your-medusa-backend.onrender.com/hooks/payment/maya`
 
 Maya recommends **IP whitelisting** for webhook security:
 - Sandbox: `13.229.160.234`, `3.1.199.75`
