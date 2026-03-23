@@ -246,7 +246,7 @@ Flow:
 - Web3: ethers.js 6.x, @solana/web3.js, wagmi 2.x
 
 ### Infrastructure
-- Hosting: Vercel (frontend), Fly.io (backend)
+- Hosting: Vercel (frontend), Render (backend)
 - Database: PlanetScale, Redis Cloud
 - RPC: Alchemy, QuickNode, Helius
 - Monitoring: Datadog, Sentry, Grafana
