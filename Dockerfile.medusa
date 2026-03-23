@@ -1,4 +1,4 @@
-# Medusa backend for Fly.io — build from monorepo root
+# Medusa backend for Render — build from monorepo root
 FROM node:20-slim AS base
 RUN corepack enable && corepack prepare pnpm@9 --activate
 WORKDIR /app
