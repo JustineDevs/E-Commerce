@@ -1,0 +1,38 @@
+# Render Blueprint — Medusa commerce backend
+# Auto-deploys only when Medusa or its dependencies change (see buildFilter).
+# Connect this repo in Render Dashboard; Render reads this file automatically.
+
+services:
+  - type: web
+    name: maharlika-medusa
+    runtime: docker
+    dockerfilePath: ./Dockerfile.medusa
+    region: singapore
+
+    # Deploy only when these paths change
+    buildFilter:
+      paths:
+        - apps/medusa/**
+        - packages/sdk/**
+        - Dockerfile.medusa
+        - package.json
+        - pnpm-lock.yaml
+        - pnpm-workspace.yaml
+
+    healthCheckPath: /health
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: COOKIE_SECRET
+        generateValue: true
+      - key: STORE_CORS
+        sync: false
+      - key: ADMIN_CORS
+        sync: false
+      - key: AUTH_CORS
+        sync: false
