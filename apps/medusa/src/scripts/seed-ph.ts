@@ -84,7 +84,21 @@ const updateStoreCurrencies = createWorkflow(
   },
 );
 
-export default async function seedPhilippines({ container }: ExecArgs) {
+export default async function seedPhilippines(args: ExecArgs) {
+  const logger = args.container.resolve(ContainerRegistrationKeys.LOGGER);
+  try {
+    await runPhilippinesSeed(args);
+  } catch (e) {
+    const err = e instanceof Error ? e : new Error(String(e));
+    logger.error(`PH seed FAILED: ${err.message}`);
+    if (err.stack) {
+      logger.error(err.stack);
+    }
+    throw err;
+  }
+}
+
+async function runPhilippinesSeed({ container }: ExecArgs) {
   const logger = container.resolve(ContainerRegistrationKeys.LOGGER);
   const link = container.resolve(ContainerRegistrationKeys.LINK);
   const query = container.resolve(ContainerRegistrationKeys.QUERY);
@@ -168,11 +182,15 @@ export default async function seedPhilippines({ container }: ExecArgs) {
     );
   }
 
-  logger.info("PH seed: tax region (ph)");
+  logger.info("PH seed: tax region — listing (country ph)");
   const existingTax = await taxModuleService.listTaxRegions({
     country_code: "ph",
   });
+  logger.info(
+    `PH seed: tax region — existing count=${existingTax.length} (skip create if >0)`,
+  );
   if (!existingTax.length) {
+    logger.info("PH seed: tax region — running createTaxRegionsWorkflow");
     await createTaxRegionsWorkflow(container).run({
       input: [
         {
@@ -181,6 +199,7 @@ export default async function seedPhilippines({ container }: ExecArgs) {
         },
       ],
     });
+    logger.info("PH seed: tax region — workflow finished");
   }
 
   logger.info("PH seed: stock location");
@@ -282,9 +301,44 @@ export default async function seedPhilippines({ container }: ExecArgs) {
     // link may already exist
   }
 
-  const serviceZoneId = fulfillmentSet.service_zones?.[0]?.id;
+  // listFulfillmentSets often omits relations; load zones when missing.
+  let serviceZoneId = fulfillmentSet.service_zones?.[0]?.id;
   if (!serviceZoneId) {
-    throw new Error("Fulfillment set has no service zone.");
+    fulfillmentSet = await fulfillmentModuleService.retrieveFulfillmentSet(
+      fulfillmentSet.id,
+      { relations: ["service_zones"] },
+    );
+    serviceZoneId = fulfillmentSet.service_zones?.[0]?.id;
+  }
+  if (!serviceZoneId) {
+    const zones = await fulfillmentModuleService.listServiceZones(
+      { fulfillment_set: { id: fulfillmentSet.id } },
+      { take: 20 },
+    );
+    serviceZoneId = zones[0]?.id;
+  }
+  if (!serviceZoneId) {
+    logger.warn(
+      "PH seed: fulfillment set has no service zones; creating Philippines zone",
+    );
+    const created = await fulfillmentModuleService.createServiceZones([
+      {
+        name: "Philippines",
+        fulfillment_set_id: fulfillmentSet.id,
+        geo_zones: [
+          {
+            country_code: "ph",
+            type: "country",
+          },
+        ],
+      },
+    ]);
+    serviceZoneId = created[0]?.id;
+  }
+  if (!serviceZoneId) {
+    throw new Error(
+      "Fulfillment set has no service zone (retrieve, list, and create all failed).",
+    );
   }
 
   const existingOptions = await fulfillmentModuleService.listShippingOptions({
@@ -338,18 +392,14 @@ export default async function seedPhilippines({ container }: ExecArgs) {
     );
   }
 
-  let publishableApiKey: ApiKey | null = null;
-  const { data: keys } = await query.graph({
+  let { data: publishableKeys } = await query.graph({
     entity: "api_key",
-    fields: ["id"],
+    fields: ["id", "title"],
     filters: { type: "publishable" },
   });
-  publishableApiKey = keys?.[0] ?? null;
 
-  if (!publishableApiKey) {
-    const {
-      result: [created],
-    } = await createApiKeysWorkflow(container).run({
+  if (!publishableKeys?.length) {
+    await createApiKeysWorkflow(container).run({
       input: {
         api_keys: [
           {
@@ -360,20 +410,32 @@ export default async function seedPhilippines({ container }: ExecArgs) {
         ],
       },
     });
-    publishableApiKey = created as ApiKey;
+    const again = await query.graph({
+      entity: "api_key",
+      fields: ["id", "title"],
+      filters: { type: "publishable" },
+    });
+    publishableKeys = again.data ?? [];
   }
 
-  try {
-    await linkSalesChannelsToApiKeyWorkflow(container).run({
-      input: {
-        id: publishableApiKey.id,
-        add: [webPhChannels[0].id],
-      },
-    });
-  } catch (e) {
-    logger.warn(
-      `linkSalesChannelsToApiKey (may already be linked): ${e instanceof Error ? e.message : String(e)}`,
-    );
+  const salesChannelId = webPhChannels[0].id;
+  for (const row of publishableKeys ?? []) {
+    const key = row as ApiKey;
+    try {
+      await linkSalesChannelsToApiKeyWorkflow(container).run({
+        input: {
+          id: key.id,
+          add: [salesChannelId],
+        },
+      });
+      logger.info(
+        `PH seed: linked sales channel ${salesChannelId} to publishable API key ${key.id}${key.title ? ` (${key.title})` : ""}`,
+      );
+    } catch (e) {
+      logger.warn(
+        `linkSalesChannelsToApiKey key=${key.id} (may already be linked): ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
   }
 
   logger.info(
