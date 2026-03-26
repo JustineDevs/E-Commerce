@@ -1,0 +1,88 @@
+import {
+  buildPayPalWebhookDedupId,
+} from "../../../lib/paypal-webhook-dedup";
+
+describe("PayPal webhook dedup ID generation", () => {
+  it("builds a dedup ID from event_type and id", () => {
+    const body = {
+      id: "WH-1234",
+      event_type: "PAYMENT.CAPTURE.COMPLETED",
+    };
+    expect(buildPayPalWebhookDedupId(body)).toBe(
+      "paypal:PAYMENT.CAPTURE.COMPLETED:WH-1234",
+    );
+  });
+
+  it("returns null when id is missing", () => {
+    const body = { event_type: "PAYMENT.CAPTURE.COMPLETED" };
+    expect(buildPayPalWebhookDedupId(body)).toBeNull();
+  });
+
+  it("uses 'unknown' when event_type is missing", () => {
+    const body = { id: "WH-5678" };
+    expect(buildPayPalWebhookDedupId(body)).toBe("paypal:unknown:WH-5678");
+  });
+});
+
+describe("PayPal webhook body parsing", () => {
+  function extractSessionAndAmount(
+    eventType: string,
+    resource: Record<string, unknown>,
+  ): { sessionId: string | undefined; amountMinor: number } {
+    let sessionId: string | undefined;
+    let amountMinor = 0;
+
+    if (eventType === "PAYMENT.CAPTURE.COMPLETED") {
+      sessionId = resource.custom_id as string | undefined;
+      const amountObj = resource.amount as
+        | { value?: string }
+        | undefined;
+      const val = parseFloat(String(amountObj?.value ?? "0"));
+      amountMinor = Number.isFinite(val) ? Math.round(val * 100) : 0;
+    } else if (eventType === "CHECKOUT.ORDER.APPROVED") {
+      const units = resource.purchase_units as
+        | Array<{ custom_id?: string; amount?: { value?: string } }>
+        | undefined;
+      const first = units?.[0];
+      sessionId = first?.custom_id;
+      const val = parseFloat(String(first?.amount?.value ?? "0"));
+      amountMinor = Number.isFinite(val) ? Math.round(val * 100) : 0;
+    }
+    return { sessionId, amountMinor };
+  }
+
+  it("extracts session_id and amount from PAYMENT.CAPTURE.COMPLETED", () => {
+    const result = extractSessionAndAmount("PAYMENT.CAPTURE.COMPLETED", {
+      custom_id: "sess_abc123",
+      amount: { value: "150.00", currency_code: "PHP" },
+    });
+    expect(result.sessionId).toBe("sess_abc123");
+    expect(result.amountMinor).toBe(15000);
+  });
+
+  it("extracts session_id from CHECKOUT.ORDER.APPROVED", () => {
+    const result = extractSessionAndAmount("CHECKOUT.ORDER.APPROVED", {
+      purchase_units: [
+        { custom_id: "sess_xyz789", amount: { value: "50.50" } },
+      ],
+    });
+    expect(result.sessionId).toBe("sess_xyz789");
+    expect(result.amountMinor).toBe(5050);
+  });
+
+  it("returns undefined session_id for unknown event type", () => {
+    const result = extractSessionAndAmount("SOME.OTHER.EVENT", {
+      custom_id: "sess_abc",
+    });
+    expect(result.sessionId).toBeUndefined();
+    expect(result.amountMinor).toBe(0);
+  });
+
+  it("returns 0 amount when value is missing", () => {
+    const result = extractSessionAndAmount("PAYMENT.CAPTURE.COMPLETED", {
+      custom_id: "sess_abc123",
+    });
+    expect(result.sessionId).toBe("sess_abc123");
+    expect(result.amountMinor).toBe(0);
+  });
+});
