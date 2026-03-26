@@ -1,0 +1,32 @@
+---
+description: Sprint scope discipline — committed items stay in scope until done or explicitly blocked; validate against the full stack when relevant.
+globs:
+alwaysApply: true
+---
+
+# Sprint commitments
+
+## Scope
+
+- Treat backlog items as fixed until shipped or marked blocked with a named dependency.
+- Do not replace implementation with documentation, placeholders, or env-only toggles for required behavior.
+- Blocked means an external blocker is named (credential, vendor SDK, hardware); it does not remove the item from scope.
+- Proof of completion includes runtime wiring and validation appropriate to the change (automated tests, or manual steps recorded in the PR).
+
+## Full application context
+
+This repo is a **Turborepo monorepo**: Medusa (`apps/medusa`), storefront and admin Next apps (`apps/storefront`, `apps/admin`), Express internal API (`apps/api`), shared `packages/*`, and the **local POS terminal agent** (`apps/terminal-agent`).
+
+When a feature touches integration across services (POS, print, Medusa, Supabase, admin API), validation should reflect that **entire path**, not a single file in isolation.
+
+## Local validation command
+
+The standard way to run **all dev processes together** is from the repo root:
+
+```bash
+pnpm run dev
+```
+
+This executes **`turbo dev`** for every package with a `dev` script (after freeing common ports). That includes the **terminal agent** on **`http://127.0.0.1:17711`** by default, alongside storefront (**3000**), admin (**3001**), API (**4000**), Medusa (**9000**), etc.
+
+Use this command when proving end-to-end behavior for changes that depend on multiple apps. For isolated edits, scoped commands (`pnpm --filter <package> dev`) are fine if the PR states what was not run.
