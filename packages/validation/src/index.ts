@@ -18,6 +18,19 @@ export const productListQuerySchema = z.object({
   category: z.string().trim().min(1).max(120).optional(),
   size: z.string().trim().min(1).max(40).optional(),
   color: z.string().trim().min(1).max(80).optional(),
+  brand: z.string().trim().min(1).max(120).optional(),
+  minPrice: z.coerce
+    .number()
+    .optional()
+    .transform((n) =>
+      n != null && Number.isFinite(n) && n >= 0 ? n : undefined,
+    ),
+  maxPrice: z.coerce
+    .number()
+    .optional()
+    .transform((n) =>
+      n != null && Number.isFinite(n) && n >= 0 ? n : undefined,
+    ),
   /** Search product name or slug (ilike). */
   q: z.preprocess((val) => {
     if (val == null || val === "") return undefined;
