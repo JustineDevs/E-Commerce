@@ -27,9 +27,15 @@ test.describe("Admin access control", () => {
   });
 
   test("Medusa BFF API returns 401 when no session", async ({ request }) => {
-    const res = await request.get(`${adminBase}/api/medusa/orders/any-id`, {
-      failOnStatusCode: false,
-    });
+    const res = await request.patch(
+      `${adminBase}/api/medusa/orders/order_test123`,
+      {
+        data: { status: "pending" },
+        failOnStatusCode: false,
+      },
+    );
     expect(res.status()).toBe(401);
+    const body = await res.json().catch(() => ({}));
+    expect(body).toMatchObject({ code: "NO_SESSION" });
   });
 });
