@@ -55,6 +55,7 @@ export default async function TrackPage({
 
   const legacyNoTokenOk =
     !secretSet &&
+    process.env.NODE_ENV !== "production" &&
     (orderId.startsWith("order_") || orderId.startsWith("cart_"));
 
   if (!hasValidToken && !legacyNoTokenOk) {
@@ -90,8 +91,7 @@ export default async function TrackPage({
           Tracking unavailable
         </h1>
         <p className="font-body text-on-surface-variant mb-6">
-          Order tracking is not configured on this environment. Please contact
-          support.
+          Order tracking is not available here right now. Please contact support.
         </p>
         <Link href="/track" className="text-primary underline">
           Back to track order
@@ -150,6 +150,22 @@ export default async function TrackPage({
       <p className="font-body text-on-surface-variant mb-12">
         Status: {(order.status as string)?.replace(/_/g, " ") ?? "Unknown"}
       </p>
+
+      {String(order.status) === "pending_payment" &&
+        orderId.startsWith("cart_") && (
+          <div className="mb-8 rounded-lg border border-outline-variant/30 bg-surface-container-lowest p-4">
+            <p className="text-sm text-on-surface-variant mb-3">
+              Payment not completed yet. Open checkout on this device using the
+              same cart (for example after switching from another browser).
+            </p>
+            <Link
+              href={`/checkout?resume=${encodeURIComponent(orderId)}`}
+              className="inline-flex items-center justify-center bg-primary text-on-primary px-5 py-2.5 rounded font-medium text-sm hover:opacity-90"
+            >
+              Continue checkout
+            </Link>
+          </div>
+        )}
 
       <div className="bg-surface-container-lowest rounded shadow-[0px_20px_40px_rgba(0,0,0,0.02)] p-8 mb-8">
         <h2 className="font-headline text-sm font-bold uppercase tracking-widest text-primary mb-6">
