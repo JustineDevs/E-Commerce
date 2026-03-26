@@ -16,6 +16,8 @@
     "build": "medusa build",
     "seed": "medusa exec ./src/scripts/seed.ts",
     "seed:ph": "medusa exec ./src/scripts/seed-ph.ts",
+    "seed:categories": "medusa exec ./src/scripts/ensure-product-categories.ts",
+    "exec:reconcile-payments": "medusa exec ./src/scripts/reconcile-pending-payments.ts",
     "import:legacy-catalog": "medusa exec ./src/scripts/import-legacy-catalog-jsonl.ts",
     "import:legacy-inventory": "medusa exec ./src/scripts/import-legacy-inventory-jsonl.ts",
     "start": "medusa start",
@@ -26,7 +28,7 @@
     "test:stress": "node --import tsx/esm --test src/lib/aftership-webhook-dedup.stress.test.ts src/lib/lemon-webhook-dedup.stress.test.ts src/lib/lemon-webhook-dedup-failclosed.stress.test.ts src/lib/paymongo-webhook-dedup.stress.test.ts src/loaders/validate-process-env.stress.test.ts"
   },
   "dependencies": {
-    "@apparel-commerce/sdk": "workspace:*",
+    "@supabase/supabase-js": "^2.45.0",
     "zod": "^3.23.8",
     "@medusajs/payment-stripe": "2.13.1",
     "pg": "^8.13.1",
@@ -40,6 +42,7 @@
     "@medusajs/medusa": "2.13.1"
   },
   "devDependencies": {
+    "@opentelemetry/exporter-zipkin": "^2.0.0",
     "@types/pg": "^8.11.10",
     "@medusajs/test-utils": "2.13.1",
     "@swc/core": "^1.7.28",
