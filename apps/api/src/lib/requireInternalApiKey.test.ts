@@ -23,19 +23,15 @@ function mockReq(headers: Record<string, string> = {}): Request {
 }
 
 function mockRes(): Response & { statusCode: number; jsonBody: unknown } {
-  let statusCode = 0;
-  let jsonBody: unknown;
   const res = {
     statusCode: 0,
     jsonBody: undefined as unknown,
     status(code: number) {
-      statusCode = code;
-      (this as { statusCode: number }).statusCode = code;
+      this.statusCode = code;
       return this;
     },
     json(body: unknown) {
-      jsonBody = body;
-      (this as { jsonBody: unknown }).jsonBody = body;
+      this.jsonBody = body;
       return this;
     },
   } as Response & { statusCode: number; jsonBody: unknown };
