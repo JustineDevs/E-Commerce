@@ -1,7 +1,17 @@
 import type { SubscriberArgs, SubscriberConfig } from "@medusajs/framework";
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils";
-import { buildTrackingUrl } from "@apparel-commerce/sdk";
+import { createHmac } from "crypto";
 import { Resend } from "resend";
+
+function buildTrackingUrl(baseUrl: string, id: string): string | null {
+  const secret = process.env.TRACKING_HMAC_SECRET?.trim();
+  if (!secret) return null;
+  const hmac = createHmac("sha256", secret);
+  hmac.update(id);
+  const token = hmac.digest("base64url");
+  const cleanBase = baseUrl.replace(/\/$/, "");
+  return `${cleanBase}/track/${encodeURIComponent(id)}?t=${encodeURIComponent(token)}`;
+}
 
 function escapeHtml(s: string): string {
   return s
