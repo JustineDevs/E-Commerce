@@ -1,17 +1,23 @@
 import Link from "next/link";
+import Image from "next/image";
 import type { Metadata } from "next";
+import { loadCmsCategoryContentPublic } from "@apparel-commerce/platform-data";
 import {
   productListQuerySchema,
   SHOP_PRODUCT_PAGE_SIZE,
 } from "@apparel-commerce/validation";
 import { CatalogProductCard } from "@/components/CatalogProductCard";
+import { CmsBlocksRenderer } from "@/components/CmsBlocksRenderer";
 import {
   fetchProductsPage,
   fetchCategorySummaries,
   fetchVariantFacets,
 } from "@/lib/catalog-fetch";
 import { firstCommerceFailure } from "@/lib/catalog-fetch-helpers";
+import type { ShopQuery } from "@/lib/shop-url";
 import { shopHref } from "@/lib/shop-url";
+import { CatalogSearchTypeahead } from "@/components/CatalogSearchTypeahead";
+import { ShopPriceRangeForm } from "@/components/ShopPriceRangeForm";
 import { ShopSortSelect } from "@/components/ShopSortSelect";
 import { StorefrontCommerceAlert } from "@/components/StorefrontCommerceAlert";
 import { canonicalUrl } from "@/lib/seo";
@@ -37,6 +43,9 @@ export default async function ShopPage({
     category?: string;
     size?: string;
     color?: string;
+    brand?: string;
+    minPrice?: string;
+    maxPrice?: string;
     sort?: string;
     offset?: string;
     q?: string;
@@ -49,6 +58,9 @@ export default async function ShopPage({
     category: sp.category,
     size: sp.size,
     color: sp.color,
+    brand: sp.brand,
+    minPrice: sp.minPrice,
+    maxPrice: sp.maxPrice,
     q: sp.q,
     sort: sp.sort,
   });
@@ -63,23 +75,30 @@ export default async function ShopPage({
   const category = q.category?.trim() || undefined;
   const size = q.size?.trim() || undefined;
   const color = q.color?.trim() || undefined;
+  const brand = q.brand?.trim() || undefined;
+  const minPrice = q.minPrice;
+  const maxPrice = q.maxPrice;
   const searchQ = q.q?.trim() || undefined;
   const sort = q.sort ?? "newest";
   const offset = q.offset ?? 0;
   const limit = q.limit ?? SHOP_PRODUCT_PAGE_SIZE;
 
-  const [pageRes, catRes, facetRes] = await Promise.all([
+  const [pageRes, catRes, facetRes, cmsCategory] = await Promise.all([
     fetchProductsPage(limit, {
       category,
       size,
       color,
+      brand,
+      minPrice,
+      maxPrice,
       q: searchQ,
       sort,
       offset,
       revalidate: 60,
     }),
-    fetchCategorySummaries(120),
-    fetchVariantFacets(category, 120),
+    fetchCategorySummaries(),
+    fetchVariantFacets(category),
+    category ? loadCmsCategoryContentPublic(category, "en") : Promise.resolve(null),
   ]);
 
   const failure = firstCommerceFailure(pageRes, catRes, facetRes);
@@ -101,8 +120,33 @@ export default async function ShopPage({
   const totalActive = categories.reduce((s, c) => s + c.count, 0);
   const hasMore = offset + products.length < total;
 
+  const base = (): ShopQuery => ({
+    category,
+    size,
+    color,
+    brand,
+    minPrice,
+    maxPrice,
+    sort,
+    search: searchQ,
+  });
+
+  const h = (patch: Partial<ShopQuery>) => shopHref({ ...base(), ...patch });
+
   return (
     <main className="storefront-page-shell max-w-[1600px] pb-12 sm:pb-16 md:pb-24">
+      {cmsCategory?.banner_url ? (
+        <div className="relative mb-10 aspect-[21/9] w-full overflow-hidden rounded-2xl bg-surface-container-low">
+          <Image
+            src={cmsCategory.banner_url}
+            alt=""
+            fill
+            sizes="(max-width: 1600px) 100vw, 1600px"
+            className="object-cover"
+            priority
+          />
+        </div>
+      ) : null}
       <header className="mb-12 grid grid-cols-1 items-end gap-8 sm:mb-16 lg:mb-20 lg:grid-cols-12">
         <div className="min-w-0 lg:col-span-8">
           <h1 className="font-headline text-[clamp(2rem,6.5vw,4.5rem)] font-bold leading-[1.05] tracking-tighter text-primary">
@@ -118,22 +162,48 @@ export default async function ShopPage({
               <strong className="text-primary">{searchQ}</strong>
             </p>
           ) : null}
-          <p className="mt-4 max-w-xl font-body text-base leading-relaxed text-on-surface-variant md:text-lg">
-            Structural silhouettes and quiet luxury-shorts, shirts, and layers
-            built for everyday precision. Every piece reflects Maharlika Apparel
-            Custom craft.
-          </p>
+          {cmsCategory?.intro_html?.trim() ? (
+            <div
+              className="mt-4 max-w-xl font-body text-base leading-relaxed text-on-surface-variant md:text-lg"
+              dangerouslySetInnerHTML={{ __html: cmsCategory.intro_html }}
+            />
+          ) : (
+            <p className="mt-4 max-w-xl font-body text-base leading-relaxed text-on-surface-variant md:text-lg">
+              Structural silhouettes and quiet luxury-shorts, shirts, and layers
+              built for everyday precision. Every piece reflects Maharlika Apparel
+              Custom craft.
+            </p>
+          )}
         </div>
-        <div className="flex justify-start lg:col-span-4 lg:justify-end">
+        <div className="flex flex-col gap-6 justify-start lg:col-span-4 lg:items-end lg:justify-end">
+          <CatalogSearchTypeahead
+            initialQ={searchQ}
+            category={category}
+            size={size}
+            color={color}
+            brand={brand}
+            minPrice={minPrice}
+            maxPrice={maxPrice}
+            sort={sort}
+          />
           <ShopSortSelect
             value={sort}
             category={category}
             size={size}
             color={color}
+            brand={brand}
+            minPrice={minPrice}
+            maxPrice={maxPrice}
             search={searchQ}
           />
         </div>
       </header>
+
+      {cmsCategory?.blocks?.length ? (
+        <div className="mb-10">
+          <CmsBlocksRenderer blocks={cmsCategory.blocks} />
+        </div>
+      ) : null}
 
       <div className="flex min-w-0 flex-col gap-10 lg:flex-row lg:gap-12">
         <aside className="w-full lg:w-64 flex-shrink-0 space-y-12">
@@ -144,7 +214,7 @@ export default async function ShopPage({
             <ul className="space-y-4">
               <li>
                 <Link
-                  href={shopHref({ size, color, sort, search: searchQ })}
+                  href={h({ category: undefined, size, color })}
                   className={`flex items-center justify-between text-sm transition-colors ${
                     !category
                       ? "font-medium text-primary"
@@ -160,12 +230,10 @@ export default async function ShopPage({
               {categories.map((c) => (
                 <li key={c.category}>
                   <Link
-                    href={shopHref({
+                    href={h({
                       category: c.category,
                       size: undefined,
                       color: undefined,
-                      sort,
-                      search: searchQ,
                     })}
                     className={`flex items-center justify-between text-sm transition-colors ${
                       category === c.category
@@ -196,12 +264,9 @@ export default async function ShopPage({
                   return (
                     <Link
                       key={s}
-                      href={shopHref({
-                        category,
+                      href={h({
                         size: active ? undefined : s,
                         color,
-                        sort,
-                        search: searchQ,
                       })}
                       className={`aspect-square flex items-center justify-center text-[10px] font-bold transition-all rounded ${
                         active
@@ -232,12 +297,9 @@ export default async function ShopPage({
                   return (
                     <Link
                       key={col}
-                      href={shopHref({
-                        category,
+                      href={h({
                         size,
                         color: active ? undefined : col,
-                        sort,
-                        search: searchQ,
                       })}
                       className={`flex items-center gap-3 w-full group rounded px-1 py-0.5 -mx-1 ${
                         active ? "ring-1 ring-primary" : ""
@@ -254,7 +316,62 @@ export default async function ShopPage({
             )}
           </section>
 
-          {(category || size || color || searchQ) && (
+          <section>
+            <h3 className="font-headline text-sm font-bold uppercase tracking-[0.2em] mb-6 text-primary">
+              Brand
+            </h3>
+            {facets.brands.length === 0 ? (
+              <p className="text-xs text-on-surface-variant">
+                Set brand on products in store metadata to filter here.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {facets.brands.map((b) => {
+                  const active = brand === b;
+                  return (
+                    <li key={b}>
+                      <Link
+                        href={h({
+                          brand: active ? undefined : b,
+                        })}
+                        className={`text-sm ${
+                          active
+                            ? "font-medium text-primary"
+                            : "text-on-surface-variant hover:text-primary"
+                        }`}
+                      >
+                        {b}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+
+          <section>
+            <h3 className="font-headline text-sm font-bold uppercase tracking-[0.2em] mb-6 text-primary">
+              Price (PHP)
+            </h3>
+            <ShopPriceRangeForm
+              category={category}
+              size={size}
+              color={color}
+              brand={brand}
+              sort={sort}
+              search={searchQ}
+              minPrice={minPrice}
+              maxPrice={maxPrice}
+            />
+          </section>
+
+          {(category ||
+            size ||
+            color ||
+            searchQ ||
+            brand ||
+            minPrice != null ||
+            maxPrice != null) && (
             <Link
               href="/shop"
               className="inline-block text-xs font-medium text-primary underline underline-offset-4 hover:opacity-80"
@@ -297,12 +414,7 @@ export default async function ShopPage({
               </p>
               {hasMore && (
                 <Link
-                  href={shopHref({
-                    category,
-                    size,
-                    color,
-                    sort,
-                    search: searchQ,
+                  href={h({
                     offset: offset + limit,
                   })}
                   className="px-12 py-4 border border-primary text-primary text-xs font-bold uppercase tracking-[0.2em] hover:bg-primary hover:text-on-primary transition-all"
