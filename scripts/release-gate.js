@@ -43,6 +43,7 @@ function main() {
 
   const checks = [
     { name: "Lint", cmd: ["pnpm", "lint"] },
+    { name: "Build (turbo)", cmd: ["pnpm", "build"] },
     { name: "Security (sensitive files)", cmd: ["pnpm", "security:check"] },
     {
       name: "Audit (triage check; see internal/docs/audit-triage.md)",
