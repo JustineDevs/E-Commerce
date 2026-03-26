@@ -7,7 +7,7 @@
  * Phases:
  *  1. Lint
  *  2. Security check (sensitive files)
- *  3. Audit (dependency vulnerabilities - OWASP)
+ *  3. Audit triage (check-audit-triage.js; aligns with release-gate)
  *  4. Unit/integration + Medusa stress
  *  5. E2E (Playwright smoke, flows)
  *  6. Dogfood (visual screenshots)
@@ -15,7 +15,7 @@
  * Usage: node scripts/stress-test.js [options]
  *   --no-lint       Skip lint
  *   --no-security   Skip security check
- *   --no-audit      Skip pnpm audit
+ *   --no-audit      Skip audit triage (check-audit-triage.js)
  *   --no-test       Skip unit/integration/medusa tests
  *   --no-e2e        Skip E2E (requires dev servers)
  *   --no-dogfood    Skip dogfood screenshots
@@ -41,8 +41,8 @@ const phases = [
   },
   {
     id: "audit",
-    name: "Dependency audit (OWASP)",
-    cmd: ["pnpm", "audit"],
+    name: "Dependency audit (triage; same as release-gate)",
+    cmd: ["node", "scripts/check-audit-triage.js"],
     skipFlag: "--no-audit",
   },
   {
