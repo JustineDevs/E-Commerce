@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { logAdminApiEvent } from "@/lib/admin-api-log";
+import { getCorrelationId } from "@/lib/request-correlation";
 import {
   getMedusaRegionId,
   getMedusaStoreSdk,
@@ -6,20 +7,29 @@ import {
   variantPricePhpFromCalculated,
 } from "@/lib/medusa-pos";
 import { requireStaffSession } from "@/lib/requireStaffSession";
+import { correlatedJson, tagResponse } from "@/lib/staff-api-response";
 
-export async function GET() {
+export async function GET(req: Request) {
+  const correlationId = getCorrelationId(req);
   const staff = await requireStaffSession();
   if (!staff.ok) {
-    return staff.response;
+    return tagResponse(staff.response, correlationId);
   }
+
+  logAdminApiEvent({
+    route: "GET /api/pos/medusa/quick-products",
+    correlationId,
+    phase: "start",
+  });
 
   const regionId = getMedusaRegionId();
   const storeSdk = getMedusaStoreSdk();
   if (!regionId || !storeSdk) {
-    return NextResponse.json(
+    return correlatedJson(
+      correlationId,
       {
         error:
-          "Medusa POS env incomplete (NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY, MEDUSA_REGION_ID)",
+          "POS environment incomplete (NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY, MEDUSA_REGION_ID)",
       },
       { status: 503 },
     );
@@ -60,9 +70,22 @@ export async function GET() {
       });
     }
 
-    return NextResponse.json({ products: list });
+    logAdminApiEvent({
+      route: "GET /api/pos/medusa/quick-products",
+      correlationId,
+      phase: "ok",
+      detail: { count: list.length },
+    });
+
+    return correlatedJson(correlationId, { products: list });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Quick products failed";
-    return NextResponse.json({ error: msg }, { status: 502 });
+    const msg = e instanceof Error ? e.message : "Quick products unavailable";
+    logAdminApiEvent({
+      route: "GET /api/pos/medusa/quick-products",
+      correlationId,
+      phase: "error",
+      detail: { message: msg },
+    });
+    return correlatedJson(correlationId, { error: msg }, { status: 502 });
   }
 }
