@@ -7,6 +7,7 @@
  */
 export {
   createSupabaseClient,
+  tryCreateSupabaseClient,
   upsertOAuthUser,
   isStaffRole,
   checkStaffRole,
@@ -14,4 +15,11 @@ export {
   exportDataSubjectByEmail,
   anonymizeStaleOrderAddresses,
   type DataSubjectExport,
+  STAFF_PERMISSION_KEYS,
+  isStaffRbacStrictEnv,
+  staffHasPermission,
+  staffPermissionListForSession,
+  resolveStaffPermissionsForUserId,
+  type StaffPermissionKey,
+  type StaffSessionLike,
 } from "@apparel-commerce/platform-data";
