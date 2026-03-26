@@ -1,6 +1,15 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import { PH_VAT_RATE, computeDisplayVat } from "@apparel-commerce/sdk";
+import {
+  buildPosReceiptPayloadFromCart,
+  fireAndForgetPrint,
+  openCashDrawerRequest,
+} from "@/lib/terminal-print";
+import { storeOfflineSale, isOnline as checkOnline } from "@/lib/offline-pos";
+import { useOfflineSync } from "@/lib/use-offline-sync";
+import { AdminBreadcrumbs, AdminPageShell } from "@/components/admin-console";
 
 type CartItem = {
   id: string;
@@ -23,6 +32,15 @@ type VariantLookup = {
   products: { name?: string } | null;
 };
 
+type ShiftData = {
+  id: string;
+  employee_id: string;
+  device_name: string;
+  opened_at: string;
+  status: string;
+  opening_cash: number;
+};
+
 export default function POSPage() {
   const [barcodeInput, setBarcodeInput] = useState("");
   const [searchInput, setSearchInput] = useState("");
@@ -30,6 +48,99 @@ export default function POSPage() {
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [commitLoading, setCommitLoading] = useState(false);
   const [linkLoading, setLinkLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [hardwareMessage, setHardwareMessage] = useState<string | null>(null);
+
+  const { online, pendingCount, syncing, trySync } = useOfflineSync();
+  const [activeShift, setActiveShift] = useState<ShiftData | null>(null);
+  const [showShiftOpen, setShowShiftOpen] = useState(false);
+  const [shiftForm, setShiftForm] = useState({ employee_id: "", opening_cash: "0", device_name: "Terminal 01" });
+  const [showCloseShift, setShowCloseShift] = useState(false);
+  const [closingCash, setClosingCash] = useState("");
+  const [showVoidModal, setShowVoidModal] = useState(false);
+  const [voidForm, setVoidForm] = useState({ action: "void_item", reason: "", approver_id: "", pin: "" });
+  const [voidTarget, setVoidTarget] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/admin/shifts?status=open")
+      .then((r) => r.ok ? r.json() : { data: [] })
+      .then(({ data }) => {
+        if (data?.length > 0) setActiveShift(data[0]);
+      })
+      .catch(() => {});
+  }, []);
+
+  async function handleOpenShift(e: React.FormEvent) {
+    e.preventDefault();
+    const res = await fetch("/api/admin/shifts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        employee_id: shiftForm.employee_id,
+        opening_cash: Number(shiftForm.opening_cash),
+        device_name: shiftForm.device_name,
+      }),
+    });
+    if (res.ok) {
+      const { data } = await res.json();
+      setActiveShift(data);
+    }
+    setShowShiftOpen(false);
+  }
+
+  async function handleCloseShift(e: React.FormEvent) {
+    e.preventDefault();
+    if (!activeShift) return;
+    const res = await fetch(`/api/admin/shifts/${activeShift.id}/close`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ closing_cash: Number(closingCash) }),
+    });
+    if (res.ok) setActiveShift(null);
+    setShowCloseShift(false);
+    setClosingCash("");
+  }
+
+  async function handleVoid(e: React.FormEvent) {
+    e.preventDefault();
+    let pinVerified = false;
+    if (voidForm.approver_id && voidForm.pin) {
+      const pinRes = await fetch("/api/admin/pin-approval", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ approver_employee_id: voidForm.approver_id, pin: voidForm.pin }),
+      });
+      if (pinRes.ok) {
+        const { approved } = await pinRes.json();
+        pinVerified = approved;
+      }
+      if (!pinVerified) {
+        setLookupError("Manager PIN not verified");
+        setShowVoidModal(false);
+        return;
+      }
+    }
+    await fetch("/api/admin/voids", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        shift_id: activeShift?.id,
+        employee_id: activeShift?.employee_id ?? "",
+        approved_by: voidForm.approver_id || undefined,
+        action: voidForm.action,
+        reason: voidForm.reason,
+        pin_verified: pinVerified,
+        line_item_id: voidTarget,
+      }),
+    });
+    if (voidTarget) {
+      setCart(cart.filter((c) => c.id !== voidTarget));
+    }
+    setShowVoidModal(false);
+    setVoidForm({ action: "void_item", reason: "", approver_id: "", pin: "" });
+    setVoidTarget(null);
+    setSuccessMessage("Void recorded successfully.");
+  }
 
   const medusaPosBase = "/api/pos/medusa";
 
@@ -81,7 +192,7 @@ export default function POSPage() {
       });
       setBarcodeInput("");
     } else {
-      setLookupError("Variant not found");
+      setLookupError("No matching variant");
     }
   }
 
@@ -104,7 +215,7 @@ export default function POSPage() {
       const msg =
         typeof err.error === "string"
           ? err.error
-          : "Could not create Medusa draft order";
+          : "Unable to create draft order";
       setLookupError(msg);
       return;
     }
@@ -114,17 +225,58 @@ export default function POSPage() {
     };
     const ref =
       data.displayId != null ? String(data.displayId) : data.draftOrderId ?? "";
-    alert(
+    setSuccessMessage(
       ref
-        ? `Medusa draft order created (ref: ${ref}). Complete payment in Medusa Admin.`
-        : "Medusa draft order created. Complete payment in Medusa Admin.",
+        ? `Draft order created (ref: ${ref}). Complete payment in Admin.`
+        : "Draft order created. Complete payment in Admin.",
     );
   }
 
   async function handleCommitSale() {
     if (cart.length === 0) return;
+    const cartSnapshot = cart.map((c) => ({
+      name: c.name,
+      qty: c.qty,
+      price: c.price,
+    }));
+    const subtotalSnap = subtotal;
+    const taxSnap = tax;
+    const totalSnap = total;
     setCommitLoading(true);
     setLookupError(null);
+    setHardwareMessage(null);
+
+    if (!checkOnline()) {
+      await storeOfflineSale({
+        id: crypto.randomUUID(),
+        device_name: activeShift?.device_name ?? "Terminal 01",
+        employee_id: activeShift?.employee_id,
+        items: cart.map((c) => ({
+          variantId: c.variantId,
+          quantity: c.qty,
+          price: c.price,
+          name: c.name,
+        })),
+        total,
+        created_at: new Date().toISOString(),
+      });
+      setCommitLoading(false);
+      setCart([]);
+      setSuccessMessage("Sale saved offline. Will sync when connection restores.");
+      fireAndForgetPrint(
+        buildPosReceiptPayloadFromCart(
+          cartSnapshot,
+          `OFFLINE-${Date.now().toString(36)}`,
+          subtotalSnap,
+          taxSnap,
+          totalSnap,
+          true,
+        ),
+        (m) => setHardwareMessage(m),
+      );
+      return;
+    }
+
     const res = await fetch(`${medusaPosBase}/commit-sale`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -140,18 +292,61 @@ export default function POSPage() {
       const { orderNumber } = (await res.json()) as { orderNumber?: string };
       setCart([]);
       setLookupError(null);
-      alert(
+      setSuccessMessage(
         orderNumber
-          ? `Medusa order ${orderNumber} created.`
-          : "Medusa order created.",
+          ? `Order ${orderNumber} created successfully.`
+          : "Order created successfully.",
+      );
+      fireAndForgetPrint(
+        buildPosReceiptPayloadFromCart(
+          cartSnapshot,
+          orderNumber ? `Order ${orderNumber}` : "Order",
+          subtotalSnap,
+          taxSnap,
+          totalSnap,
+          false,
+        ),
+        (m) => setHardwareMessage(m),
       );
     } else {
       const err = await res.json().catch(() => ({}));
-      setLookupError(
-        typeof err.error === "string"
-          ? err.error
-          : "Failed to complete Medusa sale",
+      const errMsg = typeof err.error === "string" ? err.error : "Sale did not complete";
+      await storeOfflineSale({
+        id: crypto.randomUUID(),
+        device_name: activeShift?.device_name ?? "Terminal 01",
+        employee_id: activeShift?.employee_id,
+        items: cart.map((c) => ({
+          variantId: c.variantId,
+          quantity: c.qty,
+          price: c.price,
+          name: c.name,
+        })),
+        total,
+        created_at: new Date().toISOString(),
+      });
+      setCart([]);
+      setSuccessMessage("Sale queued offline. Automatic retry is enabled.");
+      setLookupError(errMsg);
+      fireAndForgetPrint(
+        buildPosReceiptPayloadFromCart(
+          cartSnapshot,
+          `OFFLINE-ERR-${Date.now().toString(36)}`,
+          subtotalSnap,
+          taxSnap,
+          totalSnap,
+          true,
+        ),
+        (m) => setHardwareMessage(m),
       );
+    }
+  }
+
+  async function handleOpenDrawer() {
+    setHardwareMessage(null);
+    try {
+      await openCashDrawerRequest();
+    } catch (e) {
+      setHardwareMessage(e instanceof Error ? e.message : "Cash drawer did not open");
     }
   }
 
@@ -172,7 +367,7 @@ export default function POSPage() {
   }
 
   const subtotal = cart.reduce((sum, c) => sum + c.price * c.qty, 0);
-  const tax = subtotal * 0.085;
+  const tax = computeDisplayVat(subtotal);
   const total = subtotal + tax;
 
   const [quickProducts, setQuickProducts] = useState<
@@ -188,6 +383,44 @@ export default function POSPage() {
   >([]);
 
   const [quickProductsError, setQuickProductsError] = useState<string | null>(null);
+
+  const [suggestions, setSuggestions] = useState<
+    Array<{
+      variantId: string;
+      name: string;
+      sku: string;
+      size: string;
+      color: string;
+      price: number;
+      imageUrl?: string;
+    }>
+  >([]);
+
+  useEffect(() => {
+    fetch(`${medusaPosBase}/suggestions`)
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then(
+        (data: {
+          suggestions?: Array<{
+            variantId: string;
+            name: string;
+            sku: string;
+            size: string;
+            color: string;
+            price: number;
+            imageUrl?: string;
+          }>;
+        }) => {
+          setSuggestions(data.suggestions ?? []);
+        },
+      )
+      .catch(() => {
+        setSuggestions([]);
+      });
+  }, []);
 
   useEffect(() => {
     fetch(`${medusaPosBase}/quick-products`)
@@ -213,23 +446,61 @@ export default function POSPage() {
       )
       .catch((err) => {
         setQuickProductsError(
-          `Quick products unavailable: ${err instanceof Error ? err.message : "unknown error"}`,
+          `Quick products unavailable (${err instanceof Error ? err.message : "no details"})`,
         );
       });
   }, []);
 
   return (
-    <main className="p-8 flex flex-col lg:flex-row gap-8 min-h-screen">
+    <AdminPageShell
+      hideHeader
+      breadcrumbs={
+        <AdminBreadcrumbs
+          items={[{ label: "Dashboard", href: "/admin" }, { label: "POS" }]}
+        />
+      }
+    >
+      <div className="flex min-h-0 flex-col gap-8 lg:flex-row">
       <div className="flex-grow space-y-8">
-        <header className="mb-12">
-          <h1 className="text-4xl font-extrabold font-headline tracking-tight text-primary">
-            Terminal 01
-          </h1>
-          <p className="text-on-surface-variant font-body mt-2">
-            Ready for transactions. Scanning active.
-          </p>
+        <header className="mb-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-4xl font-extrabold font-headline tracking-tight text-primary">
+                {activeShift?.device_name ?? "Terminal 01"}
+              </h1>
+              <p className="text-on-surface-variant font-body mt-2">
+                {activeShift
+                  ? `Shift open since ${new Date(activeShift.opened_at).toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit" })}`
+                  : "No active shift. Open a shift to begin."}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              {!activeShift ? (
+                <button onClick={() => setShowShiftOpen(true)} className="bg-emerald-600 text-white px-5 py-2.5 text-xs font-bold uppercase tracking-widest hover:opacity-90 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-base">play_arrow</span>
+                  Open Shift
+                </button>
+              ) : (
+                <button onClick={() => setShowCloseShift(true)} className="bg-slate-600 text-white px-5 py-2.5 text-xs font-bold uppercase tracking-widest hover:opacity-90 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-base">stop</span>
+                  Close Shift
+                </button>
+              )}
+            </div>
+          </div>
         </header>
 
+        {successMessage && (
+          <div className="bg-emerald-500/10 text-emerald-700 px-4 py-2 rounded text-sm font-medium flex items-center justify-between">
+            <span>{successMessage}</span>
+            <button
+              onClick={() => setSuccessMessage(null)}
+              className="ml-4 text-emerald-600 hover:text-emerald-800"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
         {lookupError && (
           <div className="bg-error/10 text-error px-4 py-2 rounded text-sm font-medium">
             {lookupError}
@@ -307,6 +578,40 @@ export default function POSPage() {
             ))}
           </div>
         </section>
+
+        {suggestions.length > 0 ? (
+          <section className="mt-12">
+            <h3 className="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-6">
+              Suggested add-ons
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+              {suggestions.map((p) => (
+                <button
+                  key={`s-${p.variantId}`}
+                  onClick={() =>
+                    addToCart({
+                      variantId: p.variantId,
+                      name: p.name,
+                      sku: p.sku,
+                      size: p.size,
+                      color: p.color,
+                      price: p.price,
+                      qty: 1,
+                    })
+                  }
+                  className="bg-surface-container-lowest border border-outline-variant/20 p-3 text-left hover:border-primary/40 transition-colors"
+                >
+                  <p className="text-xs font-bold uppercase tracking-tighter font-headline line-clamp-2">
+                    {p.name}
+                  </p>
+                  <p className="text-xs text-on-surface-variant mt-1">
+                    PHP {p.price.toLocaleString("en-PH")}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </section>
+        ) : null}
       </div>
 
       <div className="w-full lg:w-96 flex flex-col h-[calc(100vh-4rem)] sticky top-8">
@@ -337,14 +642,21 @@ export default function POSPage() {
                       <h4 className="text-xs font-bold font-headline uppercase">
                         {item.name}
                       </h4>
-                      <button
-                        onClick={() => removeFromCart(item.id)}
-                        className="text-on-surface-variant hover:text-error transition-colors"
-                      >
-                        <span className="material-symbols-outlined text-sm">
-                          close
-                        </span>
-                      </button>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => { setVoidTarget(item.id); setShowVoidModal(true); }}
+                          className="text-on-surface-variant hover:text-amber-600 transition-colors"
+                          title="Void item (requires manager PIN)"
+                        >
+                          <span className="material-symbols-outlined text-sm">block</span>
+                        </button>
+                        <button
+                          onClick={() => removeFromCart(item.id)}
+                          className="text-on-surface-variant hover:text-error transition-colors"
+                        >
+                          <span className="material-symbols-outlined text-sm">close</span>
+                        </button>
+                      </div>
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2">
                       <span className="bg-surface-container-low px-2 py-1 rounded text-[10px] font-medium text-on-surface-variant uppercase">
@@ -389,7 +701,7 @@ export default function POSPage() {
               <span>PHP {subtotal.toLocaleString("en-PH")}</span>
             </div>
             <div className="flex justify-between text-xs text-on-surface-variant font-medium">
-              <span>Tax (8.5%)</span>
+              <span>VAT ({(PH_VAT_RATE * 100).toFixed(0)}%)</span>
               <span>PHP {tax.toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-lg font-extrabold font-headline mt-2">
@@ -417,20 +729,101 @@ export default function POSPage() {
               </span>
               {commitLoading ? "Creating..." : "Commit Sale"}
             </button>
+            <button
+              type="button"
+              onClick={() => void handleOpenDrawer()}
+              className="w-full py-3 px-6 border border-outline-variant/30 text-on-surface font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-surface-container-high transition-colors"
+            >
+              <span className="material-symbols-outlined text-lg">payments</span>
+              Open cash drawer
+            </button>
+            <p className="text-[10px] text-on-surface-variant leading-relaxed px-1">
+              Receipt printing uses the local terminal agent on this machine (default{" "}
+              <span className="font-mono">127.0.0.1:17711</span>). Configure{" "}
+              <span className="font-mono">NEXT_PUBLIC_TERMINAL_AGENT_URL</span> and thermal printer{" "}
+              <span className="font-mono">PRINTER_TCP_HOST</span> on the agent process.
+            </p>
+            {hardwareMessage ? (
+              <p className="text-xs text-amber-800 px-1">{hardwareMessage}</p>
+            ) : null}
           </div>
         </div>
       </div>
-
-      <div className="fixed bottom-8 left-72 flex gap-4">
-        <div className="bg-surface-container-highest px-4 py-2 rounded-full flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          Scanner Online
-        </div>
-        <div className="bg-surface-container-highest px-4 py-2 rounded-full flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-          <span className="w-2 h-2 rounded-full bg-emerald-500" />
-          Printer Ready
-        </div>
       </div>
-    </main>
+
+      <div className="fixed bottom-8 left-72 z-20 flex gap-4">
+        <div className="bg-surface-container-highest px-4 py-2 rounded-full flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+          <span className={`w-2 h-2 rounded-full ${activeShift ? "bg-emerald-500 animate-pulse" : "bg-slate-400"}`} />
+          {activeShift ? "Shift Active" : "No Shift"}
+        </div>
+        <div className={`px-4 py-2 rounded-full flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest ${online ? "bg-surface-container-highest text-on-surface-variant" : "bg-amber-100 text-amber-800"}`}>
+          <span className={`w-2 h-2 rounded-full ${online ? "bg-emerald-500" : "bg-amber-500 animate-pulse"}`} />
+          {online ? "Online" : "Offline Mode"}
+        </div>
+        {pendingCount > 0 && (
+          <button
+            onClick={() => void trySync()}
+            disabled={syncing}
+            className="bg-surface-container-highest px-4 py-2 rounded-full flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant hover:bg-surface-dim transition-colors disabled:opacity-50"
+          >
+            <span className="material-symbols-outlined text-xs">sync</span>
+            {syncing ? "Syncing..." : `${pendingCount} pending`}
+          </button>
+        )}
+      </div>
+
+      {showShiftOpen && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <form onSubmit={handleOpenShift} className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-8 space-y-5">
+            <h2 className="text-lg font-bold font-headline">Open Shift</h2>
+            <input required placeholder="Employee ID" value={shiftForm.employee_id} onChange={(e) => setShiftForm({ ...shiftForm, employee_id: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
+            <input required placeholder="Device name" value={shiftForm.device_name} onChange={(e) => setShiftForm({ ...shiftForm, device_name: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
+            <input type="number" step="0.01" placeholder="Opening cash" value={shiftForm.opening_cash} onChange={(e) => setShiftForm({ ...shiftForm, opening_cash: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
+            <div className="flex gap-3 justify-end">
+              <button type="button" onClick={() => setShowShiftOpen(false)} className="px-5 py-2.5 text-xs font-bold uppercase tracking-widest text-on-surface-variant">Cancel</button>
+              <button type="submit" className="bg-primary text-on-primary px-5 py-2.5 text-xs font-bold uppercase tracking-widest hover:opacity-90">Open</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {showCloseShift && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <form onSubmit={handleCloseShift} className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-8 space-y-5">
+            <h2 className="text-lg font-bold font-headline">Close Shift</h2>
+            <p className="text-sm text-on-surface-variant">Opening cash: PHP {activeShift?.opening_cash?.toLocaleString("en-PH")}</p>
+            <input required type="number" step="0.01" placeholder="Closing cash amount" value={closingCash} onChange={(e) => setClosingCash(e.target.value)} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" autoFocus />
+            <div className="flex gap-3 justify-end">
+              <button type="button" onClick={() => setShowCloseShift(false)} className="px-5 py-2.5 text-xs font-bold uppercase tracking-widest text-on-surface-variant">Cancel</button>
+              <button type="submit" className="bg-slate-700 text-white px-5 py-2.5 text-xs font-bold uppercase tracking-widest hover:opacity-90">Close Shift</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {showVoidModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <form onSubmit={handleVoid} className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-8 space-y-5">
+            <h2 className="text-lg font-bold font-headline">Void / Override</h2>
+            <select value={voidForm.action} onChange={(e) => setVoidForm({ ...voidForm, action: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40">
+              <option value="void_item">Void Item</option>
+              <option value="void_order">Void Order</option>
+              <option value="discount_override">Discount Override</option>
+              <option value="refund">Refund</option>
+            </select>
+            <input required placeholder="Reason" value={voidForm.reason} onChange={(e) => setVoidForm({ ...voidForm, reason: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
+            <div className="border-t border-outline-variant/20 pt-4">
+              <p className="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-2">Manager Approval</p>
+              <input placeholder="Manager Employee ID" value={voidForm.approver_id} onChange={(e) => setVoidForm({ ...voidForm, approver_id: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40 mb-2" />
+              <input type="password" placeholder="Manager PIN" value={voidForm.pin} onChange={(e) => setVoidForm({ ...voidForm, pin: e.target.value.replace(/\D/g, "") })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button type="button" onClick={() => { setShowVoidModal(false); setVoidTarget(null); }} className="px-5 py-2.5 text-xs font-bold uppercase tracking-widest text-on-surface-variant">Cancel</button>
+              <button type="submit" className="bg-amber-600 text-white px-5 py-2.5 text-xs font-bold uppercase tracking-widest hover:opacity-90">Confirm Void</button>
+            </div>
+          </form>
+        </div>
+      )}
+    </AdminPageShell>
   );
 }
