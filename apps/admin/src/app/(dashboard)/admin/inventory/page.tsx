@@ -1,80 +1,64 @@
-import { fetchMedusaInventoryForAdmin } from "@/lib/medusa-inventory-bridge";
+import { Suspense } from "react";
+import { redirect } from "next/navigation";
+import { AdminBreadcrumbs, AdminPageShell, AuditTimeline } from "@/components/admin-console";
+import { InventoryDefaultQuerySync } from "@/components/InventoryDefaultQuerySync";
+import { InventoryTableWithRefresh } from "@/components/InventoryTableWithRefresh";
+import { fetchMedusaInventoryPage } from "@/lib/medusa-inventory-bridge";
+import { requirePagePermission } from "@/lib/require-page-permission";
 
 export const dynamic = "force-dynamic";
 
-export default async function InventoryPage() {
-  const inventory = await fetchMedusaInventoryForAdmin();
+const ALLOWED_PAGE_SIZES = [25, 50, 100] as const;
+
+function parsePaging(sp: { page?: string; pageSize?: string }): {
+  page: number;
+  pageSize: (typeof ALLOWED_PAGE_SIZES)[number];
+} {
+  const page = Math.max(1, parseInt(sp.page ?? "1", 10) || 1);
+  const raw = parseInt(sp.pageSize ?? "25", 10);
+  const pageSize = ALLOWED_PAGE_SIZES.includes(raw as (typeof ALLOWED_PAGE_SIZES)[number])
+    ? (raw as (typeof ALLOWED_PAGE_SIZES)[number])
+    : 25;
+  return { page, pageSize };
+}
+
+export default async function InventoryPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string; pageSize?: string }>;
+}) {
+  await requirePagePermission("inventory:read");
+  const sp = await searchParams;
+  const { page, pageSize } = parsePaging(sp);
+  const offset = (page - 1) * pageSize;
+  const result = await fetchMedusaInventoryPage({ limit: pageSize, offset });
+  const totalPages =
+    result.total > 0 ? Math.max(1, Math.ceil(result.total / pageSize)) : 1;
+  if (result.total > 0 && page > totalPages) {
+    redirect(`/admin/inventory?page=${totalPages}&pageSize=${pageSize}`);
+  }
 
   return (
-    <main className="min-h-screen p-8 lg:p-12">
-      <header className="flex justify-between items-end mb-12">
-        <div>
-          <h2 className="text-4xl font-extrabold tracking-tighter text-primary font-headline">
-            Inventory
-          </h2>
-          <p className="text-on-surface-variant mt-2 font-body text-sm">
-            Live stock from Medusa. {inventory.length} variants tracked.
-          </p>
-        </div>
-      </header>
-      <div className="bg-surface-container-lowest rounded shadow-[0px_20px_40px_rgba(0,0,0,0.02)] overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-surface-container-high">
-              <th className="text-left py-4 px-6 text-xs font-bold uppercase tracking-widest text-on-surface-variant">
-                Product
-              </th>
-              <th className="text-left py-4 px-6 text-xs font-bold uppercase tracking-widest text-on-surface-variant">
-                SKU
-              </th>
-              <th className="text-left py-4 px-6 text-xs font-bold uppercase tracking-widest text-on-surface-variant">
-                Size
-              </th>
-              <th className="text-left py-4 px-6 text-xs font-bold uppercase tracking-widest text-on-surface-variant">
-                Color
-              </th>
-              <th className="text-right py-4 px-6 text-xs font-bold uppercase tracking-widest text-on-surface-variant">
-                Stock
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {inventory.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={5}
-                  className="py-16 text-center text-on-surface-variant"
-                >
-                  No inventory data. Seed products in Medusa first.
-                </td>
-              </tr>
-            ) : (
-              inventory.map((row) => (
-                <tr
-                  key={row.variantId}
-                  className="border-b border-surface-container-high/50"
-                >
-                  <td className="py-4 px-6 font-medium text-primary">
-                    {row.productName}
-                  </td>
-                  <td className="py-4 px-6 text-on-surface-variant text-sm">
-                    {row.sku}
-                  </td>
-                  <td className="py-4 px-6 text-on-surface-variant text-sm">
-                    {row.size}
-                  </td>
-                  <td className="py-4 px-6 text-on-surface-variant text-sm">
-                    {row.color}
-                  </td>
-                  <td className="py-4 px-6 text-right font-medium">
-                    {row.available}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-    </main>
+    <AdminPageShell
+      title="Inventory"
+      subtitle={`Live stock levels. ${result.total} variant${result.total === 1 ? "" : "s"} in your store.`}
+      breadcrumbs={
+        <AdminBreadcrumbs
+          items={[{ label: "Dashboard", href: "/admin" }, { label: "Inventory" }]}
+        />
+      }
+      inspector={<AuditTimeline title="Recent activity" />}
+    >
+      <Suspense fallback={null}>
+        <InventoryDefaultQuerySync />
+      </Suspense>
+      <InventoryTableWithRefresh
+        key={`${page}-${pageSize}`}
+        initialRows={result.rows}
+        page={page}
+        pageSize={pageSize}
+        total={result.total}
+      />
+    </AdminPageShell>
   );
 }
