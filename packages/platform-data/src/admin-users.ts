@@ -1,16 +1,23 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
 export async function upsertOAuthUser(
   supabase: SupabaseClient,
   input: { email: string; name?: string | null; image?: string | null; googleSub: string },
   opts: { promoteEmails: string[] }
 ): Promise<{ role: string }> {
+  const emailNorm = normalizeEmail(input.email);
+  const promoteSet = opts.promoteEmails.map((e) => normalizeEmail(e)).filter(Boolean);
+
   // Upsert user (identity only; no role, no google_sub in users table)
   const { data: user, error: uErr } = await supabase
     .from("users")
     .upsert(
       {
-        email: input.email,
+        email: emailNorm,
         name: input.name,
         image: input.image,
         updated_at: new Date().toISOString(),
@@ -37,7 +44,7 @@ export async function upsertOAuthUser(
     );
   if (oaErr) throw oaErr;
 
-  // Resolve role: check user_roles first, else promoteEmails
+  // Resolve role: ADMIN_ALLOWED_EMAILS runs first so existing `staff` rows still upgrade to admin.
   const { data: roleRow } = await supabase
     .from("user_roles")
     .select("role")
@@ -45,13 +52,14 @@ export async function upsertOAuthUser(
     .maybeSingle();
 
   let role = (roleRow?.role as string) ?? "customer";
-  if (roleRow?.role === "admin" || roleRow?.role === "staff") {
-    role = roleRow.role as string;
-  } else if (opts.promoteEmails.includes(input.email)) {
-    role = "staff";
+
+  if (promoteSet.includes(emailNorm)) {
+    role = "admin";
     await supabase
       .from("user_roles")
-      .upsert({ user_id: userId, role: "staff" }, { onConflict: "user_id" });
+      .upsert({ user_id: userId, role: "admin" }, { onConflict: "user_id" });
+  } else if (roleRow?.role === "admin" || roleRow?.role === "staff") {
+    role = roleRow.role as string;
   } else if (!roleRow) {
     await supabase
       .from("user_roles")
