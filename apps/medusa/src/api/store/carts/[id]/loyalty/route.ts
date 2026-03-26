@@ -1,0 +1,99 @@
+import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http";
+import { MedusaError } from "@medusajs/framework/utils";
+import { addToCartWorkflow } from "@medusajs/medusa/core-flows";
+
+type Body = {
+  points?: number;
+  email?: string;
+};
+
+/** 1 loyalty point = 1.00 currency unit off; amounts use smallest currency unit (e.g. centavos). */
+const MINOR_UNITS_PER_LOYALTY_POINT = 100;
+
+/**
+ * Apply loyalty points as a custom-priced line item discount.
+ * Set MEDUSA_LOYALTY_DISCOUNT_VARIANT_ID to a dedicated variant (list price may be zero).
+ */
+export async function POST(req: MedusaRequest, res: MedusaResponse) {
+  const cartId = req.params.id as string | undefined;
+  if (!cartId) {
+    throw new MedusaError(MedusaError.Types.INVALID_DATA, "Missing cart id");
+  }
+
+  const body = (req.body ?? {}) as Body;
+  const points = Math.floor(Number(body.points ?? 0));
+  const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+
+  if (points <= 0) {
+    return res.status(200).json({ cart_id: cartId, skipped: true as const });
+  }
+  if (!email) {
+    throw new MedusaError(MedusaError.Types.INVALID_DATA, "email is required to redeem points");
+  }
+
+  const variantId = process.env.MEDUSA_LOYALTY_DISCOUNT_VARIANT_ID?.trim();
+  if (!variantId) {
+    throw new MedusaError(
+      MedusaError.Types.NOT_ALLOWED,
+      "Loyalty discount variant is not configured (MEDUSA_LOYALTY_DISCOUNT_VARIANT_ID)",
+    );
+  }
+
+  const supabaseUrl = process.env.SUPABASE_URL?.trim();
+  const supabaseKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
+    process.env.SUPABASE_ANON_KEY?.trim();
+  if (!supabaseUrl || !supabaseKey) {
+    throw new MedusaError(MedusaError.Types.NOT_ALLOWED, "Supabase is not configured");
+  }
+
+  const { createClient } = await import("@supabase/supabase-js");
+  const sb = createClient(supabaseUrl, supabaseKey);
+  const { data: acct, error: acctErr } = await sb
+    .from("loyalty_accounts")
+    .select("id,points_balance")
+    .eq("customer_email", email)
+    .maybeSingle();
+
+  if (acctErr) {
+    throw new MedusaError(MedusaError.Types.INVALID_DATA, acctErr.message);
+  }
+  const balance = acct ? Number((acct as { points_balance?: number }).points_balance ?? 0) : 0;
+  if (points > balance) {
+    throw new MedusaError(
+      MedusaError.Types.INVALID_DATA,
+      `Insufficient points (have ${balance}, requested ${points})`,
+    );
+  }
+
+  const discountMinor = points * MINOR_UNITS_PER_LOYALTY_POINT;
+
+  const { result } = await addToCartWorkflow(req.scope).run({
+    input: {
+      cart_id: cartId,
+      items: [
+        {
+          variant_id: variantId,
+          quantity: 1,
+          unit_price: -discountMinor,
+          metadata: { loyalty_discount: true, loyalty_points: points },
+        },
+      ],
+    } as never,
+  });
+
+  const cartPayload = (() => {
+    if (result == null) return result;
+    if (typeof result === "object" && "cart" in result) {
+      return (result as { cart: unknown }).cart;
+    }
+    return result;
+  })();
+
+  return res.status(200).json({
+    cart_id: cartId,
+    loyalty_points: points,
+    discount_minor: discountMinor,
+    cart: cartPayload,
+  });
+}
