@@ -5,6 +5,7 @@ node_modules/
 # Build outputs
 .next/
 .turbo/
+.medusa/
 dist/
 out/
 build/
@@ -64,3 +65,8 @@ playwright/.cache/
 .agent/
 .kiro/
 internal/docs/exclusive/
+.cursor/mcp.json
+
+# Lockfile: pnpm only
+package-lock.json
+yarn.lock
