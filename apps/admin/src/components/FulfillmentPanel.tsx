@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+type CourierOption = { slug: string; label: string };
+
 export type ShipmentRow = {
   id: string;
   tracking_number?: string | null;
@@ -33,6 +35,18 @@ export function FulfillmentPanel({
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState<string | null>(null);
+  const [couriers, setCouriers] = useState<CourierOption[]>([]);
+
+  useEffect(() => {
+    fetch("/api/integrations/couriers", { credentials: "include" })
+      .then((r) => r.json())
+      .then((d: { couriers?: CourierOption[] }) => {
+        setCouriers(Array.isArray(d.couriers) ? d.couriers : []);
+      })
+      .catch(() => {
+        setCouriers([]);
+      });
+  }, []);
 
   async function addShipment(e: React.FormEvent) {
     e.preventDefault();
@@ -138,12 +152,29 @@ export function FulfillmentPanel({
             </div>
             <div>
               <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-on-surface-variant">
-                Carrier slug
+                Carrier
               </label>
+              <select
+                value={couriers.some((c) => c.slug === carrierSlug) ? carrierSlug : "__custom"}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "__custom") return;
+                  setCarrierSlug(v);
+                }}
+                className="w-full rounded border border-outline-variant/30 bg-surface-container-low px-3 py-2 text-sm mb-2"
+              >
+                <option value="__custom">Custom code below</option>
+                {couriers.map((c) => (
+                  <option key={c.slug} value={c.slug}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
               <input
                 value={carrierSlug}
                 onChange={(e) => setCarrierSlug(e.target.value)}
-                className="w-full rounded border border-outline-variant/30 bg-surface-container-low px-3 py-2 text-sm"
+                className="w-full rounded border border-outline-variant/30 bg-surface-container-low px-3 py-2 text-xs font-mono"
+                placeholder="Carrier code if not listed above"
               />
             </div>
             <div>
@@ -207,7 +238,7 @@ export function FulfillmentPanel({
         </h3>
         {initialShipments.length === 0 ? (
           <p className="text-sm text-on-surface-variant">
-            No shipments yet. AfterShip webhooks will also update this list.
+            No shipments yet. Updates from your shipping partner may appear here automatically.
           </p>
         ) : (
           <ul className="space-y-3">
