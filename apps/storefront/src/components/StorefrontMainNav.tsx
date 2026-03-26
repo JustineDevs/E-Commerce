@@ -1,18 +1,23 @@
 "use client";
 
+import type { CmsNavLink } from "@apparel-commerce/platform-data";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 type Item = { href: string; label: string; testId?: string };
 
-const ITEMS: Item[] = [
+const DEFAULT_ITEMS: Item[] = [
   { href: "/shop", label: "Shop", testId: "nav-shop" },
   { href: "/collections", label: "Collections" },
   { href: "/", label: "About" },
 ];
 
-export function StorefrontMainNav() {
+export function StorefrontMainNav({ items }: { items?: CmsNavLink[] }) {
   const pathname = usePathname() ?? "";
+  const ITEMS: Item[] =
+    items && items.length > 0
+      ? items.map((i) => ({ href: i.href, label: i.label }))
+      : DEFAULT_ITEMS;
 
   return (
     <div className="flex min-w-0 max-w-[min(100%,14rem)] flex-1 items-center justify-center gap-3 overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] sm:max-w-none sm:flex-none sm:justify-center sm:gap-6 md:gap-10 lg:gap-12 [&::-webkit-scrollbar]:hidden">
