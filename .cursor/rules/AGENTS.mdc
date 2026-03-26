@@ -1,0 +1,45 @@
+---
+description: Monorepo agent contract — apps, boundaries, local dev (pnpm run dev), terminal-agent on loopback.
+globs:
+alwaysApply: true
+---
+
+# Agent rules
+
+## Application map (this repository)
+
+Turborepo monorepo. Main surfaces:
+
+| Area | Package / app | Role |
+|------|-----------------|------|
+| Commerce API | `apps/medusa` | Medusa v2 backend (products, carts, orders, payments, inventory, regions). Default dev URL `http://localhost:9000`. |
+| Storefront | `apps/storefront` | Public Next.js shop. Dev `http://localhost:3000`. |
+| Staff admin | `apps/admin` | Next.js staff UI, POS, devices, API routes with session + RBAC. Dev `http://localhost:3001`. |
+| Internal Express | `apps/api` | Health, compliance, webhooks; uses `PORT` or **4000**. Dev `http://localhost:4000`. |
+| Local POS agent | `apps/terminal-agent` | Loopback HTTP print/drawer agent. Default **`http://127.0.0.1:17711`** (`TERMINAL_AGENT_PORT`). |
+| Shared libs | `packages/*` | `sdk`, `platform-data`, `database`, `printer-core`, `validation`, etc. |
+
+## Data and security boundaries
+
+- **Medusa** is the source of truth for products, carts, orders, payments, and inventory.
+- **Supabase** holds platform data (identity, RBAC, POS devices, offline queue metadata, CMS copy where wired) per ADR patterns in the repo.
+- Do not move commerce-of-record writes into Supabase.
+- Staff actions go through Next.js admin API routes with session checks.
+- Storefront env must not expose server-only secrets (`MEDUSA_SECRET_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, internal API keys).
+- Local POS hardware uses `apps/terminal-agent` on loopback only; browsers or admin call it **after** Medusa-backed sale success (or documented offline flows).
+- Prefer extending existing modules over parallel utilities (DRY).
+
+## Local development: single command
+
+From the **repository root**, use:
+
+```bash
+pnpm run dev
+```
+
+This runs **`pnpm kill-ports`** then **`turbo dev`**, which starts **every workspace that defines a `dev` script** in parallel (storefront, admin, Medusa, API, terminal-agent, and any other package with `dev`). Treat it as the default way to run the **full local application stack** for integration work.
+
+- **Terminal agent URL:** `http://127.0.0.1:17711` (receipt print, open drawer, `/health`, `/status`). Configure via `.env` / `.env.example` (`TERMINAL_AGENT_PORT`, `NEXT_PUBLIC_TERMINAL_AGENT_*`, device name, Supabase sync for `pos_devices` when used).
+- Other common dev ports (see `scripts/kill-project-ports.js` for what gets cleared before dev): **3000**, **3001**, **4000**, **9000**. Port **17711** is not in that kill list; stop the agent via the turbo process or manually if needed.
+
+If you only need one app, use filters (e.g. `pnpm --filter @apparel-commerce/terminal-agent dev`) instead of the root command.
