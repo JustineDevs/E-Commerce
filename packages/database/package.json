@@ -10,7 +10,8 @@
     "./*": "./src/*"
   },
   "scripts": {
-    "migrate": "supabase db push",
+    "migrate": "tsx scripts/run-migrations.ts",
+    "migrate:cli": "supabase db push",
     "seed": "tsx scripts/seed.ts",
     "apply-rls": "tsx scripts/apply-sql.ts supabase/migrations/enable_rls.sql",
     "lint": "eslint src --ext .ts",
@@ -24,9 +25,9 @@
   "devDependencies": {
     "@apparel-commerce/config-eslint": "workspace:*",
     "@apparel-commerce/config-typescript": "workspace:*",
-    "eslint": "^9.0.0",
     "@types/pg": "^8.11.0",
     "dotenv": "^16.4.0",
+    "eslint": "^9.0.0",
     "pg": "^8.13.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0"
