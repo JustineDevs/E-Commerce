@@ -325,14 +325,24 @@ export default class PaymongoPaymentProviderService extends AbstractPaymentProvi
       );
     }
 
+    const successPayload = this.paymongoWebhookSuccessPayload(body);
     const dedupId = buildPaymongoWebhookDedupId(body);
     if (dedupId) {
       const isFirst = await claimPaymongoWebhookDedup(dedupId);
       if (!isFirst) {
-        return { action: PaymentActions.NOT_SUPPORTED };
+        return successPayload ?? { action: PaymentActions.NOT_SUPPORTED };
       }
     }
 
+    if (!successPayload) {
+      return { action: PaymentActions.NOT_SUPPORTED };
+    }
+    return successPayload;
+  }
+
+  private paymongoWebhookSuccessPayload(
+    body: Record<string, unknown>,
+  ): WebhookActionResult | null {
     const evt = body.data as
       | {
           attributes?: {
@@ -350,23 +360,23 @@ export default class PaymongoPaymentProviderService extends AbstractPaymentProvi
 
     const eventType = String(evt?.attributes?.type ?? "");
     if (eventType !== "link.payment.paid") {
-      return { action: PaymentActions.NOT_SUPPORTED };
+      return null;
     }
 
     const linkAttrs = evt?.attributes?.data?.attributes;
     const description = linkAttrs?.description;
     if (typeof description !== "string") {
-      return { action: PaymentActions.NOT_SUPPORTED };
+      return null;
     }
 
     const sessionId = parseSessionFromDescription(description);
     if (!sessionId) {
-      return { action: PaymentActions.NOT_SUPPORTED };
+      return null;
     }
 
     const status = (linkAttrs?.status ?? "").toLowerCase();
     if (status !== "paid") {
-      return { action: PaymentActions.NOT_SUPPORTED };
+      return null;
     }
 
     const amount = linkAttrs?.amount;
