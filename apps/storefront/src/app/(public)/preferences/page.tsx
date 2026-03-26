@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { PreferencesControls } from "@/components/PreferencesControls";
 
 export const metadata: Metadata = {
   title: "Region & language",
@@ -11,6 +12,7 @@ export default function PreferencesPage() {
         Region &amp; language
       </h1>
       <div className="mt-8 space-y-6 font-body text-sm leading-relaxed text-on-surface-variant">
+        <PreferencesControls />
         <section>
           <h2 className="font-headline text-lg font-bold text-primary">
             Currency
@@ -19,16 +21,6 @@ export default function PreferencesPage() {
             All prices are shown in <strong>Philippine Peso (PHP)</strong>{" "}
             unless a payment provider displays a processed total in another
             denomination at checkout.
-          </p>
-        </section>
-        <section>
-          <h2 className="font-headline text-lg font-bold text-primary">
-            Language
-          </h2>
-          <p>
-            The storefront copy is provided in <strong>English</strong>.
-            Filipino or additional locales can be layered on when product
-            content is translated in the catalog.
           </p>
         </section>
         <section>
