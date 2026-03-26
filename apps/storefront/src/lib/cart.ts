@@ -9,6 +9,7 @@ export type CartLine = {
   price: number;
 };
 
+/** Browser-only bag until checkout builds a Medusa cart; line prices here are for display. */
 const STORAGE_KEY = "apparel-commerce-cart-v1";
 
 function isBrowser(): boolean {
@@ -19,7 +20,13 @@ export function readCart(): CartLine[] {
   if (!isBrowser()) return [];
   const raw = sessionStorage.getItem(STORAGE_KEY);
   if (!raw) return [];
-  const parsed = JSON.parse(raw) as unknown;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    sessionStorage.removeItem(STORAGE_KEY);
+    return [];
+  }
   if (!Array.isArray(parsed)) return [];
   return parsed.filter(
     (row): row is CartLine =>
