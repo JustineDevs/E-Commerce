@@ -1,24 +1,26 @@
 import Link from "next/link";
+import { AdminBreadcrumbs, AdminPageShell, AuditTimeline } from "@/components/admin-console";
 import { fetchMedusaOrdersForAdmin } from "@/lib/medusa-order-bridge";
+import { requirePagePermission } from "@/lib/require-page-permission";
 
 export const dynamic = "force-dynamic";
 
 export default async function OrdersPage() {
+  await requirePagePermission("orders:read");
   const { orders, total } = await fetchMedusaOrdersForAdmin();
 
   return (
-    <main className="min-h-screen p-8 lg:p-12">
-      <header className="flex justify-between items-end mb-12">
-        <div>
-          <h2 className="text-4xl font-extrabold tracking-tighter text-primary font-headline">
-            Orders
-          </h2>
-          <p className="text-on-surface-variant mt-2 font-body text-sm">
-            {total} total orders from Medusa.
-          </p>
-        </div>
-      </header>
-      <div className="bg-surface-container-lowest rounded shadow-[0px_20px_40px_rgba(0,0,0,0.02)] overflow-hidden">
+    <AdminPageShell
+      title="Orders"
+      subtitle={`${total} total orders.`}
+      breadcrumbs={
+        <AdminBreadcrumbs
+          items={[{ label: "Dashboard", href: "/admin" }, { label: "Orders" }]}
+        />
+      }
+      inspector={<AuditTimeline title="Recent activity" />}
+    >
+      <div className="overflow-hidden rounded-lg bg-surface-container-lowest shadow-[0px_20px_40px_rgba(0,0,0,0.02)]">
         <table className="w-full">
           <thead>
             <tr className="border-b border-surface-container-high">
@@ -75,6 +77,6 @@ export default async function OrdersPage() {
           </tbody>
         </table>
       </div>
-    </main>
+    </AdminPageShell>
   );
 }
