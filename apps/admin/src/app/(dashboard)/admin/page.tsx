@@ -1,16 +1,74 @@
 import Link from "next/link";
+import { getServerSession } from "next-auth/next";
+import { redirect } from "next/navigation";
+import { isStaffRole, staffHasPermission, staffPermissionListForSession } from "@apparel-commerce/database";
+import { AdminPageShell, AuditTimeline } from "@/components/admin-console";
+import { AdminTechnicalDetails } from "@/components/AdminTechnicalDetails";
 import { fetchMedusaOrdersForAdmin } from "@/lib/medusa-order-bridge";
-import { fetchMedusaInventoryForAdmin } from "@/lib/medusa-inventory-bridge";
+import { fetchAllMedusaInventoryRows } from "@/lib/medusa-inventory-bridge";
+import { authOptions } from "@/lib/auth";
+import { getStorefrontPublicOrigin } from "@/lib/storefront-public-url";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminDashboardPage() {
+export default async function AdminDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ denied?: string }>;
+}) {
+  const { denied } = await searchParams;
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    redirect("/api/auth/signin");
+  }
+  const role = session.user.role ?? "";
+  if (!isStaffRole(role)) {
+    redirect("/api/auth/signin");
+  }
+
+  const perms = staffPermissionListForSession(session);
+  const canDashboard = staffHasPermission(perms, "dashboard:read");
+
+  if (!canDashboard) {
+    const bannerSlot = (
+      <>
+        {denied ? (
+          <div className="rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <p className="font-medium">That screen is not available for your role.</p>
+            <p className="mt-1 text-xs text-amber-900/80">
+              Ask an administrator if you need access. Reference:{" "}
+              <span className="font-mono">{denied}</span>
+            </p>
+          </div>
+        ) : null}
+        <div className="rounded border border-outline-variant/30 bg-surface-container-high px-4 py-3 text-sm text-on-surface">
+          <p className="font-medium text-primary">Overview is not enabled for your account</p>
+          <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
+            Your account may need to be on the administrator allow list, or an administrator must
+            grant dashboard access for staff. Sign out and sign in again after your access is updated.
+          </p>
+        </div>
+      </>
+    );
+    return (
+      <AdminPageShell
+        title="Overview"
+        subtitle="Sales and stock at a glance."
+        bannerSlot={bannerSlot}
+      >
+        <p className="text-sm text-on-surface-variant">
+          When access is granted, order totals and inventory will load here.
+        </p>
+      </AdminPageShell>
+    );
+  }
+
   const [ordersResult, inventory] = await Promise.all([
     fetchMedusaOrdersForAdmin(10),
-    fetchMedusaInventoryForAdmin(),
+    fetchAllMedusaInventoryRows({ batchSize: 100 }),
   ]);
 
-  const { orders, total: totalOrders } = ordersResult;
+  const { orders, total: totalOrders, commerceUnavailable } = ordersResult;
 
   const activeOrders = orders.filter(
     (o) => o.status !== "delivered" && o.status !== "cancelled",
@@ -18,20 +76,48 @@ export default async function AdminDashboardPage() {
   const lowStockCount = inventory.filter((i) => i.available > 0 && i.available <= 5).length;
   const outOfStockCount = inventory.filter((i) => i.available <= 0).length;
 
-  return (
-    <main className="min-h-screen p-8 lg:p-12">
-      <header className="flex justify-between items-end mb-12">
-        <div>
-          <h2 className="text-4xl font-extrabold tracking-tighter text-primary font-headline">
-            Overview
-          </h2>
-          <p className="text-on-surface-variant mt-2 font-body text-sm">
-            Live data from Medusa.
+  const shopOrigin = getStorefrontPublicOrigin();
+
+  const bannerSlot = (
+    <>
+      {denied && (
+        <div className="rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <p className="font-medium">That screen is not available for your role.</p>
+          <p className="mt-1 text-xs text-amber-900/80">
+            Ask an administrator if you need access. Reference:{" "}
+            <span className="font-mono">{denied}</span>
           </p>
         </div>
-      </header>
+      )}
+      {commerceUnavailable && (
+        <div className="rounded border border-outline-variant/30 bg-surface-container-high px-4 py-3 text-sm text-on-surface">
+          <p className="font-medium text-primary">Store connection unavailable</p>
+          <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
+            This often happens in the first minute after the system starts. Wait a moment, then use
+            refresh in your browser. If the problem continues, ask whoever runs your servers to check
+            that the online store service is running.
+          </p>
+          <AdminTechnicalDetails className="mt-3">
+            <p>
+              This screen loads orders and stock from your store service. During local development it
+              often listens on <code>port 9000</code>. Start order: run <code>pnpm run dev</code>,
+              wait until the terminal shows the store service is ready (for example{" "}
+              <code>Server is ready on port: 9000</code>), then reload this page.
+            </p>
+          </AdminTechnicalDetails>
+        </div>
+      )}
+    </>
+  );
 
-      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+  return (
+    <AdminPageShell
+      title="Overview"
+      subtitle="Sales and stock at a glance. The same online store feeds the shop, inventory, orders, and POS."
+      bannerSlot={bannerSlot}
+      inspector={<AuditTimeline title="Recent activity" />}
+    >
+      <section className="mb-12 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
         <Link
           href="/admin/orders"
           className="bg-surface-container-lowest p-6 rounded shadow-[0px_20px_40px_rgba(0,0,0,0.02)] border-l-4 border-primary hover:shadow-md transition-shadow"
@@ -75,13 +161,13 @@ export default async function AdminDashboardPage() {
           className="bg-surface-container-lowest p-6 rounded shadow-[0px_20px_40px_rgba(0,0,0,0.02)] hover:shadow-md transition-shadow"
         >
           <span className="text-[10px] font-bold tracking-widest text-secondary uppercase">
-            Variants Tracked
+            Stock lines
           </span>
           <h3 className="text-2xl font-bold tracking-tight text-primary mt-2">
             {inventory.length}
           </h3>
           <p className="text-[10px] text-on-surface-variant mt-1 font-medium">
-            In Medusa inventory
+            Tracked in inventory
           </p>
         </Link>
         <div className="bg-surface-container-lowest p-6 rounded shadow-[0px_20px_40px_rgba(0,0,0,0.02)]">
@@ -111,9 +197,14 @@ export default async function AdminDashboardPage() {
                 View all
               </Link>
             </div>
-            {orders.length === 0 ? (
+            {orders.length === 0 && !commerceUnavailable ? (
               <p className="text-sm text-on-surface-variant py-8 text-center">
                 No orders yet. They will appear here once customers check out.
+              </p>
+            ) : orders.length === 0 ? (
+              <p className="text-sm text-on-surface-variant py-8 text-center">
+                Order list is not available until the store connection is restored. Try refreshing in a
+                moment.
               </p>
             ) : (
               <div className="space-y-4">
@@ -187,6 +278,12 @@ export default async function AdminDashboardPage() {
             </h3>
             <div className="space-y-3">
               <Link
+                href="/admin/catalog"
+                className="block rounded border border-outline-variant/20 p-3 text-sm font-medium text-primary hover:bg-surface-container-low transition-colors"
+              >
+                Products catalog
+              </Link>
+              <Link
                 href="/admin/orders"
                 className="block rounded border border-outline-variant/20 p-3 text-sm font-medium text-primary hover:bg-surface-container-low transition-colors"
               >
@@ -204,10 +301,18 @@ export default async function AdminDashboardPage() {
               >
                 Open POS terminal
               </Link>
+              <a
+                href={`${shopOrigin}/shop`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block rounded border border-outline-variant/20 p-3 text-sm font-medium text-primary hover:bg-surface-container-low transition-colors"
+              >
+                Open storefront shop
+              </a>
             </div>
           </div>
         </aside>
       </div>
-    </main>
+    </AdminPageShell>
   );
 }
