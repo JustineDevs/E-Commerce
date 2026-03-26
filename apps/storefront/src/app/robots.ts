@@ -1,35 +1,10 @@
 import type { MetadataRoute } from "next";
-import { getBaseUrl } from "@/lib/seo";
+import { DEFAULT_PUBLIC_SITE_ORIGIN } from "@apparel-commerce/sdk";
 
 export default function robots(): MetadataRoute.Robots {
-  const base = getBaseUrl();
+  const base = (process.env.NEXT_PUBLIC_SITE_URL ?? DEFAULT_PUBLIC_SITE_ORIGIN).replace(/\/$/, "");
   return {
-    rules: [
-      {
-        userAgent: "*",
-        allow: "/",
-        disallow: [
-          "/api/",
-          "/account",
-          "/checkout",
-          "/sign-in",
-          "/register",
-          "/preferences",
-        ],
-      },
-      {
-        userAgent: "Googlebot",
-        allow: "/",
-        disallow: [
-          "/api/",
-          "/account",
-          "/checkout",
-          "/sign-in",
-          "/register",
-          "/preferences",
-        ],
-      },
-    ],
+    rules: { userAgent: "*", allow: "/", disallow: ["/api/", "/account"] },
     sitemap: `${base}/sitemap.xml`,
   };
 }
