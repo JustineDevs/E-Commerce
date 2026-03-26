@@ -1,5 +1,6 @@
+import nextDynamic from "next/dynamic";
+import { loadStorefrontHomeContentForPublic } from "@apparel-commerce/platform-data";
 import Link from "next/link";
-import { HomeScrollExperience } from "@/components/home/HomeScrollExperience";
 import { StorefrontCommerceAlert } from "@/components/StorefrontCommerceAlert";
 import { fetchFeaturedProducts } from "@/lib/catalog-fetch";
 import {
@@ -8,6 +9,22 @@ import {
   canonicalUrl,
 } from "@/lib/seo";
 
+const HomeScrollExperience = nextDynamic(
+  () =>
+    import("@/components/home/HomeScrollExperience").then((m) => ({
+      default: m.HomeScrollExperience,
+    })),
+  {
+    loading: () => (
+      <div
+        className="min-h-[min(72svh,40rem)] w-full animate-pulse bg-surface-container-low"
+        aria-hidden
+      />
+    ),
+    ssr: true,
+  },
+);
+
 export const dynamic = "force-dynamic";
 
 export const metadata = {
@@ -15,7 +32,10 @@ export const metadata = {
 };
 
 export default async function HomePage() {
-  const featured = await fetchFeaturedProducts(4, 60);
+  const [featured, home] = await Promise.all([
+    fetchFeaturedProducts(4),
+    loadStorefrontHomeContentForPublic(),
+  ]);
   if (featured.kind !== "ok") {
     return (
       <main className="storefront-page-shell max-w-[1600px] pb-12">
@@ -54,7 +74,7 @@ export default async function HomePage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(webJsonLd) }}
       />
-      <HomeScrollExperience products={featured.products} />
+      <HomeScrollExperience products={featured.products} home={home} />
     </>
   );
 }
