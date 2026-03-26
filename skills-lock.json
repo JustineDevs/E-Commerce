@@ -61,6 +61,11 @@
       "sourceType": "github",
       "computedHash": "fec10108a56b5e4a5a998d99e453e0142c92d58f73955b566c2cf7bf8da1fcdc"
     },
+    "nextjs-performance": {
+      "source": "giuseppe-trisciuoglio/developer-kit",
+      "sourceType": "github",
+      "computedHash": "e7aacb7a0f57077fd7494a5c3b633cbc6a351463142acb1101a7f85570e20ace"
+    },
     "owasp-security": {
       "source": "hoodini/ai-agents-skills",
       "sourceType": "github",
