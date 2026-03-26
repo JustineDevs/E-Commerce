@@ -10,3 +10,5 @@ alter table public.compliance_exports enable row level security;
 alter table public.retention_jobs enable row level security;
 alter table public.audit_logs enable row level security;
 alter table public.legacy_import_runs enable row level security;
+alter table public.admin_entity_workflow enable row level security;
+alter table public.admin_operator_notes enable row level security;
