@@ -1,11 +1,10 @@
 import type { Request, Response, NextFunction } from "express";
 import { randomUUID } from "crypto";
 
-declare global {
-  namespace Express {
-    interface Request {
-      requestId?: string;
-    }
+declare module "express-serve-static-core" {
+  // eslint-disable-next-line no-unused-vars -- merges onto Express Request
+  interface Request {
+    requestId?: string;
   }
 }
 
