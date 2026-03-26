@@ -1,25 +1,35 @@
-import { NextResponse } from "next/server";
+import { logAdminApiEvent } from "@/lib/admin-api-log";
+import { getCorrelationId } from "@/lib/request-correlation";
 import {
   getMedusaAdminSdk,
   getMedusaRegionId,
   getMedusaSalesChannelId,
 } from "@/lib/medusa-pos";
 import { requireStaffSession } from "@/lib/requireStaffSession";
+import { correlatedJson, tagResponse } from "@/lib/staff-api-response";
 
 export async function POST(req: Request) {
+  const correlationId = getCorrelationId(req);
   const staff = await requireStaffSession();
   if (!staff.ok) {
-    return staff.response;
+    return tagResponse(staff.response, correlationId);
   }
+
+  logAdminApiEvent({
+    route: "POST /api/pos/medusa/draft-order",
+    correlationId,
+    phase: "start",
+  });
 
   const adminSdk = getMedusaAdminSdk();
   const regionId = getMedusaRegionId();
   const salesChannelId = getMedusaSalesChannelId();
   if (!adminSdk || !regionId || !salesChannelId) {
-    return NextResponse.json(
+    return correlatedJson(
+      correlationId,
       {
         error:
-          "Medusa POS env incomplete (MEDUSA_SECRET_API_KEY, MEDUSA_REGION_ID, MEDUSA_SALES_CHANNEL_ID)",
+          "POS environment incomplete (MEDUSA_SECRET_API_KEY, MEDUSA_REGION_ID, MEDUSA_SALES_CHANNEL_ID)",
       },
       { status: 503 },
     );
@@ -31,7 +41,7 @@ export async function POST(req: Request) {
   };
   const items = body.items ?? [];
   if (items.length === 0) {
-    return NextResponse.json({ error: "No items" }, { status: 400 });
+    return correlatedJson(correlationId, { error: "No items" }, { status: 400 });
   }
 
   try {
@@ -45,13 +55,26 @@ export async function POST(req: Request) {
       })),
     });
 
-    return NextResponse.json({
+    logAdminApiEvent({
+      route: "POST /api/pos/medusa/draft-order",
+      correlationId,
+      phase: "ok",
+      detail: { draftOrderId: draft_order?.id },
+    });
+
+    return correlatedJson(correlationId, {
       draftOrderId: draft_order?.id,
       displayId: draft_order?.display_id,
     });
   } catch (e) {
     const msg =
-      e instanceof Error ? e.message : "Could not create Medusa draft order";
-    return NextResponse.json({ error: msg }, { status: 502 });
+      e instanceof Error ? e.message : "Unable to create draft order";
+    logAdminApiEvent({
+      route: "POST /api/pos/medusa/draft-order",
+      correlationId,
+      phase: "error",
+      detail: { message: msg },
+    });
+    return correlatedJson(correlationId, { error: msg }, { status: 502 });
   }
 }
