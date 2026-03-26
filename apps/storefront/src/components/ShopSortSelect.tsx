@@ -2,12 +2,23 @@
 
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
+import {
+  Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@apparel-commerce/ui";
 
 type Props = {
   value: string;
   category?: string;
   size?: string;
   color?: string;
+  brand?: string;
+  minPrice?: number;
+  maxPrice?: number;
   search?: string;
 };
 
@@ -16,6 +27,9 @@ export function ShopSortSelect({
   category,
   size,
   color,
+  brand,
+  minPrice,
+  maxPrice,
   search,
 }: Props) {
   const router = useRouter();
@@ -26,6 +40,13 @@ export function ShopSortSelect({
     if (category) params.set("category", category);
     if (size) params.set("size", size);
     if (color) params.set("color", color);
+    if (brand) params.set("brand", brand);
+    if (minPrice != null && Number.isFinite(minPrice)) {
+      params.set("minPrice", String(minPrice));
+    }
+    if (maxPrice != null && Number.isFinite(maxPrice)) {
+      params.set("maxPrice", String(maxPrice));
+    }
     if (search?.trim()) params.set("q", search.trim());
     if (sort && sort !== "newest") params.set("sort", sort);
     startTransition(() => {
@@ -33,26 +54,33 @@ export function ShopSortSelect({
     });
   }
 
+  const labels: Record<string, string> = {
+    newest: "Newest first",
+    name_asc: "Name A–Z",
+    price_asc: "Price: low to high",
+    price_desc: "Price: high to low",
+  };
+
   return (
-    <div className="flex flex-col gap-2 w-full max-w-xs">
-      <label
-        htmlFor="shop-sort"
-        className="font-label text-xs uppercase tracking-widest text-on-surface-variant"
-      >
+    <div className="flex w-full max-w-xs flex-col gap-2">
+      <Label htmlFor="shop-sort" variant="form" className="font-label">
         Sort
-      </label>
-      <select
-        id="shop-sort"
+      </Label>
+      <Select
         value={value}
         disabled={pending}
-        onChange={(e) => apply(e.target.value)}
-        className="bg-surface-container-high px-4 py-2 text-xs font-medium uppercase tracking-wider border border-outline-variant/20 rounded outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60"
+        onValueChange={(v) => apply(v)}
       >
-        <option value="newest">Newest first</option>
-        <option value="name_asc">Name A–Z</option>
-        <option value="price_asc">Price: low to high</option>
-        <option value="price_desc">Price: high to low</option>
-      </select>
+        <SelectTrigger id="shop-sort" aria-label="Sort products">
+          <SelectValue placeholder={labels[value] ?? "Sort"} />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="newest">{labels.newest}</SelectItem>
+          <SelectItem value="name_asc">{labels.name_asc}</SelectItem>
+          <SelectItem value="price_asc">{labels.price_asc}</SelectItem>
+          <SelectItem value="price_desc">{labels.price_desc}</SelectItem>
+        </SelectContent>
+      </Select>
     </div>
   );
 }
