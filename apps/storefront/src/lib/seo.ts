@@ -13,7 +13,12 @@ export function getBaseUrl(): string {
 export function canonicalUrl(path: string): string {
   const base = getBaseUrl();
   const p = path.startsWith("/") ? path : `/${path}`;
-  return `${base}${p}`.replace(/\/+/g, "/");
+  const full = `${base}${p}`;
+  const protocolEnd = full.indexOf("://");
+  if (protocolEnd === -1) return full.replace(/\/+/g, "/");
+  const protocol = full.slice(0, protocolEnd + 3);
+  const rest = full.slice(protocolEnd + 3).replace(/\/+/g, "/");
+  return protocol + rest;
 }
 
 export function buildJsonLdOrganization() {
@@ -58,9 +63,8 @@ export function buildJsonLdProduct(product: {
   const minPrice = product.variants.length
     ? Math.min(...product.variants.map((v) => v.price))
     : 0;
-  const image =
-    product.images[0]?.imageUrl ??
-    `${base}/icons/favicon-512x512.png`;
+  const imageList = product.images.map((i) => i.imageUrl).filter(Boolean);
+  const fallbackImage = `${base}/icons/favicon-512x512.png`;
 
   return {
     "@context": "https://schema.org",
@@ -68,7 +72,7 @@ export function buildJsonLdProduct(product: {
     name: product.name,
     url,
     description: product.description ?? product.name,
-    image: product.images.map((i) => i.imageUrl).filter(Boolean),
+    image: imageList.length > 0 ? imageList : [fallbackImage],
     category: product.category ?? undefined,
     offers: {
       "@type": "Offer",
