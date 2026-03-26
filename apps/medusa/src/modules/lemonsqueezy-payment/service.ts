@@ -393,24 +393,31 @@ export default class LemonSqueezyPaymentProviderService extends AbstractPaymentP
       return { action: PaymentActions.NOT_SUPPORTED };
     }
 
+    const successPayload = this.lemonWebhookSuccessPayload(body);
     const dedupId = buildLemonWebhookDedupId(body);
     if (dedupId) {
       const first = await claimLemonWebhookDedup(dedupId);
       if (!first) {
-        return { action: PaymentActions.NOT_SUPPORTED };
+        return successPayload ?? { action: PaymentActions.NOT_SUPPORTED };
       }
     }
 
+    return successPayload ?? { action: PaymentActions.NOT_SUPPORTED };
+  }
+
+  private lemonWebhookSuccessPayload(
+    body: Record<string, unknown>,
+  ): WebhookActionResult | null {
     const sessionId = extractMedusaSessionId(body);
     if (!sessionId) {
-      return { action: PaymentActions.NOT_SUPPORTED };
+      return null;
     }
 
     const total = extractPaidTotalMinor(body);
     if (total == null) {
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
-        "Lemon webhook missing order total."
+        "Lemon webhook missing order total.",
       );
     }
 
