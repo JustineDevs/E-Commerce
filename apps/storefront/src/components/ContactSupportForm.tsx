@@ -1,6 +1,15 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+  Button,
+  Input,
+  Label,
+  Textarea,
+} from "@apparel-commerce/ui";
 import { getSupportEmail, getSupportPhoneDisplay } from "@/lib/public-site";
 
 export function ContactSupportForm() {
@@ -35,13 +44,16 @@ export function ContactSupportForm() {
           </a>
         </p>
       ) : (
-        <p className="text-sm text-error">
-          Customer email is not configured. Add{" "}
-          <code className="rounded bg-surface-container-high px-1">
-            NEXT_PUBLIC_SUPPORT_EMAIL
-          </code>{" "}
-          in your environment.
-        </p>
+        <Alert variant="destructive">
+          <AlertTitle>Email not configured</AlertTitle>
+          <AlertDescription className="text-sm">
+            Add{" "}
+            <code className="rounded bg-surface-container-high px-1">
+              NEXT_PUBLIC_SUPPORT_EMAIL
+            </code>{" "}
+            in your environment.
+          </AlertDescription>
+        </Alert>
       )}
       {phone ? (
         <p className="text-sm">
@@ -55,43 +67,33 @@ export function ContactSupportForm() {
         </p>
       ) : null}
 
-      <div>
-        <label
-          htmlFor="contact-subject"
-          className="mb-1 block text-xs font-bold uppercase tracking-wider text-primary"
-        >
+      <div className="space-y-2">
+        <Label htmlFor="contact-subject" variant="form">
           Subject
-        </label>
-        <input
+        </Label>
+        <Input
           id="contact-subject"
           value={subject}
           onChange={(e) => setSubject(e.target.value)}
-          className="w-full max-w-md rounded border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-sm text-on-surface outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+          className="max-w-md"
           autoComplete="off"
         />
       </div>
-      <div>
-        <label
-          htmlFor="contact-body"
-          className="mb-1 block text-xs font-bold uppercase tracking-wider text-primary"
-        >
+      <div className="space-y-2">
+        <Label htmlFor="contact-body" variant="form">
           Message
-        </label>
-        <textarea
+        </Label>
+        <Textarea
           id="contact-body"
           value={body}
           onChange={(e) => setBody(e.target.value)}
           rows={6}
-          className="w-full max-w-lg rounded border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-sm text-on-surface outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+          className="max-w-lg"
         />
       </div>
-      <button
-        type="button"
-        onClick={submitMailto}
-        className="rounded bg-primary px-8 py-3 text-sm font-bold uppercase tracking-widest text-on-primary hover:opacity-90"
-      >
+      <Button type="button" onClick={submitMailto} className="uppercase tracking-widest">
         Open in email app
-      </button>
+      </Button>
       {status ? (
         <p className="text-xs text-on-surface-variant">{status}</p>
       ) : null}
