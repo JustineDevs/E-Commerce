@@ -7,7 +7,7 @@ You are working on the **Apparel Commerce Platform**, a composable commerce syst
 - **Purpose**: Unified online and in-store sales for a shorts/apparel retail business in the Philippines.
 - **Architecture**: Monorepo (Turborepo + pnpm) with one shared source of truth for products, variants, inventory, orders, payments, and shipments.
 - **Apps**: `apps/storefront`, `apps/admin`, `apps/api`, `apps/medusa`.
-- **Packages**: `types`, `validation`, `rate-limits`, `database`, `config`, `sdk`.
+- **Packages**: `types`, `validation`, `rate-limits`, `database`, `config`, `sdk`, `ui`, `platform-data`.
 
 ## Canonical Documentation
 
@@ -64,6 +64,7 @@ apps/
 └── medusa       # Commerce backend (Medusa 2)
 packages/
 ├── types, validation, rate-limits, database, config, sdk
+└── ui             # Shared shadcn-style primitives (@apparel-commerce/ui)
 ```
 
 ## MCP (Model Context Protocol)
@@ -73,6 +74,19 @@ packages/
 - **Supabase** – Database, migrations, Edge Functions. See `mcp_supabase_*` tools.
 
 Ensure Stripe and PayPal MCP servers are enabled in Cursor when working on payment integrations.
+
+### UI and layout (see `internal/docs/MCP-UI-STACK.md`)
+
+| MCP | Use |
+|-----|-----|
+| **shadcn** | Registry and `add` commands; extend `packages/ui`. |
+| **ui-layouts-mcp** | Layout and motion patterns; port into Tailwind + `@apparel-commerce/ui`. |
+| **gsap-master** | GSAP timelines and scroll patterns; align with storefront motion. |
+| **tailwindcss-server** | Tailwind utilities and token consistency. |
+| **socraticode** | Guided reasoning for refactors. |
+| **mui-mcp**, **mantine**, **chakra-ui**, **heroui-react**, **daisyui-blueprint**, **kibo-ui** | **Reference only** for patterns; do not add as runtime deps without an ADR. |
+
+Full rules, workflows, and anti-patterns: **`internal/docs/MCP-UI-STACK.md`**.
 
 ## Skills (when relevant)
 
