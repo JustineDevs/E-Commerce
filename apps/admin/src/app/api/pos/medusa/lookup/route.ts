@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { logAdminApiEvent } from "@/lib/admin-api-log";
+import { getCorrelationId } from "@/lib/request-correlation";
 import {
   getMedusaAdminSdk,
   getMedusaRegionId,
@@ -7,12 +9,19 @@ import {
   variantPricePhpFromCalculated,
 } from "@/lib/medusa-pos";
 import { requireStaffSession } from "@/lib/requireStaffSession";
+import { correlatedJson, tagResponse } from "@/lib/staff-api-response";
 
 export async function POST(req: Request) {
+  const correlationId = getCorrelationId(req);
   const staff = await requireStaffSession();
   if (!staff.ok) {
-    return staff.response;
+    return tagResponse(staff.response, correlationId);
   }
+  logAdminApiEvent({
+    route: "POST /api/pos/medusa/lookup",
+    correlationId,
+    phase: "start",
+  });
 
   const body = (await req.json().catch(() => ({}))) as {
     barcode?: string;
@@ -22,17 +31,22 @@ export async function POST(req: Request) {
   const sku = typeof body.sku === "string" ? body.sku.trim() : "";
   const trimmed = barcode || sku;
   if (!trimmed) {
-    return NextResponse.json({ error: "Missing barcode or sku" }, { status: 400 });
+    return correlatedJson(
+      correlationId,
+      { error: "Missing barcode or sku" },
+      { status: 400 },
+    );
   }
 
   const regionId = getMedusaRegionId();
   const storeSdk = getMedusaStoreSdk();
   const adminSdk = getMedusaAdminSdk();
   if (!regionId || !storeSdk || !adminSdk) {
-    return NextResponse.json(
+    return correlatedJson(
+      correlationId,
       {
         error:
-          "Medusa POS env incomplete (NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY, MEDUSA_REGION_ID, MEDUSA_SECRET_API_KEY)",
+          "POS environment incomplete (NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY, MEDUSA_REGION_ID, MEDUSA_SECRET_API_KEY)",
       },
       { status: 503 },
     );
@@ -108,13 +122,26 @@ export async function POST(req: Request) {
   }
 
   if (!variant?.id) {
-    return new NextResponse(null, { status: 404 });
+    logAdminApiEvent({
+      route: "POST /api/pos/medusa/lookup",
+      correlationId,
+      phase: "error",
+      detail: { reason: "not_found" },
+    });
+    return tagResponse(new NextResponse(null, { status: 404 }), correlationId);
   }
 
   const { size, color } = optionRowsToSizeColor(variant.options);
   const price = variantPricePhpFromCalculated(variant.calculated_price);
 
-  return NextResponse.json({
+  logAdminApiEvent({
+    route: "POST /api/pos/medusa/lookup",
+    correlationId,
+    phase: "ok",
+    detail: { variantId: variant.id },
+  });
+
+  return correlatedJson(correlationId, {
     id: variant.id,
     sku: String(variant.sku ?? ""),
     size,
