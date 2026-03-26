@@ -9,10 +9,10 @@ export default function SearchPage() {
   return (
     <main className="storefront-page-shell max-w-xl">
       <h1 className="font-headline text-3xl font-bold text-primary sm:text-4xl">
-        Search catalog
+        Search the shop
       </h1>
       <p className="mt-3 text-sm text-on-surface-variant">
-        Find products by name or URL slug.
+        Find products by name or keywords.
       </p>
       <form
         action="/shop"
