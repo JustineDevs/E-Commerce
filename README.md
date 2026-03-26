@@ -33,7 +33,7 @@ The platform uses a shared monorepo and a single transactional database so that 
 ## Live preview
 
 **Storefront (Vercel):** https://maharlika-apparel-custom.vercel.app — see [VERCEL.md](VERCEL.md)  
-**Medusa backend (Render):** See [GUIDE.md](internal/docs/GUIDE.md) for credentials and deploy via `render.yaml`.
+**Medusa backend (Render):** See [GUIDE.md](docs/GUIDE.md) for credentials and deploy via `render.yaml`.
 
 Configure `NEXT_PUBLIC_SITE_URL` and related env vars to this origin when deploying.
 
@@ -117,10 +117,10 @@ pnpm build
 
 ## Documentation
 
-- [Payment Integration](internal/docs/runbooks/PAYMENT-INTEGRATION.md) – Lemon Squeezy, Stripe, PayPal, Paymongo (GCash), Maya setup
-- [Specification](internal/docs/spec.md) – System scope, tech stack, functional requirements
-- [Blueprint](internal/docs/blueprint.md) – Sprint plan, data model, OMS flow
-- [Privacy & Terms](internal/docs/privacy-terms.md) – PRD, service agreement, GDPR/PDPA
+- [Payment Integration](docs/runbooks/PAYMENT-INTEGRATION.md) – Lemon Squeezy, Stripe, PayPal, Paymongo (GCash), Maya setup
+- [Specification](docs/spec.md) – System scope, tech stack, functional requirements
+- [Blueprint](docs/blueprint.md) – Sprint plan, data model, OMS flow
+- [Privacy & Terms](docs/privacy-terms.md) – PRD, service agreement, GDPR/PDPA
 
 ## Security
 
