@@ -28,7 +28,7 @@ test.describe.configure({ mode: "serial" });
 for (const { path: routePath, file } of ADMIN_ROUTES) {
   test(`admin screenshot ${routePath}`, async ({ page }) => {
     await page.goto(routePath, { waitUntil: "load" });
-    await page.locator("body").waitFor({ state: "visible" });
+    await page.locator("body").waitFor({ state: "attached" });
     await page.evaluate(() => document.fonts?.ready ?? Promise.resolve());
     const out = path.join(OUT_DIR, `${file}.png`);
     await page.screenshot({ path: out, fullPage: true });
