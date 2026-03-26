@@ -1,5 +1,6 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
+import { getMedusaStoreBaseUrl } from "../medusa-env";
 import {
   assertMedusaStorefrontEnvProduction,
   listMissingMedusaStorefrontEnv,
@@ -88,6 +89,21 @@ describe("medusa-storefront env", () => {
     process.env.NODE_ENV = "production";
     process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY = "pk_123";
     process.env.NEXT_PUBLIC_MEDUSA_REGION_ID = "reg_123";
+    process.env.NEXT_PUBLIC_MEDUSA_URL = "https://api.example.com";
+    assert.doesNotThrow(() => assertMedusaStorefrontEnvProduction());
+  });
+
+  it("getMedusaStoreBaseUrl: prefers NEXT_PUBLIC when MEDUSA_BACKEND is loopback and public is not", () => {
+    process.env.MEDUSA_BACKEND_URL = "http://localhost:9000";
+    process.env.NEXT_PUBLIC_MEDUSA_URL = "https://api.example.com";
+    assert.strictEqual(getMedusaStoreBaseUrl(), "https://api.example.com");
+  });
+
+  it("assertMedusaStorefrontEnvProduction: production passes when loopback backend is overridden by public URL", () => {
+    process.env.NODE_ENV = "production";
+    process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY = "pk_123";
+    process.env.NEXT_PUBLIC_MEDUSA_REGION_ID = "reg_123";
+    process.env.MEDUSA_BACKEND_URL = "http://localhost:9000";
     process.env.NEXT_PUBLIC_MEDUSA_URL = "https://api.example.com";
     assert.doesNotThrow(() => assertMedusaStorefrontEnvProduction());
   });
