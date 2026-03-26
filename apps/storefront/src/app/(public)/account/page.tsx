@@ -1,12 +1,19 @@
 import Link from "next/link";
+import Image from "next/image";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
+import { SignOutButton } from "@/components/SignOutButton";
+import { PreferencesControls } from "@/components/PreferencesControls";
+import { fetchCustomerOrders } from "@/lib/medusa-account-orders";
 
 export const dynamic = "force-dynamic";
 
 export default async function AccountPage() {
   const session = await getServerSession(authOptions);
   const user = session?.user;
+  const { orders } = user?.email
+    ? await fetchCustomerOrders(user.email)
+    : { orders: [] };
 
   return (
     <main className="storefront-page-shell max-w-4xl">
@@ -18,6 +25,23 @@ export default async function AccountPage() {
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <section className="bg-surface-container-lowest rounded shadow-[0px_20px_40px_rgba(0,0,0,0.02)] p-8 md:col-span-2">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="font-headline text-sm font-bold uppercase tracking-widest text-primary">
+              Preferences
+            </h2>
+            <Link
+              href="/preferences"
+              className="text-sm font-medium text-primary hover:underline"
+            >
+              Open full preferences page
+            </Link>
+          </div>
+          <div className="mt-6">
+            <PreferencesControls />
+          </div>
+        </section>
+
         <section className="bg-surface-container-lowest rounded shadow-[0px_20px_40px_rgba(0,0,0,0.02)] p-8">
           <h2 className="font-headline text-sm font-bold uppercase tracking-widest text-primary mb-6">
             Profile
@@ -25,23 +49,18 @@ export default async function AccountPage() {
           {user ? (
             <div className="space-y-3">
               {user.image && (
-                <img
+                <Image
                   src={user.image}
                   alt=""
-                  className="w-14 h-14 rounded-full"
+                  width={56}
+                  height={56}
+                  className="rounded-full"
                   referrerPolicy="no-referrer"
                 />
               )}
               <p className="text-sm font-medium text-on-surface">{user.name}</p>
               <p className="text-sm text-on-surface-variant">{user.email}</p>
-              <form action="/api/auth/signout" method="POST">
-                <button
-                  type="submit"
-                  className="mt-4 inline-block border border-outline-variant/40 text-on-surface-variant px-6 py-2.5 rounded font-medium hover:bg-surface-container-low text-sm"
-                >
-                  Sign out
-                </button>
-              </form>
+              <SignOutButton />
             </div>
           ) : (
             <>
@@ -62,16 +81,60 @@ export default async function AccountPage() {
           <h2 className="font-headline text-sm font-bold uppercase tracking-widest text-primary mb-6">
             Order History
           </h2>
-          <p className="text-on-surface-variant text-sm mb-6">
-            View and track your orders.
-          </p>
-          <p className="text-on-surface-variant text-sm">
-            No orders yet.{" "}
-            <Link href="/shop" className="text-primary hover:underline">
-              Start shopping
-            </Link>
-            .
-          </p>
+          {orders.length > 0 ? (
+            <ul className="space-y-4">
+              {orders.map((order) => (
+                <li
+                  key={order.id}
+                  className="flex items-center justify-between border-b border-surface-container-high pb-4 last:border-0 last:pb-0"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-primary">
+                      Order #{order.displayId}
+                    </p>
+                    <p className="text-xs text-on-surface-variant mt-1">
+                      {order.itemCount} item{order.itemCount !== 1 ? "s" : ""} ·{" "}
+                      {order.status.replace(/_/g, " ")} ·{" "}
+                      {order.createdAt
+                        ? new Date(order.createdAt).toLocaleDateString("en-PH", {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                          })
+                        : ""}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-medium">
+                      {order.currency} {order.total.toLocaleString("en-PH")}
+                    </p>
+                    <div className="flex flex-col items-end gap-1">
+                      <Link
+                        href={`/track/${order.id}`}
+                        className="text-xs text-primary hover:underline"
+                      >
+                        Track
+                      </Link>
+                      <Link
+                        href={`/account/orders/${order.id}/return`}
+                        className="text-xs text-on-surface-variant hover:underline"
+                      >
+                        Return
+                      </Link>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-on-surface-variant text-sm">
+              No orders yet.{" "}
+              <Link href="/shop" className="text-primary hover:underline">
+                Start shopping
+              </Link>
+              .
+            </p>
+          )}
         </section>
       </div>
 
