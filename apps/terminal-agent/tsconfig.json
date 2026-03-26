@@ -1,0 +1,10 @@
+{
+  "extends": "@apparel-commerce/config-typescript/base.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "rootDir": "src",
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts"]
+}
