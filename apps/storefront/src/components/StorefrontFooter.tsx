@@ -1,8 +1,15 @@
+import type { CmsFooterColumn, CmsSocialLink } from "@apparel-commerce/platform-data";
 import Image from "next/image";
 import Link from "next/link";
 import { getInstagramHref } from "@/lib/public-site";
 
-export function StorefrontFooter() {
+export function StorefrontFooter({
+  cmsFooterColumns,
+  cmsSocialLinks,
+}: {
+  cmsFooterColumns?: CmsFooterColumn[];
+  cmsSocialLinks?: CmsSocialLink[];
+}) {
   const instagram = getInstagramHref();
 
   return (
@@ -26,6 +33,24 @@ export function StorefrontFooter() {
             © {new Date().getFullYear()} Maharlika Apparel Custom.
           </p>
         </div>
+        {cmsFooterColumns?.map((col) => (
+          <div key={col.title} className="flex min-w-0 flex-col gap-4">
+            <h4 className="font-headline text-sm font-bold uppercase tracking-widest text-primary md:text-base">
+              {col.title}
+            </h4>
+            <nav className="flex flex-col gap-2.5 md:gap-3" aria-label={col.title}>
+              {col.links.map((l) => (
+                <Link
+                  key={`${col.title}-${l.href}-${l.label}`}
+                  href={l.href}
+                  className="text-sm leading-snug text-slate-600 hover:text-primary md:text-base"
+                >
+                  {l.label}
+                </Link>
+              ))}
+            </nav>
+          </div>
+        ))}
         <div className="flex min-w-0 flex-col gap-4">
           <h4 className="font-headline text-sm font-bold uppercase tracking-widest text-primary md:text-base">
             Shop
@@ -185,6 +210,17 @@ export function StorefrontFooter() {
             Connect
           </h4>
           <nav className="flex flex-col gap-2.5 md:gap-3" aria-label="Social">
+            {cmsSocialLinks?.map((s) => (
+              <a
+                key={s.href}
+                href={s.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm leading-snug text-slate-600 hover:text-primary md:text-base"
+              >
+                {s.label}
+              </a>
+            ))}
             {instagram ? (
               <a
                 href={instagram}
