@@ -2,7 +2,12 @@ import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans, Inter } from "next/font/google";
 import { DEFAULT_PUBLIC_SITE_ORIGIN } from "@apparel-commerce/sdk";
 import { SmoothScrollProvider } from "@/components/SmoothScrollProvider";
+import { StorefrontPreferenceSync } from "@/components/StorefrontPreferenceSync";
 import { NextAuthSessionProvider } from "@/components/NextAuthSessionProvider";
+import { CartAbandonmentBeacon } from "@/components/CartAbandonmentBeacon";
+import { CartSyncOnSignIn } from "@/components/CartSyncOnSignIn";
+import { MedusaCartProvider } from "@/context/MedusaCartContext";
+import { ClarityScript } from "@/components/ClarityScript";
 import { VercelWebAnalytics } from "@/components/VercelWebAnalytics";
 import "./globals.css";
 
@@ -110,8 +115,14 @@ export default function RootLayout({
       </head>
       <body className="min-h-[100dvh] min-w-0 overflow-x-hidden bg-surface text-on-surface font-body antialiased supports-[height:100dvh]:min-h-dvh">
         <NextAuthSessionProvider>
-          <SmoothScrollProvider>{children}</SmoothScrollProvider>
+          <MedusaCartProvider>
+            <CartSyncOnSignIn />
+            <StorefrontPreferenceSync />
+            <CartAbandonmentBeacon />
+            <SmoothScrollProvider>{children}</SmoothScrollProvider>
+          </MedusaCartProvider>
         </NextAuthSessionProvider>
+        <ClarityScript />
         <VercelWebAnalytics />
       </body>
     </html>
