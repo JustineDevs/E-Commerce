@@ -16,7 +16,7 @@ gsap.registerPlugin(ScrollTrigger);
 
 interface SmoothScrollContextValue {
   lenis: Lenis | null;
-  setScrollLocked: (locked: boolean) => void;
+  setScrollLocked: (_locked: boolean) => void;
 }
 
 const SmoothScrollContext = createContext<SmoothScrollContextValue>({
@@ -46,8 +46,8 @@ export function SmoothScrollProvider({
   const [scrollLocked, setScrollLockedRaw] = useState(false);
   const pathname = usePathname();
 
-  const setScrollLocked = useCallback((locked: boolean) => {
-    setScrollLockedRaw(locked);
+  const setScrollLocked = useCallback((value: boolean) => {
+    setScrollLockedRaw(value);
   }, []);
 
   useEffect(() => {
