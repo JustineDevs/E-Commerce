@@ -15,7 +15,12 @@ export type MedusaOrderRow = {
 export async function fetchMedusaOrdersForAdmin(
   limit = 50,
   offset = 0,
-): Promise<{ orders: MedusaOrderRow[]; total: number }> {
+): Promise<{
+  orders: MedusaOrderRow[];
+  total: number;
+  /** True when Medusa could not be reached (e.g. still starting, wrong URL). */
+  commerceUnavailable?: boolean;
+}> {
   const qs = new URLSearchParams();
   qs.set("limit", String(limit));
   qs.set("offset", String(offset));
@@ -24,9 +29,14 @@ export async function fetchMedusaOrdersForAdmin(
     "id,display_id,status,currency_code,created_at,email,total,payment_status,fulfillment_status,metadata,*customer",
   );
   qs.set("order", "-created_at");
-  const res = await medusaAdminFetch(`/admin/orders?${qs.toString()}`, {
-    method: "GET",
-  });
+  let res: Response;
+  try {
+    res = await medusaAdminFetch(`/admin/orders?${qs.toString()}`, {
+      method: "GET",
+    });
+  } catch {
+    return { orders: [], total: 0, commerceUnavailable: true };
+  }
   if (!res.ok) {
     return { orders: [], total: 0 };
   }
@@ -135,10 +145,7 @@ function mapShipments(metadata: Record<string, unknown> | undefined): MedusaShip
     .filter((s) => s.id.length > 0);
 }
 
-function mapLineItems(
-  items: unknown,
-  currency: string,
-): MedusaAdminOrderItem[] {
+function mapLineItems(items: unknown): MedusaAdminOrderItem[] {
   if (!Array.isArray(items)) {
     return [];
   }
@@ -230,7 +237,7 @@ export async function fetchMedusaOrderDetailForAdmin(
       typeof order.created_at === "string"
         ? order.created_at
         : new Date().toISOString(),
-    order_items: mapLineItems(order.items, currency),
+    order_items: mapLineItems(order.items),
   };
 
   return {
@@ -257,6 +264,97 @@ export async function fetchMedusaOrderJson(
   const json = (await res.json()) as unknown;
   const order = unwrapOrderPayload(json);
   return order;
+}
+
+export type MedusaPaymentSummary = {
+  id: string;
+  /** Amount in smallest currency unit (e.g. centavos). */
+  amount: number;
+  currency_code: string;
+  captured_amount?: number;
+  refunded_amount?: number;
+};
+
+function collectPaymentsFromOrderPayload(order: Record<string, unknown>): MedusaPaymentSummary[] {
+  const out: MedusaPaymentSummary[] = [];
+  const pushRaw = (p: Record<string, unknown>) => {
+    const id = String(p.id ?? "");
+    if (!id) return;
+    const amt = Number(p.amount ?? 0);
+    const cap = p.captured_amount != null ? Number(p.captured_amount) : undefined;
+    const ref = p.refunded_amount != null ? Number(p.refunded_amount) : undefined;
+    out.push({
+      id,
+      amount: Number.isFinite(amt) ? amt : 0,
+      currency_code: String(p.currency_code ?? "PHP").toUpperCase(),
+      captured_amount: cap,
+      refunded_amount: ref,
+    });
+  };
+
+  const collections = order.payment_collections ?? order.payment_collection;
+  const list = Array.isArray(collections)
+    ? collections
+    : collections && typeof collections === "object"
+      ? [collections]
+      : [];
+  for (const col of list) {
+    const c = col as Record<string, unknown>;
+    const payments = c.payments;
+    if (!Array.isArray(payments)) continue;
+    for (const p of payments) {
+      if (p && typeof p === "object") {
+        pushRaw(p as Record<string, unknown>);
+      }
+    }
+  }
+  return out;
+}
+
+export async function fetchMedusaOrderPaymentsForAdmin(
+  orderId: string,
+): Promise<MedusaPaymentSummary[]> {
+  const qs = new URLSearchParams();
+  qs.set(
+    "fields",
+    "id,payment_collection,payment_collections,*payment_collection.payments,*payment_collections.payments",
+  );
+  const res = await medusaAdminFetch(
+    `/admin/orders/${encodeURIComponent(orderId)}?${qs.toString()}`,
+    { method: "GET" },
+  );
+  if (!res.ok) {
+    return [];
+  }
+  const json = (await res.json()) as unknown;
+  const order = unwrapOrderPayload(json);
+  if (!order) {
+    return [];
+  }
+  return collectPaymentsFromOrderPayload(order);
+}
+
+export async function refundMedusaPayment(
+  paymentId: string,
+  amountMinor: number,
+  note?: string,
+): Promise<{ ok: boolean; error?: string; status: number }> {
+  const body: Record<string, unknown> = { amount: amountMinor };
+  if (note?.trim()) {
+    body.note = note.trim();
+  }
+  const res = await medusaAdminFetch(
+    `/admin/payments/${encodeURIComponent(paymentId)}/refund`,
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+    },
+  );
+  if (res.ok) {
+    return { ok: true, status: res.status };
+  }
+  const text = await res.text().catch(() => "");
+  return { ok: false, error: `${res.status} ${text}`, status: res.status };
 }
 
 export async function patchMedusaOrderMetadata(
