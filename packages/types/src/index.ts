@@ -20,6 +20,14 @@ export interface ProductVariant {
   isActive: boolean;
 }
 
+/** Clickable region on a lifestyle image linking to another product PDP. */
+export interface ProductImageHotspot {
+  xPct: number;
+  yPct: number;
+  productSlug: string;
+  label?: string;
+}
+
 export interface Product {
   id: string;
   slug: string;
@@ -28,6 +36,20 @@ export interface Product {
   category: string | null;
   status: string;
   brand: string | null;
+  /** ISO timestamp when present (for sort). */
+  createdAt: string | null;
   images: ProductImage[];
   variants: ProductVariant[];
+  /** From Medusa product metadata (single source of truth in commerce DB). */
+  videoUrl: string | null;
+  weightKg: number | null;
+  dimensionsLabel: string | null;
+  material: string | null;
+  /** Optional lifestyle hero image URL with clickable hotspots. */
+  lifestyleImageUrl: string | null;
+  hotspots: ProductImageHotspot[];
+  /** Related product handles for cross-sell (same category or explicit list). */
+  relatedHandles: string[];
+  /** SEO helper stored in metadata; storefront can prefer over auto-truncated description. */
+  seoDescription: string | null;
 }
