@@ -1,0 +1,59 @@
+{
+  "mcpServers": {
+    "shadcn": {
+      "command": "npx",
+      "args": [
+        "shadcn@latest",
+        "mcp"
+      ]
+    },
+    "ui-layouts-mcp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "@ui-layouts/mcp"
+      ]
+    },
+    "socraticode": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "socraticode"
+      ]
+    },
+    "gsap-master": {
+      "command": "npx",
+      "args": [
+        "bruzethegreat-gsap-master-mcp-server@latest"
+      ]
+    },
+    "tailwindcss-server": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "tailwindcss-mcp-server"
+      ]
+    },
+    "mui-mcp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@mui/mcp@latest"
+      ]
+    },
+    "heroui-react": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@heroui/react-mcp@latest"
+      ]
+    },
+    "mantine": {
+      "command": "npx",
+      "args": [
+        "@hakxel/mantine-ui-server"
+      ]
+    }
+  }
+}
