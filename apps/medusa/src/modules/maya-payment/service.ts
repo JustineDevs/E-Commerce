@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import type {
   AuthorizePaymentInput,
   AuthorizePaymentOutput,
@@ -63,6 +64,26 @@ function parseSessionFromRequestRef(ref: string | undefined): string | undefined
   if (!ref?.startsWith(prefix)) return undefined;
   const id = ref.slice(prefix.length).trim();
   return id.length > 0 ? id : undefined;
+}
+
+function verifyMayaSignature(
+  rawBody: string,
+  signatureHeader: string,
+  secret: string,
+): boolean {
+  if (!signatureHeader) return false;
+  const digest = crypto
+    .createHmac("sha256", secret)
+    .update(rawBody)
+    .digest("hex");
+  try {
+    const a = Buffer.from(digest, "utf8");
+    const b = Buffer.from(signatureHeader, "utf8");
+    if (a.length !== b.length) return false;
+    return crypto.timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
 }
 
 export default class MayaPaymentProviderService extends AbstractPaymentProvider<MayaPaymentOptions> {
@@ -282,8 +303,20 @@ export default class MayaPaymentProviderService extends AbstractPaymentProvider<
           ? payload.rawData.toString("utf8")
           : JSON.stringify(payload.rawData);
 
-    /* Maya recommends IP whitelisting for webhook security. Signature verification
-     * can be added if Maya provides it. See: developers.maya.ph/docs/webhooks */
+    const signatureHeader =
+      (payload.headers["x-maya-signature"] as string | undefined) ??
+      (payload.headers["x-paymaya-signature"] as string | undefined) ??
+      "";
+
+    if (this.options_.webhookSecret && this.options_.webhookSecret.trim()) {
+      if (!verifyMayaSignature(raw, signatureHeader, this.options_.webhookSecret)) {
+        throw new MedusaError(
+          MedusaError.Types.NOT_ALLOWED,
+          "Maya webhook signature verification failed.",
+        );
+      }
+    }
+
     let body: Record<string, unknown>;
     try {
       body = JSON.parse(raw) as Record<string, unknown>;
@@ -294,23 +327,33 @@ export default class MayaPaymentProviderService extends AbstractPaymentProvider<
       );
     }
 
+    const successPayload = this.mayaWebhookSuccessPayload(body);
     const dedupId = buildMayaWebhookDedupId(body);
     if (dedupId) {
       const isFirst = await claimMayaWebhookDedup(dedupId);
       if (!isFirst) {
-        return { action: PaymentActions.NOT_SUPPORTED };
+        // Gateway retries must get the same success shape so HTTP 200 is returned
+        // while Medusa payment processing stays idempotent downstream.
+        return successPayload ?? { action: PaymentActions.NOT_SUPPORTED };
       }
     }
 
+    return successPayload ?? { action: PaymentActions.NOT_SUPPORTED };
+  }
+
+  /** Parsed PAYMENT_SUCCESS payload, or null if this delivery should be ignored. */
+  private mayaWebhookSuccessPayload(
+    body: Record<string, unknown>,
+  ): WebhookActionResult | null {
     const paymentStatus = (body.paymentStatus as string) ?? "";
     if (paymentStatus !== "PAYMENT_SUCCESS") {
-      return { action: PaymentActions.NOT_SUPPORTED };
+      return null;
     }
 
     const requestRef = body.requestReferenceNumber as string | undefined;
     const sessionId = parseSessionFromRequestRef(requestRef);
     if (!sessionId) {
-      return { action: PaymentActions.NOT_SUPPORTED };
+      return null;
     }
 
     const webhookBody = body as {
