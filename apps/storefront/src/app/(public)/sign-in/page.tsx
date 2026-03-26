@@ -1,5 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@apparel-commerce/ui";
+import { describeAuthSignInError } from "@/lib/auth-sign-in-errors";
+import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 
 export const metadata: Metadata = {
   title: "Sign in",
@@ -15,45 +27,55 @@ export default async function SignInPage({
     typeof sp.callbackUrl === "string" && sp.callbackUrl.startsWith("/")
       ? sp.callbackUrl
       : "/account";
-  const googleHref = `/api/auth/signin/google?callbackUrl=${encodeURIComponent(callback)}`;
+  const authErr = describeAuthSignInError(sp.error);
 
   return (
     <main className="storefront-page-shell max-w-md">
-      <h1 className="font-headline text-3xl font-bold tracking-tight text-primary sm:text-4xl">
-        Sign in
-      </h1>
-      <p className="mt-3 text-sm leading-relaxed text-on-surface-variant">
-        Access your account and order history with Google. By continuing you
-        agree to our{" "}
-        <Link href="/terms" className="underline hover:text-primary">
-          Terms
-        </Link>{" "}
-        and{" "}
-        <Link href="/privacy" className="underline hover:text-primary">
-          Privacy
-        </Link>
-        .
-      </p>
-      {sp.error ? (
-        <p
-          className="mt-4 rounded border border-error/30 bg-error-container/30 px-4 py-2 text-sm text-error"
-          role="alert"
-        >
-          Sign-in error. Check Google OAuth configuration or try again.
-        </p>
-      ) : null}
-      <a
-        href={googleHref}
-        className="mt-8 flex w-full items-center justify-center gap-2 rounded bg-primary py-4 text-sm font-bold uppercase tracking-widest text-on-primary hover:opacity-90"
-      >
-        Continue with Google
-      </a>
-      <p className="mt-6 text-center text-sm text-on-surface-variant">
-        New here?{" "}
-        <Link href="/register" className="font-medium text-primary underline">
-          Create an account
-        </Link>
-      </p>
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-headline text-3xl font-bold tracking-tight sm:text-4xl">
+            Sign in
+          </CardTitle>
+          <CardDescription className="font-body text-sm leading-relaxed">
+            Access your account and order history with Google. By continuing you
+            agree to our{" "}
+            <Link href="/terms" className="underline hover:text-primary">
+              Terms
+            </Link>{" "}
+            and{" "}
+            <Link href="/privacy" className="underline hover:text-primary">
+              Privacy
+            </Link>
+            .
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {sp.error ? (
+            <Alert variant="destructive">
+              <AlertTitle>Sign-in did not complete</AlertTitle>
+              <AlertDescription>
+                <p className="leading-relaxed opacity-95">{authErr.hint}</p>
+                <details className="mt-3 text-xs">
+                  <summary className="cursor-pointer font-medium opacity-80">
+                    Technical code
+                  </summary>
+                  <p className="mt-2 font-mono opacity-80">{authErr.codeLabel}</p>
+                </details>
+              </AlertDescription>
+            </Alert>
+          ) : null}
+          <GoogleSignInButton callbackUrl={callback} />
+          <p className="text-center text-sm text-on-surface-variant">
+            New here?{" "}
+            <Link
+              href="/register"
+              className="font-medium text-primary underline"
+            >
+              Create an account
+            </Link>
+          </p>
+        </CardContent>
+      </Card>
     </main>
   );
 }
