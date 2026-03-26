@@ -4,7 +4,13 @@ import globals from "globals";
 /** @type {import("eslint").Linter.Config[]} */
 export default [
   {
-    ignores: ["**/node_modules/**", "**/dist/**", "**/.next/**", "**/build/**"],
+    ignores: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/.next/**",
+      "**/build/**",
+      "**/.medusa/**",
+    ],
   },
   {
     files: ["**/*.ts", "**/*.tsx"],
@@ -25,7 +31,10 @@ export default [
       },
     },
     rules: {
-      "no-unused-vars": "warn",
+      "no-unused-vars": [
+        "warn",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
       "no-undef": "error",
     },
   },
