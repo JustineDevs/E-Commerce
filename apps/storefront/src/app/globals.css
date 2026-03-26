@@ -72,3 +72,15 @@
     padding-right: var(--storefront-page-px);
   }
 }
+
+@layer utilities {
+  html[data-store-density="compact"] {
+    --storefront-page-pt: clamp(0.75rem, 2vw, 1.75rem);
+    --storefront-page-pb: clamp(3rem, 6vw, 6rem);
+  }
+
+  html[data-reduce-motion="true"] .motion-surface a,
+  html[data-reduce-motion="true"] .motion-surface button {
+    transition-duration: 0ms !important;
+  }
+}
