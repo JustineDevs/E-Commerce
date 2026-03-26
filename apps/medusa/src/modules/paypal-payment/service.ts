@@ -31,7 +31,10 @@ import {
   PaymentActions,
   PaymentSessionStatus,
 } from "@medusajs/framework/utils";
-import { DEFAULT_PUBLIC_SITE_ORIGIN } from "@apparel-commerce/sdk";
+import {
+  buildPayPalWebhookDedupId,
+  claimPayPalWebhookDedup,
+} from "../../lib/paypal-webhook-dedup";
 
 export type PayPalPaymentOptions = {
   clientId: string;
@@ -127,10 +130,13 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
         "php",
     ).toUpperCase();
 
+    const storefrontOrigin =
+      process.env.STOREFRONT_PUBLIC_URL?.trim() ||
+      process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
+      "http://localhost:3000";
     const returnUrl =
       process.env.PAYPAL_RETURN_URL?.trim() ||
-      process.env.STOREFRONT_PUBLIC_URL?.trim() ||
-      `${DEFAULT_PUBLIC_SITE_ORIGIN.replace(/\/$/, "")}/checkout`;
+      `${storefrontOrigin.replace(/\/$/, "")}/checkout`;
     const cancelUrl =
       process.env.PAYPAL_CANCEL_URL?.trim() ||
       `${returnUrl.replace(/\/$/, "")}?paypal=cancel`;
@@ -305,12 +311,84 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
   }
 
   async getWebhookActionAndData(
-    _payload: {
+    payload: {
       data: Record<string, unknown>;
       rawData: string | Buffer;
       headers: Record<string, unknown>;
     },
   ): Promise<WebhookActionResult> {
-    return { action: PaymentActions.NOT_SUPPORTED };
+    const raw =
+      typeof payload.rawData === "string"
+        ? payload.rawData
+        : Buffer.isBuffer(payload.rawData)
+          ? payload.rawData.toString("utf8")
+          : JSON.stringify(payload.rawData);
+
+    let body: Record<string, unknown>;
+    try {
+      body = JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "Invalid PayPal webhook JSON.",
+      );
+    }
+
+    const eventType = (body.event_type as string) ?? "";
+    const captureEvents = [
+      "PAYMENT.CAPTURE.COMPLETED",
+      "CHECKOUT.ORDER.APPROVED",
+    ];
+    if (!captureEvents.includes(eventType)) {
+      return { action: PaymentActions.NOT_SUPPORTED };
+    }
+
+    const dedupId = buildPayPalWebhookDedupId(body);
+    if (dedupId) {
+      const isFirst = await claimPayPalWebhookDedup(dedupId);
+      if (!isFirst) {
+        return { action: PaymentActions.NOT_SUPPORTED };
+      }
+    }
+
+    const resource = body.resource as Record<string, unknown> | undefined;
+    if (!resource) {
+      return { action: PaymentActions.NOT_SUPPORTED };
+    }
+
+    let sessionId: string | undefined;
+    let amountMinor = 0;
+
+    if (eventType === "PAYMENT.CAPTURE.COMPLETED") {
+      sessionId = resource.custom_id as string | undefined;
+      const amountObj = resource.amount as
+        | { value?: string; currency_code?: string }
+        | undefined;
+      const val = parseFloat(String(amountObj?.value ?? "0"));
+      amountMinor = Number.isFinite(val) ? Math.round(val * 100) : 0;
+    } else if (eventType === "CHECKOUT.ORDER.APPROVED") {
+      const units = resource.purchase_units as
+        | Array<{
+            custom_id?: string;
+            amount?: { value?: string };
+          }>
+        | undefined;
+      const first = units?.[0];
+      sessionId = first?.custom_id;
+      const val = parseFloat(String(first?.amount?.value ?? "0"));
+      amountMinor = Number.isFinite(val) ? Math.round(val * 100) : 0;
+    }
+
+    if (!sessionId?.trim()) {
+      return { action: PaymentActions.NOT_SUPPORTED };
+    }
+
+    return {
+      action: PaymentActions.SUCCESSFUL,
+      data: {
+        session_id: sessionId,
+        amount: Math.max(0, amountMinor),
+      },
+    };
   }
 }
