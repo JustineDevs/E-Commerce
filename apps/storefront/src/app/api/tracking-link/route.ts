@@ -4,7 +4,24 @@ import {
   DEFAULT_PUBLIC_SITE_ORIGIN,
 } from "@apparel-commerce/sdk";
 
+import {
+  getRequestIp,
+  rateLimitFixedWindow,
+} from "@/lib/storefront-api-rate-limit";
+
+const WINDOW_MS = 60_000;
+const MAX_PER_WINDOW = 60;
+
 export async function POST(req: Request) {
+  const ip = getRequestIp(req);
+  const rl = rateLimitFixedWindow(`tracking-link:${ip}`, MAX_PER_WINDOW, WINDOW_MS);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: "Too many requests", retryAfter: rl.retryAfterSec },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } },
+    );
+  }
+
   let body: { cartId?: string };
   try {
     body = (await req.json()) as { cartId?: string };
