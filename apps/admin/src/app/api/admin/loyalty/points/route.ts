@@ -1,0 +1,33 @@
+import { NextRequest } from "next/server";
+import { getServerSession } from "next-auth/next";
+import { staffHasPermission } from "@apparel-commerce/database";
+import {
+  addPoints,
+  redeemPoints,
+} from "@apparel-commerce/platform-data";
+import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
+import { authOptions } from "@/lib/auth";
+import { getCorrelationId } from "@/lib/request-correlation";
+import { correlatedJson } from "@/lib/staff-api-response";
+
+export async function POST(req: NextRequest) {
+  const cid = getCorrelationId(req);
+  const session = await getServerSession(authOptions);
+  if (!session?.user) return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
+  if (!staffHasPermission(session.user.permissions ?? [], "loyalty:write")) {
+    return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
+  }
+  const { account_id, points, reason, order_id, action } = await req.json();
+  if (!account_id || points == null || !reason) {
+    return correlatedJson(cid, { error: "account_id, points, and reason are required" }, { status: 400 });
+  }
+  const sup = adminSupabaseOr503(cid);
+  if ("response" in sup) return sup.response;
+  const sb = sup.client;
+  if (action === "redeem") {
+    const account = await redeemPoints(sb, account_id, Math.abs(points), reason);
+    return correlatedJson(cid, { data: account });
+  }
+  const account = await addPoints(sb, account_id, points, reason, order_id);
+  return correlatedJson(cid, { data: account });
+}
