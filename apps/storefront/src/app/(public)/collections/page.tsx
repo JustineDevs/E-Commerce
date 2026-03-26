@@ -14,11 +14,11 @@ export const metadata: Metadata = {
   alternates: { canonical: canonicalUrl("/collections") },
 };
 
-/** Curated category entry points; API summaries fill counts when those categories exist. */
+/** Curated category entry points; counts when available from the shop. */
 const FEATURED_LABELS = ["Shorts", "Shirt", "Jacket"] as const;
 
 export default async function CollectionsPage() {
-  const catRes = await fetchCategorySummaries(120);
+  const catRes = await fetchCategorySummaries();
   if (catRes.kind !== "ok") {
     return (
       <main className="storefront-page-shell max-w-[1200px]">
@@ -41,8 +41,8 @@ export default async function CollectionsPage() {
           Collections
         </h1>
         <p className="font-body text-on-surface-variant max-w-2xl leading-relaxed">
-          Shop by category-shorts, shirts, and jackets from Maharlika Apparel
-          Custom. Each link opens the catalog with that filter applied.
+          Shop by category: shorts, shirts, and jackets from Maharlika Apparel
+          Custom. Each link opens the shop with that category selected.
         </p>
       </header>
       <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -75,7 +75,7 @@ export default async function CollectionsPage() {
           href="/shop"
           className="text-primary font-medium underline underline-offset-4"
         >
-          View full catalog
+          View full shop
         </Link>
       </p>
     </main>
