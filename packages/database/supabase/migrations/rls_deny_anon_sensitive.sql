@@ -26,3 +26,9 @@ create policy audit_logs_deny_anon on public.audit_logs for all to anon using (f
 
 drop policy if exists legacy_import_runs_deny_anon on public.legacy_import_runs;
 create policy legacy_import_runs_deny_anon on public.legacy_import_runs for all to anon using (false) with check (false);
+
+drop policy if exists admin_entity_workflow_deny_anon on public.admin_entity_workflow;
+create policy admin_entity_workflow_deny_anon on public.admin_entity_workflow for all to anon using (false) with check (false);
+
+drop policy if exists admin_operator_notes_deny_anon on public.admin_operator_notes;
+create policy admin_operator_notes_deny_anon on public.admin_operator_notes for all to anon using (false) with check (false);
