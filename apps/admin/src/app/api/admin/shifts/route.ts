@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { getServerSession } from "next-auth/next";
-import { staffHasPermission } from "@apparel-commerce/database";
+import { staffSessionAllows } from "@apparel-commerce/database";
 import {
   openShift,
   listShifts,
@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   const cid = getCorrelationId(req);
   const session = await getServerSession(authOptions);
   if (!session?.user) return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
-  if (!staffHasPermission(session.user.permissions ?? [], "pos:use")) {
+  if (!staffSessionAllows(session, "pos:use")) {
     return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
   }
   const sup = adminSupabaseOr503(cid);
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
   const cid = getCorrelationId(req);
   const session = await getServerSession(authOptions);
   if (!session?.user) return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
-  if (!staffHasPermission(session.user.permissions ?? [], "pos:shift_manage")) {
+  if (!staffSessionAllows(session, "pos:shift_manage")) {
     return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
   }
   const body = await req.json();
