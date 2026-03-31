@@ -1,5 +1,5 @@
 import { getServerSession } from "next-auth/next";
-import { staffHasPermission } from "@apparel-commerce/database";
+import { staffSessionAllows } from "@apparel-commerce/database";
 import {
   transitionEntityWorkflow,
   type EntityWorkflowType,
@@ -46,7 +46,7 @@ export async function POST(req: Request) {
   if (!perm) {
     return correlatedJson(correlationId, { error: "Invalid entity_type" }, { status: 400 });
   }
-  if (!staffHasPermission(session.user.permissions ?? [], perm)) {
+  if (!staffSessionAllows(session, perm)) {
     return correlatedJson(correlationId, { error: "Forbidden" }, { status: 403 });
   }
 
