@@ -2,22 +2,28 @@ import type { ReactNode } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AdminBreadcrumbs, AdminPageShell } from "@/components/admin-console";
+import { ADMIN_COMMAND_CMS_GROUPS, ADMIN_NAV_GROUPS } from "@/config/admin-nav";
+import { isEmailAllowedForGuideDemos } from "@/lib/admin-allowed-emails";
+import { authOptions } from "@/lib/auth";
+import { GUIDE_DEMO_CATALOG } from "@/lib/guide-demos-catalog";
 import { requirePagePermission } from "@/lib/require-page-permission";
+import { getServerSession } from "next-auth/next";
 
 export const metadata: Metadata = {
   title: "Admin guide",
   description:
-    "How to use the store back office: dashboards, products, orders, content, and settings.",
+    "Staff admin guide: sidebar navigation, daily tasks, commerce versus website content, and permissions.",
 };
 
-const toc = [
-  { href: "#start-here", label: "Start here" },
-  { href: "#commerce", label: "Commerce" },
-  { href: "#operations", label: "Operations" },
-  { href: "#marketing", label: "Marketing" },
-  { href: "#settings", label: "Settings" },
-  { href: "#roles", label: "Administrators, staff, and permissions" },
-  { href: "#tips", label: "Tips and support" },
+const tocBase = [
+  { href: "#welcome", label: "Overview" },
+  { href: "#ownership", label: "Who owns what" },
+  { href: "#sidebar", label: "How to use the sidebar" },
+  { href: "#navigation-map", label: "Where do I go?" },
+  { href: "#daily-tasks", label: "Daily tasks" },
+  { href: "#advanced", label: "Advanced operations" },
+  { href: "#interactive-demos", label: "Interactive demos" },
+  { href: "#important-notes", label: "Important notes" },
 ] as const;
 
 function Section({
@@ -47,18 +53,13 @@ function Subheading({ children }: { children: ReactNode }) {
   );
 }
 
-function BulletList({ items }: { items: string[] }) {
-  return (
-    <ul className="list-disc space-y-2 pl-5 text-on-surface-variant">
-      {items.map((t) => (
-        <li key={t}>{t}</li>
-      ))}
-    </ul>
-  );
-}
-
 export default async function AdminDocsPage() {
   await requirePagePermission("dashboard:read");
+  const session = await getServerSession(authOptions);
+  const canAccessGuideDemos = isEmailAllowedForGuideDemos(session?.user?.email ?? null);
+  const toc = canAccessGuideDemos
+    ? tocBase
+    : tocBase.filter((item) => item.href !== "#interactive-demos");
 
   const tocNav = (
     <nav
@@ -86,7 +87,7 @@ export default async function AdminDocsPage() {
   return (
     <AdminPageShell
       title="Admin guide"
-      subtitle="A practical guide for store owners and managers. No technical background required. Use the left menu to open any area; this page explains what each area is for and how to work through common tasks."
+      subtitle="Operator guide for owners and managers: where to go for each task, what the commerce system owns versus website content, and how permissions shape the menu."
       breadcrumbs={
         <AdminBreadcrumbs
           items={[{ label: "Dashboard", href: "/admin" }, { label: "Admin guide" }]}
@@ -95,288 +96,380 @@ export default async function AdminDocsPage() {
       inspector={tocNav}
     >
       <div className="mx-auto max-w-3xl space-y-14 pb-16">
-        <div className="rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-6 shadow-sm sm:p-8">
-          <p className="font-body text-sm leading-relaxed text-on-surface-variant">
-            This back office connects to your online catalog, checkout, and customer records. Numbers
-            and lists update when the store systems are online. If you see a connection message on
-            the home screen, wait a moment and refresh, or contact whoever maintains your hosting.
-          </p>
-        </div>
-
-        <Section id="start-here" title="Start here">
+        <Section id="welcome" title="Overview">
           <p>
-            After you sign in, you land on the{" "}
-            <strong className="text-primary">Overview</strong> (Dashboard). The left sidebar groups
-            tools into Commerce, Operations, Marketing, and Settings. Your account email and role
-            appear at the bottom; use <strong className="text-primary">Logout</strong> when you
-            finish on a shared computer.
+            <strong className="text-primary">Staff admin console.</strong> Use this area for
+            day-to-day operations: catalog, inventory, orders, POS, analytics, customers, team
+            tools, settings, and website content.
+          </p>
+          <div
+            className="mt-6 rounded-xl border border-amber-500/35 bg-amber-500/10 p-5 text-on-surface"
+            role="note"
+          >
+            <p className="font-semibold text-primary">Catalog and prices stay in the commerce system</p>
+            <p className="mt-2 text-on-surface-variant">
+              Homepage and editorial content are handled in the admin CMS and storefront-home
+              surfaces. Do not treat the CMS as the source of truth for pricing, stock counts, or
+              product records.
+            </p>
+          </div>
+        </Section>
+
+        <Section id="ownership" title="Who owns what">
+          <p>
+            Some data lives in the <strong className="text-primary">commerce engine</strong> (your
+            store&apos;s product catalog, prices, orders, inventory positions, regions, and payment
+            provider configuration at checkout). That is the system of record for selling.
+          </p>
+          <p className="mt-4">
+            Other data lives in <strong className="text-primary">platform tools</strong> connected
+            to this admin: staff sign-in and permissions, CMS copy and media, loyalty programs,
+            employee records, devices, campaigns, the storefront homepage payload, channel events,
+            and chat or intake archives. Those tools do not replace commerce records for products or
+            orders.
+          </p>
+        </Section>
+
+        <Section id="sidebar" title="How to use the sidebar">
+          <p>
+            <strong className="text-primary">Use the left sidebar to move by task.</strong> The
+            sidebar is the main navigation of the admin, and it only shows areas your role is
+            allowed to access.
           </p>
           <p className="mt-4">
             Press <strong className="text-primary">Ctrl+K</strong> (Windows) or{" "}
             <strong className="text-primary">Cmd+K</strong> (Mac), or use{" "}
-            <strong className="text-primary">Search pages</strong> in the sidebar, to open search
-            and jump to any screen by name.
+            <strong className="text-primary">Search pages</strong> in the sidebar, to jump to any
+            screen by name.
           </p>
-          <Subheading>Typical daily flow</Subheading>
-          <BulletList
-            items={[
-              "Check Overview for new orders and stock warnings.",
-              "Open Orders to confirm, pack, or update status.",
-              "Use Inventory when you need exact counts or locations.",
-              "Use Content when you change website text, banners, or blog posts.",
-            ]}
-          />
+          <Subheading>Sidebar reference (matches the live menu)</Subheading>
+          <div className="space-y-6 rounded-xl border border-outline-variant/20 bg-surface-container-lowest/80 p-5">
+            {ADMIN_NAV_GROUPS.map((group) => (
+              <div key={group.label}>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                  {group.label}
+                </p>
+                <ul className="mt-2 space-y-1.5">
+                  {group.items.map((item) => (
+                    <li key={item.href}>
+                      <Link
+                        href={item.href}
+                        className="font-medium text-primary underline decoration-primary/30 underline-offset-2 hover:decoration-primary"
+                      >
+                        {item.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
         </Section>
 
-        <Section id="commerce" title="Commerce">
-          <Subheading>
-            <Link href="/admin" className="text-primary underline">
-              Dashboard (Overview)
-            </Link>
-          </Subheading>
+        <Section id="navigation-map" title="Where do I go?">
           <p>
-            High-level counts: total orders, active orders, low or out-of-stock signals, and quick
-            links into Orders, Inventory, and POS. Recent orders may appear for fast access.
+            Use the table below by <strong className="text-primary">business intent</strong>. Links
+            match the real sidebar; group names below are for learning, not separate menus.
           </p>
+          <div className="mt-6 overflow-x-auto rounded-xl border border-outline-variant/20">
+            <table className="min-w-full border-collapse text-left text-sm">
+              <thead>
+                <tr className="border-b border-outline-variant/20 bg-surface-container-lowest">
+                  <th className="px-4 py-3 font-headline text-xs font-bold uppercase tracking-wider text-primary">
+                    Group
+                  </th>
+                  <th className="px-4 py-3 font-headline text-xs font-bold uppercase tracking-wider text-primary">
+                    What belongs here
+                  </th>
+                  <th className="px-4 py-3 font-headline text-xs font-bold uppercase tracking-wider text-primary">
+                    Business explanation
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-outline-variant/15">
+                <tr>
+                  <td className="whitespace-nowrap px-4 py-3 font-medium text-primary">Commerce</td>
+                  <td className="px-4 py-3 text-on-surface-variant">
+                    <Link href="/admin" className="text-primary underline">
+                      Dashboard
+                    </Link>
+                    ,{" "}
+                    <Link href="/admin/catalog" className="text-primary underline">
+                      Products
+                    </Link>
+                    ,{" "}
+                    <Link href="/admin/inventory" className="text-primary underline">
+                      Inventory
+                    </Link>
+                    ,{" "}
+                    <Link href="/admin/orders" className="text-primary underline">
+                      Orders
+                    </Link>
+                    ,{" "}
+                    <Link href="/admin/pos" className="text-primary underline">
+                      POS
+                    </Link>
+                    ,{" "}
+                    <Link href="/admin/analytics" className="text-primary underline">
+                      Analytics
+                    </Link>
+                    ,{" "}
+                    <Link href="/admin/crm" className="text-primary underline">
+                      CRM
+                    </Link>
+                    ,{" "}
+                    <Link href="/admin/settings/payments" className="text-primary underline">
+                      Payments
+                    </Link>
+                  </td>
+                  <td className="px-4 py-3 text-on-surface-variant">
+                    Monitor sales, manage the catalog, check stock, review orders, run in-store sales,
+                    read business metrics, view customers, and inspect payment and region setup.
+                  </td>
+                </tr>
+                <tr>
+                  <td className="whitespace-nowrap px-4 py-3 font-medium text-primary">
+                    Team and growth
+                  </td>
+                  <td className="px-4 py-3 text-on-surface-variant">
+                    <Link href="/admin/employees" className="text-primary underline">
+                      Employees
+                    </Link>
+                    ,{" "}
+                    <Link href="/admin/loyalty" className="text-primary underline">
+                      Loyalty
+                    </Link>
+                    ,{" "}
+                    <Link href="/admin/campaigns" className="text-primary underline">
+                      Campaigns
+                    </Link>
+                  </td>
+                  <td className="px-4 py-3 text-on-surface-variant">
+                    Staff records and access, customer rewards, and marketing execution.
+                  </td>
+                </tr>
+                <tr>
+                  <td className="whitespace-nowrap px-4 py-3 font-medium text-primary">Operations</td>
+                  <td className="px-4 py-3 text-on-surface-variant">
+                    <Link href="/admin/devices" className="text-primary underline">
+                      Devices
+                    </Link>
+                    ,{" "}
+                    <Link href="/admin/channels" className="text-primary underline">
+                      Channels
+                    </Link>
+                    ,{" "}
+                    <Link href="/admin/chat-orders" className="text-primary underline">
+                      Chat orders
+                    </Link>
+                    ,{" "}
+                    <Link href="/admin/offline-queue" className="text-primary underline">
+                      Offline queue
+                    </Link>
+                  </td>
+                  <td className="px-4 py-3 text-on-surface-variant">
+                    Register hardware, review channel events, process chat or manual intake, and clear
+                    POS sync when the network was down.
+                  </td>
+                </tr>
+                <tr>
+                  <td className="whitespace-nowrap px-4 py-3 font-medium text-primary">Website</td>
+                  <td className="px-4 py-3 text-on-surface-variant">
+                    <Link href="/admin/settings/storefront" className="text-primary underline">
+                      Storefront home
+                    </Link>
+                    ,{" "}
+                    <Link href="/admin/cms" className="text-primary underline">
+                      Content
+                    </Link>
+                    ,{" "}
+                    <Link href="/admin/reviews" className="text-primary underline">
+                      Reviews
+                    </Link>
+                  </td>
+                  <td className="px-4 py-3 text-on-surface-variant">
+                    Homepage payload, CMS sections (pages, navigation, announcement bar, categories,
+                    media, blog, forms, redirects, experiments, product lookup for authors), and
+                    review moderation.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-          <Subheading>
-            <Link href="/admin/catalog" className="text-primary underline">
-              Products
-            </Link>
-          </Subheading>
+          <Subheading>For catalog and order operations, think commerce first</Subheading>
           <p>
-            Your sellable items: titles, descriptions, images, variants (such as size or color),
-            and pricing. Search and filters help you find SKUs quickly. Use{" "}
-            <strong className="text-primary">Add product</strong> for new items, or open a row to
-            edit details. Product data is the source for what shoppers see on the website.
+            Products, prices, orders, inventory, and payment-region setup are tied to the commerce
+            system rather than the CMS layer.
           </p>
-
-          <Subheading>
-            <Link href="/admin/inventory" className="text-primary underline">
-              Inventory
-            </Link>
-          </Subheading>
+          <Subheading>For website updates, think content first</Subheading>
           <p>
-            Stock levels by location or variant. Use this when you reconcile physical counts, spot
-            shortages, or confirm availability before a promotion. Refresh the view if numbers look
-            stale after warehouse updates.
-          </p>
-
-          <Subheading>
-            <Link href="/admin/orders" className="text-primary underline">
-              Orders
-            </Link>
-          </Subheading>
-          <p>
-            Every customer order from the website (and other connected channels, if configured).
-            Open an order to see line items, payment status, shipping details, and customer contact
-            information. From an order you can move to related tools such as receipts when your
-            process allows it.
-          </p>
-
-          <Subheading>
-            <Link href="/admin/pos" className="text-primary underline">
-              POS (point of sale)
-            </Link>
-          </Subheading>
-          <p>
-            In-store or counter sales. Staff typically start or close a shift, ring up items, and
-            follow your store policy for voids or manager approval. Use this when shoppers pay in
-            person rather than on the website.
-          </p>
-
-          <Subheading>
-            <Link href="/admin/offline-queue" className="text-primary underline">
-              Offline queue
-            </Link>
-          </Subheading>
-          <p>
-            Holds actions that could not sync while the network was down. Review this after
-            connectivity returns so nothing is left pending.
-          </p>
-
-          <Subheading>
-            <Link href="/admin/crm" className="text-primary underline">
-              CRM
-            </Link>
-          </Subheading>
-          <p>
-            Customer relationship management: profiles, contact history, and notes that help your
-            team serve repeat buyers. Open a customer to see detail and activity in one place.
-          </p>
-        </Section>
-
-        <Section id="operations" title="Operations">
-          <Subheading>
-            <Link href="/admin/employees" className="text-primary underline">
-              Employees
-            </Link>
-          </Subheading>
-          <p>
-            Staff accounts, roles, and who may sign in to this back office. Keep this accurate when
-            people join or leave so access stays appropriate.
-          </p>
-
-          <Subheading>
-            <Link href="/admin/devices" className="text-primary underline">
-              Devices
-            </Link>
-          </Subheading>
-          <p>
-            Registered hardware such as tablets or terminals used with POS or in-store workflows.
-            Use it to align devices with your security policy.
-          </p>
-
-          <Subheading>
-            <Link href="/admin/channels" className="text-primary underline">
-              Channels
-            </Link>
-          </Subheading>
-          <p>
-            Sales channels (for example web versus wholesale). Adjust which catalog or pricing
-            applies where, according to how your business is set up.
-          </p>
-
-          <Subheading>
-            <Link href="/admin/chat-orders" className="text-primary underline">
-              Chat orders
-            </Link>
-          </Subheading>
-          <p>
-            Orders or requests that arrive through chat-based workflows. Process them alongside
-            standard web orders so fulfillment stays consistent.
-          </p>
-        </Section>
-
-        <Section id="marketing" title="Marketing">
-          <Subheading>
-            <Link href="/admin/analytics" className="text-primary underline">
-              Analytics
-            </Link>
-          </Subheading>
-          <p>
-            Charts and metrics for revenue, traffic patterns, and performance. Use them in reviews
-            with marketing and finance to decide what to scale or fix.
-          </p>
-
-          <Subheading>
-            <Link href="/admin/loyalty" className="text-primary underline">
-              Loyalty
-            </Link>
-          </Subheading>
-          <p>
-            Points, tiers, and rewards for repeat customers. Enroll shoppers, adjust balances when
-            policy allows, and maintain the rewards your brand advertises.
-          </p>
-
-          <Subheading>
-            <Link href="/admin/campaigns" className="text-primary underline">
-              Campaigns
-            </Link>
-          </Subheading>
-          <p>
-            Marketing campaigns and audience segments. Create or schedule outreach, track what is
-            active, and coordinate with your creative and legal guidelines.
-          </p>
-
-          <Subheading>
-            <Link href="/admin/settings/storefront" className="text-primary underline">
-              Storefront home
-            </Link>
-          </Subheading>
-          <p>
-            Hero text, imagery, and featured content on your public home page. Changes here affect
-            the first impression visitors get; pair with Content for full site updates.
-          </p>
-
-          <Subheading>
-            <Link href="/admin/cms" className="text-primary underline">
-              Content
-            </Link>
-          </Subheading>
-          <p>
-            The website editor hub. Product prices and cart behavior still come from your commerce
-            system; Content covers what customers read and see outside the product grid.
-          </p>
-          <BulletList
-            items={[
-              "Pages: extra pages such as policies or landing pages.",
-              "Navigation and footer: header menus, footer columns, and social links.",
-              "Announcement bar: short banner at the top for promos or notices.",
-              "Category pages: intros and visuals for each shop category.",
-              "Media library: reusable images and files.",
-              "Blog: articles and news.",
-              "Form submissions: messages from contact or signup forms.",
-              "Redirects: map old URLs to new ones after a rename.",
-              "Page tests: compare two versions of a page to learn what performs better.",
-              "Product lookup: find product IDs and handles for content or campaigns.",
-            ]}
-          />
-        </Section>
-
-        <Section id="settings" title="Settings">
-          <Subheading>
-            <Link href="/admin/settings/payments" className="text-primary underline">
-              Payments
-            </Link>
-          </Subheading>
-          <p>
-            Payment methods and provider settings used at checkout. Changes here affect how
-            customers pay online; coordinate with finance before switching providers.
-          </p>
-
-          <Subheading>
-            <Link href="/admin/receipts" className="text-primary underline">
-              Receipts
-            </Link>
-          </Subheading>
-          <p>
-            Look up digital receipts by order. Helpful for customer service, exchanges, and
-            accounting questions.
-          </p>
-
-          <Subheading>
-            <Link href="/admin/workflow" className="text-primary underline">
-              Workflow
-            </Link>
-          </Subheading>
-          <p>
-            Internal review queues for catalog, content, and campaign changes before they go live.
-            Use it when your organization requires approvals or staged publishing.
-          </p>
-
-          <Subheading>
-            <Link href="/admin/audit" className="text-primary underline">
-              Audit log
-            </Link>
-          </Subheading>
-          <p>
-            A chronological record of important actions in the back office. Use it for compliance,
-            troubleshooting, or verifying who changed what and when.
+            Homepage payload and CMS sections such as pages, navigation, announcements, blog, media,
+            forms, redirects, and experiments are managed in the content side of admin.
           </p>
         </Section>
 
-        <Section id="roles" title="Administrators, staff, and permissions">
-          <p>
-            <strong className="text-primary">Administrators</strong> have full access to the back
-            office. <strong className="text-primary">Staff</strong> accounts only see areas that
-            were explicitly granted (for example cash register and orders, but not payroll data).
-            If a screen sends you back to the overview with a short notice, your account does not
-            include that permission. Ask an administrator to update your grants if your job
-            requires it.
-          </p>
+        <Section id="daily-tasks" title="Daily tasks">
+          <Subheading>Most common tasks</Subheading>
+          <ol className="list-decimal space-y-3 pl-5 text-on-surface-variant">
+            <li>
+              <strong className="text-on-surface">Check today&apos;s performance:</strong> open{" "}
+              <Link href="/admin" className="text-primary underline">
+                Dashboard
+              </Link>{" "}
+              for overview metrics, recent orders, and stock alerts.
+            </li>
+            <li>
+              <strong className="text-on-surface">Review or fulfill an order:</strong> open{" "}
+              <Link href="/admin/orders" className="text-primary underline">
+                Orders
+              </Link>
+              , then select an order to view details and fulfillment actions.
+            </li>
+            <li>
+              <strong className="text-on-surface">Update stock visibility:</strong> open{" "}
+              <Link href="/admin/inventory" className="text-primary underline">
+                Inventory
+              </Link>{" "}
+              and refresh the latest variant stock data.
+            </li>
+            <li>
+              <strong className="text-on-surface">Sell in person:</strong> open{" "}
+              <Link href="/admin/pos" className="text-primary underline">
+                POS
+              </Link>{" "}
+              for lookup, cart, draft order, and sale completion flows.
+            </li>
+            <li>
+              <strong className="text-on-surface">Update homepage content:</strong> open{" "}
+              <Link href="/admin/settings/storefront" className="text-primary underline">
+                Storefront home
+              </Link>{" "}
+              for the homepage payload editor.
+            </li>
+            <li>
+              <strong className="text-on-surface">Edit website content:</strong> open{" "}
+              <Link href="/admin/cms" className="text-primary underline">
+                Content
+              </Link>{" "}
+              for pages, menus, announcement bar, categories, media, blog, forms, redirects,
+              experiments, and commerce lookup for authors.
+            </li>
+          </ol>
         </Section>
 
-        <Section id="tips" title="Tips and support">
-          <BulletList
-            items={[
-              "Bookmark this Admin guide from the left menu whenever you onboard a new manager.",
-              "Keep product names, photos, and policies aligned so customers see one clear story.",
-              "After large campaigns, check Analytics and Orders together to confirm results.",
-              "For technical outages, note the exact time and any on-screen message before contacting support.",
-            ]}
-          />
-          <p className="text-on-surface-variant">
+        <Section id="advanced" title="Advanced operations">
+          <Subheading>POS</Subheading>
+          <p>
+            The POS area supports lookup, cart building, draft order flow, sale commit, suggestions,
+            offline queue behavior, and optional terminal printing paths.
+          </p>
+          <Subheading>Orders</Subheading>
+          <p>
+            The orders area includes list and detail views; the detail page includes fulfillment
+            actions and shipment-related tools.
+          </p>
+          <Subheading>Inventory</Subheading>
+          <p>
+            The inventory page is focused on variant-level stock visibility with refresh support
+            from server-side data.
+          </p>
+          <Subheading>Products</Subheading>
+          <p>
+            The products list is commerce-backed and links to the commerce product editor. A native
+            add-product path exists in admin; full end-to-end wiring for every catalog scenario may
+            still be evolving, so confirm critical launches with your operations lead.
+          </p>
+          <Subheading>Content hub sections</Subheading>
+          <ul className="mt-2 space-y-2 text-on-surface-variant">
+            {ADMIN_COMMAND_CMS_GROUPS.flatMap((g) =>
+              g.items.map((item) => (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    className="font-medium text-primary underline decoration-primary/30 underline-offset-2"
+                  >
+                    {item.label}
+                  </Link>
+                </li>
+              )),
+            )}
+          </ul>
+          {canAccessGuideDemos ? (
+            <>
+              <Subheading>Training demos</Subheading>
+              <p>
+                Open the{" "}
+                <Link
+                  href="/guide-demos/index.html"
+                  className="font-semibold text-primary underline decoration-primary/30 underline-offset-2 hover:decoration-primary"
+                >
+                  demo index
+                </Link>{" "}
+                for static HTML simulators: fake browser chrome, sidebar that matches this admin, mock
+                data only, requestAnimationFrame cursor paths, captions, optional Web Speech, pause,
+                skip, speed, and presentation or manual stepping. Access requires your email in{" "}
+                <code className="rounded bg-surface-container px-1 py-0.5 text-xs">ADMIN_ALLOWED_EMAILS</code>
+                .
+              </p>
+            </>
+          ) : (
+            <>
+              <Subheading>Training demos</Subheading>
+              <p className="text-on-surface-variant">
+                Interactive HTML demos are limited to addresses configured in{" "}
+                <code className="rounded bg-surface-container px-1 py-0.5 text-xs">ADMIN_ALLOWED_EMAILS</code>
+                . Ask your administrator if you need access.
+              </p>
+            </>
+          )}
+        </Section>
+
+        {canAccessGuideDemos ? (
+          <Section id="interactive-demos" title="Interactive demos (safe simulator)">
+            <p>
+              Each link opens a new tab. Demos are deterministic and offline friendly. They explain how
+              staff work in admin while commerce truth stays in your commerce engine and customer-facing
+              pages reflect content and storefront settings separately.
+            </p>
+            <div className="mt-6 grid gap-4 sm:grid-cols-2">
+              {GUIDE_DEMO_CATALOG.map((d) => (
+                <a
+                  key={d.key}
+                  href={`/guide-demos/${d.file}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-xl border border-outline-variant/25 bg-surface-container-lowest/90 p-4 shadow-sm transition hover:border-primary/40"
+                >
+                  <p className="font-headline text-sm font-bold text-primary">{d.title}</p>
+                  <p className="mt-1 text-xs text-on-surface-variant">
+                    <span className="font-semibold text-on-surface">Audience:</span> {d.audience}
+                  </p>
+                  <p className="mt-2 text-xs text-on-surface-variant">
+                    <span className="font-semibold text-on-surface">Outcome:</span> {d.outcome}
+                  </p>
+                  <p className="mt-2 text-xs leading-relaxed text-on-surface-variant">{d.summary}</p>
+                </a>
+              ))}
+            </div>
+          </Section>
+        ) : null}
+
+        <Section id="important-notes" title="Important notes">
+          <div
+            className="rounded-xl border border-red-500/30 bg-red-500/10 p-5 text-on-surface"
+            role="alert"
+          >
+            <p className="font-semibold text-primary">Permissions and changing features</p>
+            <p className="mt-2 text-on-surface-variant">
+              Not every staff member sees every menu. The sidebar is permission-filtered, and many
+              areas depend on role-based access from the staff session. Some screens are read-focused,
+              others are operational. Product edit flows may still be transitional in places,
+              including the native create or edit catalog path, so coordinate with your administrator
+              when you need a change that does not appear in your menu.
+            </p>
+          </div>
+          <p className="mt-6 text-on-surface-variant">
             For technical setup (servers, domains, integrations), rely on your development or IT
             partner. This guide stays focused on day-to-day use of the back office.
           </p>
