@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { encodeEscPosReceipt, drawerOpenPulse } from "./escpos.js";
+import {
+  encodeEscPosProductLabel,
+  encodeEscPosReceipt,
+  drawerOpenPulse,
+} from "./escpos.js";
 
 describe("encodeEscPosReceipt", () => {
   it("produces non-empty ESC/POS bytes with init and cut", () => {
@@ -15,6 +19,23 @@ describe("encodeEscPosReceipt", () => {
     assert.ok(buf.length > 20);
     assert.equal(buf[0], 0x1b);
     assert.equal(buf[1], 0x40);
+  });
+});
+
+describe("encodeEscPosProductLabel", () => {
+  it("produces ESC/POS bytes with init and cut", () => {
+    const buf = encodeEscPosProductLabel({
+      productName: "Test Tee",
+      sku: "SKU-001",
+      barcode: "4800123456789",
+      size: "M",
+      color: "Black",
+      priceDisplay: "PHP 599.00",
+    });
+    assert.ok(buf.length > 30);
+    assert.equal(buf[0], 0x1b);
+    assert.equal(buf[1], 0x40);
+    assert.ok(Buffer.from(buf).toString("latin1").includes("SKU-001"));
   });
 });
 
