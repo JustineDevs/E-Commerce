@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { getServerSession } from "next-auth/next";
-import { staffHasPermission } from "@apparel-commerce/database";
+import { staffSessionAllows } from "@apparel-commerce/database";
 import {
   getSegmentMembers,
   addSegmentMembers,
@@ -16,7 +16,7 @@ export async function GET(req: NextRequest, ctx: Ctx) {
   const cid = getCorrelationId(req);
   const session = await getServerSession(authOptions);
   if (!session?.user) return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
-  if (!staffHasPermission(session.user.permissions ?? [], "crm:segments")) {
+  if (!staffSessionAllows(session, "crm:segments")) {
     return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
   }
   const { id } = await ctx.params;
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
   const cid = getCorrelationId(req);
   const session = await getServerSession(authOptions);
   if (!session?.user) return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
-  if (!staffHasPermission(session.user.permissions ?? [], "crm:segments")) {
+  if (!staffSessionAllows(session, "crm:segments")) {
     return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
   }
   const { id } = await ctx.params;
