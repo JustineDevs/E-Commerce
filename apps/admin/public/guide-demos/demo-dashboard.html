@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Demo — Dashboard</title>
+    <link rel="stylesheet" href="./demo-shared.css" />
+  </head>
+  <body>
+    <div class="controls demo-controls">
+      <button type="button" id="btn-play">Play</button>
+      <button type="button" id="btn-pause" disabled>Pause</button>
+      <button type="button" id="btn-step" disabled style="display: none">Next step</button>
+      <button type="button" id="btn-skip">Skip</button>
+      <button type="button" id="btn-reset" disabled>Reset</button>
+      <label class="demo-ctrl-label"><input type="checkbox" id="chk-mute" /> Mute</label>
+      <label class="demo-ctrl-label"
+        >Speed
+        <select id="sel-speed" aria-label="Demo speed">
+          <option value="1">1×</option>
+          <option value="1.35">1.35×</option>
+          <option value="1.45" selected>1.45×</option>
+          <option value="1.75">1.75×</option>
+          <option value="2">2×</option>
+        </select></label
+      >
+      <label class="demo-ctrl-label"
+        >Mode
+        <select id="sel-mode" aria-label="Demo mode">
+          <option value="presentation" selected>Presentation</option>
+          <option value="manual">Manual</option>
+        </select></label
+      >
+      <div
+        class="demo-progress"
+        role="progressbar"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-valuenow="0"
+        id="demo-progress-wrap"
+      >
+        <div class="demo-progress-bar" id="demo-progress-bar"></div>
+      </div>
+      <a href="./index.html">← All demos</a>
+    </div>
+    <p class="hint">
+      Interactive DOM preview: full admin sidebar (Commerce, Operations, Marketing, Settings, plus
+      Content sub-routes). Press Play for a scripted walkthrough with Web Speech narration and HTML5
+      audio ticks.
+    </p>
+    <audio id="ui-tick" preload="auto" src="data:audio/wav;base64,UklGRi4AAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA="></audio>
+    <audio id="narration" preload="none"></audio>
+    <div class="wrap" id="wrap">
+      <div class="browser">
+        <div class="chrome-top">
+          <div class="dots" aria-hidden="true">
+            <span></span><span></span><span></span>
+          </div>
+          <div class="url-bar" id="url-bar"></div>
+        </div>
+        <div class="stage" id="stage">
+          <aside class="sidebar" id="sidebar"></aside>
+          <div class="main">
+            <div class="scene on" id="scene-0">
+              <h2 class="faux">Overview</h2>
+              <div class="kpis">
+                <div class="kpi"><b>128</b>Orders (30d)</div>
+                <div class="kpi"><b>14</b>Active</div>
+                <div class="kpi"><b>3</b>Low stock</div>
+              </div>
+              <p style="font-size: 12px; color: var(--muted); margin: 0">
+                Recent orders and quick links appear here.
+              </p>
+            </div>
+            <div class="scene" id="scene-1">
+              <h2 class="faux">Products</h2>
+              <p style="font-size: 12px; color: var(--muted)">
+                Search and manage your catalog. This is a scripted preview only.
+              </p>
+            </div>
+            <div class="caption" id="caption">Press Play to start the demo.</div>
+          </div>
+          <div class="cursor" id="cursor" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M4 3L4 20L9 15L14 22L16 21L11 14L18 14L4 3Z"
+                fill="white"
+                stroke="#191c1e"
+                stroke-width="1.2"
+              />
+            </svg>
+          </div>
+          <div class="ripple" id="ripple"></div>
+        </div>
+      </div>
+    </div>
+
+    <script src="./demo-mock-data.js"></script>
+    <script src="./demo-runtime.js"></script>
+    <script>
+      (function () {
+        var GD = window.GuideDemo;
+        GD.renderSidebar("#sidebar", "dashboard");
+        var TIMELINE = [
+          {
+            t: 0,
+            x: 0.55,
+            y: 0.35,
+            cap: "Welcome to the dashboard overview.",
+            speak: "Welcome. This is your overview: orders, stock signals, and quick links.",
+          },
+          {
+            t: 3800,
+            x: 0.12,
+            y: 0.22,
+            cap: "The sidebar lists Commerce, Operations, Marketing, and Settings.",
+            speak: "The left sidebar groups every area of the back office.",
+          },
+          {
+            t: 7600,
+            x: 0.12,
+            y: 0.32,
+            cap: "Open Products to manage your catalog.",
+            speak: "Next, we open Products.",
+          },
+          {
+            t: 9800,
+            x: 0.12,
+            y: 0.36,
+            cap: "",
+            speak: "",
+            click: true,
+            navKey: "catalog",
+          },
+          {
+            t: 10200,
+            scene: 1,
+            x: 0.62,
+            y: 0.28,
+            cap: "Here you search and edit products.",
+            speak: "This is the product list. Search by name or handle, then edit or add items.",
+          },
+          {
+            t: 15000,
+            x: 0.12,
+            y: 0.2,
+            cap: "Return to Overview when you are done.",
+            speak: "Back to Overview when you are finished.",
+          },
+          {
+            t: 17200,
+            x: 0.12,
+            y: 0.2,
+            cap: "",
+            speak: "",
+            click: true,
+            navKey: "dashboard",
+          },
+          {
+            t: 17600,
+            scene: 0,
+            x: 0.5,
+            y: 0.35,
+            cap: "End of dashboard demo.",
+            speak: "That ends the dashboard tour.",
+          },
+        ];
+        GD.attachPlayer({
+          wrap: "#wrap",
+          stage: "#stage",
+          cursor: "#cursor",
+          ripple: "#ripple",
+          caption: "#caption",
+          urlBar: "#url-bar",
+          btnPlay: "#btn-play",
+          btnReset: "#btn-reset",
+          btnPause: "#btn-pause",
+          btnSkip: "#btn-skip",
+          btnStep: "#btn-step",
+          selSpeed: "#sel-speed",
+          selMode: "#sel-mode",
+          chkMute: "#chk-mute",
+          progressBar: "#demo-progress-bar",
+          progressWrap: "#demo-progress-wrap",
+          narrationAudio: "#narration",
+          uiTick: "#ui-tick",
+          currentKey: "dashboard",
+          defaultUrl: GD.getUrlForKey("dashboard"),
+          timeline: TIMELINE,
+          totalMs: 20500,
+          urlForScene: function (idx) {
+            return idx === 0 ? GD.getUrlForKey("dashboard") : GD.getUrlForKey("catalog");
+          },
+        });
+      })();
+    </script>
+  </body>
+</html>

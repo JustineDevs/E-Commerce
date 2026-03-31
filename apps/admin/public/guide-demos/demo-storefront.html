@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Demo — Storefront home</title>
+<link rel="stylesheet" href="./demo-shared.css" />
+</head>
+<body>
+<header class="demo-story"><h1>Storefront home</h1><p><strong>Audience:</strong> Brand leads.</p><p><strong>Outcome:</strong> Homepage payload story (mock).</p></header>
+<div class="controls demo-controls">
+<button type="button" id="btn-play">Play</button>
+<button type="button" id="btn-pause" disabled>Pause</button>
+<button type="button" id="btn-step" disabled style="display:none">Next</button>
+<button type="button" id="btn-skip">Skip</button>
+<button type="button" id="btn-reset" disabled>Reset</button>
+<label class="demo-ctrl-label"><input type="checkbox" id="chk-mute" /> Mute</label>
+<label class="demo-ctrl-label">Speed <select id="sel-speed"><option value="1.45" selected>1.45×</option></select></label>
+<label class="demo-ctrl-label">Mode <select id="sel-mode"><option value="presentation" selected>Presentation</option><option value="manual">Manual</option></select></label>
+<div class="demo-progress" id="demo-progress-wrap" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"><div id="demo-progress-bar" class="demo-progress-bar"></div></div>
+<a href="./index.html">Back</a>
+</div>
+<audio id="ui-tick" preload="auto" src="data:audio/wav;base64,UklGRi4AAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA="></audio>
+<div class="wrap" id="wrap"><div class="browser"><div class="chrome-top"><div class="dots" aria-hidden="true"><span></span><span></span><span></span></div><div class="url-bar" id="url-bar"></div></div>
+<div class="stage" id="stage"><aside class="sidebar" id="sidebar"></aside><div class="main"><div class="scene on" id="scene-0"><h2 class="faux">Homepage modules</h2>
+<p style="font-size:11px;color:var(--muted)">Hero · featured · editorial (mock)</p>
+<div class="toolbar"><span class="btn-faux" id="sf-publish">Save draft</span></div>
+</div><div class="scene" id="scene-1"><h2 class="faux">Content</h2><p style="font-size:11px;color:var(--muted)">CMS for long-form pages</p></div>
+<div class="caption" id="caption">Play</div></div>
+<div class="cursor" id="cursor" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 3L4 20L9 15L14 22L16 21L11 14L18 14L4 3Z" fill="white" stroke="#191c1e" stroke-width="1.2"/></svg></div><div class="ripple" id="ripple"></div></div></div></div>
+<script src="./demo-mock-data.js"></script><script src="./demo-runtime.js"></script>
+<script>
+(function(){var G=window.GuideDemo;G.renderSidebar("#sidebar","storefront");
+var pub=document.getElementById("sf-publish");
+var T=[{t:0,x:0.5,y:0.35,cap:"Storefront home edits customer-facing modules.",speak:"This surface shapes homepage payload not product prices."},{t:2800,x:0.72,y:0.22,cap:"",speak:"",click:true},{t:3200,x:0.14,y:0.58,cap:"",speak:"",click:true,navKey:"cms"},{t:3600,scene:1,x:0.5,y:0.38,cap:"CMS holds pages and media.",speak:"Content hub complements storefront home."},{t:6200,x:0.14,y:0.52,click:true,navKey:"storefront"},{t:6600,scene:0,x:0.5,y:0.35,cap:"Recap.",speak:"End"}];
+T[1].flashPub=true;
+G.attachPlayer({wrap:"#wrap",stage:"#stage",cursor:"#cursor",ripple:"#ripple",caption:"#caption",urlBar:"#url-bar",btnPlay:"#btn-play",btnReset:"#btn-reset",btnPause:"#btn-pause",btnSkip:"#btn-skip",btnStep:"#btn-step",selSpeed:"#sel-speed",selMode:"#sel-mode",chkMute:"#chk-mute",progressBar:"#demo-progress-bar",progressWrap:"#demo-progress-wrap",uiTick:"#ui-tick",currentKey:"storefront",defaultUrl:G.getUrlForKey("storefront"),timeline:T,totalMs:7800,urlForScene:function(i){return i===0?G.getUrlForKey("storefront"):G.getUrlForKey("cms");},onClick:function(ev){if(pub&&ev.flashPub){pub.classList.add("flash");setTimeout(function(){pub.classList.remove("flash");},500);}}});
+})();
+</script>
+</body>
+</html>

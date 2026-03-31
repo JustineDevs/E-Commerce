@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Demo — Content</title>
+    <link rel="stylesheet" href="./demo-shared.css" />
+  </head>
+  <body>
+    <div class="controls demo-controls">
+      <button type="button" id="btn-play">Play</button>
+      <button type="button" id="btn-pause" disabled>Pause</button>
+      <button type="button" id="btn-step" disabled style="display: none">Next step</button>
+      <button type="button" id="btn-skip">Skip</button>
+      <button type="button" id="btn-reset" disabled>Reset</button>
+      <label class="demo-ctrl-label"><input type="checkbox" id="chk-mute" /> Mute</label>
+      <label class="demo-ctrl-label"
+        >Speed
+        <select id="sel-speed" aria-label="Demo speed">
+          <option value="1">1×</option>
+          <option value="1.35">1.35×</option>
+          <option value="1.45" selected>1.45×</option>
+          <option value="1.75">1.75×</option>
+          <option value="2">2×</option>
+        </select></label
+      >
+      <label class="demo-ctrl-label"
+        >Mode
+        <select id="sel-mode" aria-label="Demo mode">
+          <option value="presentation" selected>Presentation</option>
+          <option value="manual">Manual</option>
+        </select></label
+      >
+      <div
+        class="demo-progress"
+        role="progressbar"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-valuenow="0"
+        id="demo-progress-wrap"
+      >
+        <div class="demo-progress-bar" id="demo-progress-bar"></div>
+      </div>
+      <a href="./index.html">← All demos</a>
+    </div>
+    <p class="hint">
+      Sidebar includes Content plus the same website sub-routes as Cmd+K (Pages, Blog, Media, and more).
+      Play opens a page editor scene.
+    </p>
+    <audio id="ui-tick" preload="auto" src="data:audio/wav;base64,UklGRi4AAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA="></audio>
+    <audio id="narration" preload="none"></audio>
+    <div class="wrap" id="wrap">
+      <div class="browser">
+        <div class="chrome-top">
+          <div class="dots" aria-hidden="true">
+            <span></span><span></span><span></span>
+          </div>
+          <div class="url-bar" id="url-bar"></div>
+        </div>
+        <div class="stage" id="stage">
+          <aside class="sidebar" id="sidebar"></aside>
+          <div class="main">
+            <div class="scene on" id="scene-0">
+              <h2 class="faux">Content</h2>
+              <p style="font-size: 11px; color: var(--muted); margin: 0 0 10px">
+                Pages, navigation, blog, and media for the public site.
+              </p>
+              <div class="cms-list">
+                <div class="cms-row hl" id="cms-row">
+                  <span>Shipping policy</span><span>Page</span>
+                </div>
+                <div class="cms-row"><span>Announcement bar</span><span>Settings</span></div>
+                <div class="cms-row"><span>Blog: Spring drop</span><span>Post</span></div>
+              </div>
+            </div>
+            <div class="scene" id="scene-1">
+              <h2 class="faux">Edit page</h2>
+              <p style="font-size: 11px; color: var(--muted); margin: 0 0 8px">Shipping policy</p>
+              <div class="editor">
+                Edit body copy, publish when ready. Commerce data still comes from Products and
+                checkout.
+              </div>
+            </div>
+            <div class="caption" id="caption">Press Play to start the demo.</div>
+          </div>
+          <div class="cursor" id="cursor" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M4 3L4 20L9 15L14 22L16 21L11 14L18 14L4 3Z"
+                fill="white"
+                stroke="#191c1e"
+                stroke-width="1.2"
+              />
+            </svg>
+          </div>
+          <div class="ripple" id="ripple"></div>
+        </div>
+      </div>
+    </div>
+
+    <script src="./demo-mock-data.js"></script>
+    <script src="./demo-runtime.js"></script>
+    <script>
+      (function () {
+        var GD = window.GuideDemo;
+        GD.renderSidebar("#sidebar", "cms");
+        var cmsRow = document.getElementById("cms-row");
+
+        var TIMELINE = [
+          {
+            t: 0,
+            x: 0.625,
+            y: 0.4,
+            cap: "Content covers what customers read: pages, blog, navigation, and media.",
+            speak: "Content covers what customers read on the public site, separate from cart logic.",
+          },
+          {
+            t: 4000,
+            x: 0.64,
+            y: 0.45,
+            cap: "Pick a page or post to edit copy and publish when ready.",
+            speak: "Open a page or post to edit copy and publish when you are ready.",
+          },
+          {
+            t: 7000,
+            x: 0.64,
+            y: 0.45,
+            cap: "",
+            speak: "",
+            click: true,
+            openPage: true,
+          },
+          {
+            t: 7800,
+            scene: 1,
+            x: 0.62,
+            y: 0.42,
+            cap: "Publishing updates the live site after your workflow allows it.",
+            speak: "Publishing updates the live site after your workflow and approvals allow it.",
+          },
+          {
+            t: 13600,
+            scene: 0,
+            x: 0.625,
+            y: 0.4,
+            cap: "Return to the hub to work on navigation or blog posts next.",
+            speak: "Return to the hub to work on navigation or blog posts next.",
+          },
+          {
+            t: 17600,
+            x: 0.625,
+            y: 0.4,
+            cap: "End of content demo.",
+            speak: "That ends the content tour.",
+          },
+        ];
+
+        GD.attachPlayer({
+          wrap: "#wrap",
+          stage: "#stage",
+          cursor: "#cursor",
+          ripple: "#ripple",
+          caption: "#caption",
+          urlBar: "#url-bar",
+          btnPlay: "#btn-play",
+          btnReset: "#btn-reset",
+          btnPause: "#btn-pause",
+          btnSkip: "#btn-skip",
+          btnStep: "#btn-step",
+          selSpeed: "#sel-speed",
+          selMode: "#sel-mode",
+          chkMute: "#chk-mute",
+          progressBar: "#demo-progress-bar",
+          progressWrap: "#demo-progress-wrap",
+          narrationAudio: "#narration",
+          uiTick: "#ui-tick",
+          currentKey: "cms",
+          defaultUrl: GD.getUrlForKey("cms"),
+          timeline: TIMELINE,
+          totalMs: 19600,
+          urlForScene: function (idx) {
+            return idx === 0
+              ? GD.getUrlForKey("cms")
+              : GD.BASE + "/admin/cms/pages/shipping-policy";
+          },
+          onClick: function (ev) {
+            if (ev.openPage) {
+              cmsRow.classList.add("hl");
+              setTimeout(function () {
+                cmsRow.classList.remove("hl");
+              }, 200);
+            }
+          },
+        });
+      })();
+    </script>
+  </body>
+</html>

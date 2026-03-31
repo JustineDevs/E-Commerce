@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Admin guide — Demo presentations</title>
+    <link rel="stylesheet" href="./demo-shared.css" />
+  </head>
+  <body class="demo-index-page">
+    <div class="index-hub">
+      <a class="back" href="/admin/docs">← Back to Admin guide</a>
+      <h1>Demo presentations</h1>
+      <p class="lead">
+        Each interactive page mirrors the staff sidebar (Commerce, Operations, Marketing, Settings,
+        plus Content website routes). Press Play for a timed walkthrough: fake browser chrome, scripted
+        cursor on a requestAnimationFrame timeline, CSS scene transitions, captions, Web Speech
+        narration, and HTML5 audio ticks. Use Chrome or Edge for speech.
+      </p>
+      <div id="hub-sections"></div>
+    </div>
+
+    <script src="./demo-runtime.js"></script>
+    <script>
+      (function () {
+        var GD = window.GuideDemo;
+        var hub = document.getElementById("hub-sections");
+        var demoDesc = {
+          dashboard: "Overview, KPIs, and jumping into Products.",
+          catalog: "Catalog list, search, and edit surface.",
+          inventory: "Stock grid, refresh, and detail.",
+          orders: "Order list and row drill-in.",
+          pos: "Quick add, cart, and payment scene.",
+          "offline-queue": "POS drafts ready to sync after offline selling.",
+          crm: "Customer tiers, search, and loyalty handoff.",
+          employees: "Roster, roles, and invite state.",
+          devices: "Registers and peripherals health.",
+          channels: "Web, POS, and chat event volume.",
+          "chat-orders": "Manual intake threads and reply state.",
+          analytics: "Channel mix and revenue cards (mock).",
+          loyalty: "Program stats and campaigns handoff.",
+          campaigns: "Scheduled and live outreach rows.",
+          storefront: "Homepage modules versus CMS (illustrative).",
+          cms: "Content hub and page editor preview.",
+          reviews: "Pending and flagged moderation queue.",
+          payments: "Provider and region orientation (read-only mock).",
+        };
+
+        GD.NAV_GROUPS.forEach(function (group) {
+          var section = document.createElement("section");
+          section.className = "index-section";
+          var h2 = document.createElement("h2");
+          h2.textContent = group.label;
+          section.appendChild(h2);
+          var grid = document.createElement("div");
+          grid.className = "index-grid";
+
+          group.items.forEach(function (item) {
+            var demoFile = GD.DEMO_BY_KEY[item.key];
+            var card = document.createElement(demoFile ? "a" : "div");
+            card.className = "index-card" + (demoFile ? "" : " index-card-muted");
+            if (demoFile) {
+              card.href = "./" + demoFile;
+              card.target = "_blank";
+              card.rel = "noopener";
+            }
+            var strong = document.createElement("strong");
+            strong.textContent = item.label;
+            card.appendChild(strong);
+            var span = document.createElement("span");
+            span.textContent = demoFile
+              ? demoDesc[item.key] || "Guided tour with narration."
+              : "Preview routes exist in the full admin. No standalone movie yet.";
+            card.appendChild(span);
+            grid.appendChild(card);
+          });
+
+          section.appendChild(grid);
+          hub.appendChild(section);
+        });
+      })();
+    </script>
+  </body>
+</html>

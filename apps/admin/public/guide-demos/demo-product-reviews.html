@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Demo — Reviews</title>
+<link rel="stylesheet" href="./demo-shared.css" />
+</head>
+<body>
+<header class="demo-story"><h1>Reviews</h1><p><strong>Audience:</strong> Trust leads.</p></header>
+<div class="controls demo-controls">
+<button type="button" id="btn-play">Play</button><button type="button" id="btn-pause" disabled>Pause</button>
+<button type="button" id="btn-step" disabled style="display:none">Next</button><button type="button" id="btn-skip">Skip</button><button type="button" id="btn-reset" disabled>Reset</button>
+<label class="demo-ctrl-label"><input type="checkbox" id="chk-mute" /> Mute</label>
+<label class="demo-ctrl-label">Speed <select id="sel-speed"><option value="1.45" selected>1.45×</option></select></label>
+<label class="demo-ctrl-label">Mode <select id="sel-mode"><option value="presentation" selected>Presentation</option><option value="manual">Manual</option></select></label>
+<div class="demo-progress" id="demo-progress-wrap" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"><div class="demo-progress-bar" id="demo-progress-bar"></div></div>
+<a href="./index.html">← All demos</a></div>
+<audio id="ui-tick" preload="auto" src="data:audio/wav;base64,UklGRi4AAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA="></audio>
+<div class="wrap" id="wrap"><div class="browser"><div class="chrome-top"><div class="dots" aria-hidden="true"><span></span><span></span><span></span></div><div class="url-bar" id="url-bar"></div></div>
+<div class="stage" id="stage"><aside class="sidebar" id="sidebar"></aside><div class="main"><div class="scene on">
+<h2 class="faux">Moderation</h2>
+<div class="faux-table demo-generic-grid"><div class="faux-head"><span>Product</span><span>Excerpt</span><span>Mod</span></div>
+<div class="faux-row hl"><span>Linen tee</span><span>Fabric feels</span><span>Pending</span></div>
+<div class="faux-row"><span>Crossbody</span><span>Strap frayed</span><span>Flagged</span></div></div>
+</div><div class="caption" id="caption">Press Play.</div></div>
+<div class="cursor" id="cursor" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M4 3L4 20L9 15L14 22L16 21L11 14L18 14L4 3Z" fill="white" stroke="#191c1e" stroke-width="1.2"/></svg></div><div class="ripple" id="ripple"></div></div></div></div>
+<script src="./demo-mock-data.js"></script><script src="./demo-runtime.js"></script>
+<script>
+(function(){var G=window.GuideDemo;G.renderSidebar("#sidebar","reviews");
+var T=[{t:0,x:0.5,y:0.36,cap:"Reviews need human judgment.",speak:"Moderation protects brand voice."},{t:2800,x:0.55,y:0.52,click:true},{t:5200,x:0.5,y:0.4,cap:"Recap.",speak:"End."}];
+G.attachPlayer({wrap:"#wrap",stage:"#stage",cursor:"#cursor",ripple:"#ripple",caption:"#caption",urlBar:"#url-bar",btnPlay:"#btn-play",btnReset:"#btn-reset",btnPause:"#btn-pause",btnSkip:"#btn-skip",btnStep:"#btn-step",selSpeed:"#sel-speed",selMode:"#sel-mode",chkMute:"#chk-mute",progressBar:"#demo-progress-bar",progressWrap:"#demo-progress-wrap",uiTick:"#ui-tick",currentKey:"reviews",defaultUrl:G.getUrlForKey("reviews"),timeline:T,totalMs:6400});
+})();
+</script>
+</body>
+</html>
