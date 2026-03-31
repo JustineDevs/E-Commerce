@@ -70,7 +70,7 @@ export function getMedusaRegionId(): string | undefined {
 export function getMedusaPaymentProviderId(): string {
   return (
     process.env.NEXT_PUBLIC_MEDUSA_PAYMENT_PROVIDER_ID?.trim() ||
-    "pp_lemonsqueezy_lemonsqueezy"
+    "pp_stripe_stripe"
   );
 }
 
@@ -80,4 +80,18 @@ export function getMedusaSalesChannelId(): string | undefined {
     process.env.NEXT_PUBLIC_MEDUSA_SALES_CHANNEL_ID?.trim() ||
     undefined
   );
+}
+
+/**
+ * Merge `sales_channel_id` into Store API query params when env is set (products, carts).
+ * Do not use for `GET /store/product-categories`: Medusa v2 rejects `sales_channel_id`
+ * on that route (400 Unrecognized fields). Category sidebars rely on `store.product.list`
+ * with `sales_channel_id` for per-category counts instead.
+ */
+export function withSalesChannelId(
+  params: Record<string, unknown>,
+): Record<string, unknown> {
+  const sc = getMedusaSalesChannelId()?.trim();
+  if (sc) params.sales_channel_id = sc;
+  return params;
 }
