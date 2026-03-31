@@ -1,8 +1,8 @@
 /**
- * In-process fixed-window limits for public Route Handlers.
- * Each serverless instance has its own map; abusive traffic spread across
- * many cold instances is only partially throttled. Prefer an edge or Redis
- * limiter if this becomes a problem in production.
+ * Rate limits for public Route Handlers.
+ * When UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are set, limits use
+ * Upstash Redis REST (shared across instances). Otherwise a fixed window
+ * in-process map is used.
  */
 
 type Bucket = { count: number; resetAt: number };
@@ -19,7 +19,7 @@ function pruneIfNeeded(): void {
   }
 }
 
-export function rateLimitFixedWindow(
+function rateLimitInProcess(
   key: string,
   max: number,
   windowMs: number,
@@ -39,6 +39,75 @@ export function rateLimitFixedWindow(
   }
   b.count += 1;
   return { ok: true };
+}
+
+/**
+ * Upstash Redis REST returns JSON `{ "result": number }` (or legacy plain number string).
+ */
+export function parseUpstashRestNumber(body: string): number | null {
+  const t = body.trim();
+  if (!t) return null;
+  if (t.startsWith("{")) {
+    try {
+      const j = JSON.parse(t) as { result?: unknown };
+      const r = j.result;
+      if (typeof r === "number" && Number.isFinite(r)) return r;
+      if (typeof r === "string") {
+        const n = Number(r);
+        return Number.isFinite(n) ? n : null;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+}
+
+async function rateLimitUpstash(
+  key: string,
+  max: number,
+  windowMs: number,
+): Promise<{ ok: true } | { ok: false; retryAfterSec: number } | null> {
+  const base = process.env.UPSTASH_REDIS_REST_URL?.trim();
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
+  if (!base || !token) return null;
+  const root = base.replace(/\/$/, "");
+  const k = encodeURIComponent(`sf:rl:${key}`);
+  const windowSec = Math.max(1, Math.ceil(windowMs / 1000));
+  const auth = { Authorization: `Bearer ${token}` };
+
+  const incrRes = await fetch(`${root}/incr/${k}`, { headers: auth });
+  if (!incrRes.ok) return null;
+  const count = parseUpstashRestNumber(await incrRes.text());
+  if (count === null) return null;
+  if (count === 1) {
+    await fetch(`${root}/expire/${k}/${windowSec}`, { headers: auth });
+  }
+  if (count > max) {
+    const ttlRes = await fetch(`${root}/ttl/${k}`, { headers: auth });
+    const ttlParsed = ttlRes.ok ? parseUpstashRestNumber(await ttlRes.text()) : null;
+    const ttlRaw = ttlParsed !== null ? ttlParsed : -1;
+    const ttl = Number.isFinite(ttlRaw) && ttlRaw > 0 ? ttlRaw : windowSec;
+    return { ok: false, retryAfterSec: Math.max(1, ttl) };
+  }
+  return { ok: true };
+}
+
+/**
+ * Fixed-window limit. Uses Upstash when configured; otherwise in-process.
+ */
+export async function rateLimitFixedWindow(
+  key: string,
+  max: number,
+  windowMs: number,
+): Promise<{ ok: true } | { ok: false; retryAfterSec: number }> {
+  const remote = await rateLimitUpstash(key, max, windowMs);
+  if (remote !== null) {
+    return remote;
+  }
+  return rateLimitInProcess(key, max, windowMs);
 }
 
 export function getRequestIp(req: Request): string {
