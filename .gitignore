@@ -46,6 +46,8 @@ stress-test/playwright-report/
 stress-test/test-results/
 stress-test/blob-report/
 stress-test/.playwright-cache/
+stress-test/release-gate-logs/
+stress-test/checkout-provider-stress-logs/
 stress-test/e2e/.auth/
 stress-test/dogfood-output/**/*.png
 stress-test/dogfood-output/**/*.webm
