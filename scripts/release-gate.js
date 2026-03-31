@@ -8,15 +8,27 @@
  *  1. Runtime (Node 20 required; lint, tests)
  *  2. Security (security check, audit triage)
  *  3. Data (database/platform tests)
- *  4. E2E (with --include-e2e: Playwright starts all 4 apps + runs E2E)
+ *  4. E2E (with --include-e2e: Playwright starts all 4 apps + runs stress-test/e2e: smoke, flows, dogfood)
  *
- * Usage: node scripts/release-gate.js [--include-e2e]
+ * Optional DB prep: `pnpm e2e:prep:medusa` skips Medusa seed when the store API already has products; `pnpm e2e:ensure-staff` no-ops if the staff user already exists.
+ * For admin E2E credentials (local dev): root .env ADMIN_ALLOWED_EMAILS (first email) + NEXTAUTH_SECRET; run `pnpm e2e:ensure-staff`.
+ * Playwright sets NEXTAUTH_URL per app (storefront 3000, admin 3001) so admin sign-in works even when root .env only lists the storefront URL.
+ *
+ * Full run report (`pnpm release-gate:full`): raw logs are written under stress-test/release-gate-logs/
+ *   - release-gate-full-latest.log (overwritten each run)
+ *   - release-gate-full-<ISO-timestamp>.log (history)
+ * Disable file report: --no-report
+ *
+ * Usage: node scripts/release-gate.js [--include-e2e] [--no-report]
  */
 const { spawnSync } = require("child_process");
+const fs = require("fs");
 const path = require("path");
 
 const root = path.resolve(__dirname, "..");
 const includeE2e = process.argv.includes("--include-e2e");
+const noReport = process.argv.includes("--no-report");
+const recordReport = includeE2e && !noReport;
 
 const nodeMajor = parseInt(process.version.slice(1).split(".")[0], 10);
 if (nodeMajor !== 20) {
@@ -26,20 +38,72 @@ if (nodeMajor !== 20) {
   process.exit(1);
 }
 
-function run(cmd, args = []) {
+/** Raw log buffer for full report (child output + banners). */
+const reportChunks = [];
+
+function emit(s) {
+  process.stdout.write(s);
+  if (recordReport) {
+    reportChunks.push(typeof s === "string" ? s : String(s));
+  }
+}
+
+function emitLine(s) {
+  emit(s + (s.endsWith("\n") ? "" : "\n"));
+}
+
+function flushReportFiles() {
+  if (!recordReport || reportChunks.length === 0) return;
+  const dir = path.join(root, "stress-test", "release-gate-logs");
+  fs.mkdirSync(dir, { recursive: true });
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const latestPath = path.join(dir, "release-gate-full-latest.log");
+  const datedPath = path.join(dir, `release-gate-full-${stamp}.log`);
+  const body = reportChunks.join("");
+  const footer = `\n\n━━━ Log file paths ━━━\n${latestPath}\n${datedPath}\n`;
+  const full = body + footer;
+  fs.writeFileSync(latestPath, full, "utf8");
+  fs.writeFileSync(datedPath, full, "utf8");
+  process.stdout.write(
+    `\n━━━ Full raw report written ━━━\n${latestPath}\n${datedPath}\n`,
+  );
+}
+
+function run(gateName, cmd, args = []) {
   const [program, ...rest] = cmd;
+  const fullCmd = [program, ...rest, ...args].join(" ");
+  emitLine("");
+  emitLine(`━━━ ${gateName} ━━━`);
+  emitLine(`$ ${fullCmd}`);
   const result = spawnSync(program, [...rest, ...args], {
-    stdio: "inherit",
     cwd: root,
     shell: true,
+    encoding: "utf8",
+    maxBuffer: 256 * 1024 * 1024,
   });
-  return result.status;
+  const out = [result.stdout, result.stderr].filter(Boolean).join("");
+  if (out) emit(out);
+  const code = result.status;
+  emitLine(`[exit ${code}] ${gateName}`);
+  return code;
 }
 
 function main() {
   let failed = false;
 
-  console.log("\n🚦 Release gate — Same-Day Release Board (automatable checks)\n");
+  const started = new Date().toISOString();
+  emitLine("=== Release gate ===");
+  emitLine(`Started: ${started}`);
+  emitLine(`Node: ${process.version}`);
+  emitLine(`CWD: ${root}`);
+  emitLine(`Args: ${process.argv.slice(2).join(" ") || "(none)"}`);
+  if (recordReport) {
+    emitLine(
+      "Report: stress-test/release-gate-logs/release-gate-full-latest.log (+ timestamped copy)",
+    );
+  }
+  emitLine("");
+  emitLine("🚦 Release gate — Same-Day Release Board (automatable checks)");
 
   const checks = [
     { name: "Lint", cmd: ["pnpm", "lint"] },
@@ -50,41 +114,70 @@ function main() {
       cmd: ["node", "scripts/check-audit-triage.js"],
     },
     {
+      name: "Storefront client / secret boundary",
+      cmd: ["node", "scripts/check-storefront-client-boundary.mjs"],
+    },
+    {
+      name: "Supabase migrations (no parallel commerce tables)",
+      cmd: ["node", "scripts/check-commerce-migration-boundary.mjs"],
+    },
+    {
+      name: "Admin API route staff / internal guards",
+      cmd: ["node", "scripts/check-admin-api-staff-guard.mjs"],
+    },
+    {
       name: "Unit / integration / Medusa / database",
       cmd: ["pnpm", "test"],
     },
   ];
 
   for (const { name, cmd } of checks) {
-    console.log(`\n━━━ ${name} ━━━\n`);
-    const code = run(cmd);
+    const code = run(name, cmd);
     if (code !== 0) {
-      console.error(`\n❌ ${name} failed (exit ${code})`);
+      emitLine(`❌ ${name} failed (exit ${code})`);
       failed = true;
     }
   }
 
   if (includeE2e) {
-    console.log("\n━━━ E2E (Playwright) ━━━\n");
-    const code = run(["node", "scripts/run-e2e.js"]);
+    const code = run("E2E (Playwright)", ["node", "scripts/run-e2e.js"]);
     if (code !== 0) {
-      console.error("\n❌ E2E failed");
+      emitLine("❌ E2E failed");
       failed = true;
     }
   } else {
-    console.log(
-      "\n⏭️  E2E skipped. For full proof: pnpm release-gate:full (starts all 4 apps + E2E).\n",
+    emitLine("");
+    emitLine(
+      "⏭️  E2E skipped. For full proof: pnpm release-gate:full (starts all 4 apps + E2E).",
     );
   }
 
+  emitLine("");
+  emitLine(`Finished: ${new Date().toISOString()}`);
+  emitLine(`Result: ${failed ? "FAILED" : "PASSED"}`);
+  emitLine("=== End release gate ===");
+
   if (failed) {
-    console.error("\n🛑 Release gate FAILED. Do not ship.\n");
+    emitLine("");
+    emitLine("🛑 Release gate FAILED. Do not ship.");
+  } else if (includeE2e) {
+    emitLine("");
+    emitLine("✅ Release gate passed (full: automated + boot + E2E).");
+  } else {
+    emitLine("");
+    emitLine(
+      "✅ Release gate passed. Run pnpm release-gate:full for boot + E2E before ship.",
+    );
+  }
+
+  if (recordReport) {
+    flushReportFiles();
+  }
+
+  if (failed) {
+    process.stderr.write("\n🛑 Release gate FAILED. Do not ship.\n");
     process.exit(1);
   }
-  const msg = includeE2e
-    ? "\n✅ Release gate passed (full: automated + boot + E2E).\n"
-    : "\n✅ Release gate passed. Run pnpm release-gate:full for boot + E2E before ship.\n";
-  console.log(msg);
   process.exit(0);
 }
 
