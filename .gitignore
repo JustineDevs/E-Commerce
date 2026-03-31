@@ -68,6 +68,7 @@ playwright/.cache/
 .kiro/
 internal/docs/exclusive/
 .cursor/mcp.json
+.claude/
 
 # Lockfile: pnpm only
 package-lock.json
