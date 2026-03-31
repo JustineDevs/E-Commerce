@@ -1,7 +1,7 @@
 import type { SubscriberArgs, SubscriberConfig } from "@medusajs/framework";
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils";
 import { createHmac } from "crypto";
-import { Resend } from "resend";
+import { emitOrderPlacedFunnelEvent } from "../lib/commerce-funnel-sink";
 
 function buildTrackingUrl(baseUrl: string, id: string): string | null {
   const secret = process.env.TRACKING_HMAC_SECRET?.trim();
@@ -42,6 +42,29 @@ export default async function orderPlacedResendEmail({
   event: { data },
   container,
 }: SubscriberArgs<{ id: string }>) {
+  const logger = container.resolve(ContainerRegistrationKeys.LOGGER) as {
+    warn?: (m: string) => void;
+    info?: (m: string) => void;
+  };
+
+  const orderModule = container.resolve(Modules.ORDER);
+  const order = await orderModule.retrieveOrder(data.id, {
+    relations: ["customer"],
+  }) as { email?: string; id?: string; display_id?: number; customer?: { email?: string } | null };
+
+  const orderDisplayLabel =
+    order.display_id != null ? String(order.display_id) : String(order.id ?? data.id);
+  try {
+    await emitOrderPlacedFunnelEvent({
+      logger: logger as { info?: (msg: string) => void },
+      orderId: String(order.id ?? data.id),
+      displayId: orderDisplayLabel,
+      channel: "store",
+    });
+  } catch {
+    /* funnel sink must not block checkout email */
+  }
+
   const key = process.env.RESEND_API_KEY?.trim();
   const from = process.env.RESEND_FROM_EMAIL?.trim();
   const brand =
@@ -54,15 +77,6 @@ export default async function orderPlacedResendEmail({
   if (!key || !from || !storefrontBase) {
     return;
   }
-
-  const logger = container.resolve(ContainerRegistrationKeys.LOGGER) as {
-    warn?: (m: string) => void;
-  };
-
-  const orderModule = container.resolve(Modules.ORDER);
-  const order = await orderModule.retrieveOrder(data.id, {
-    relations: ["customer"],
-  }) as { email?: string; id?: string; display_id?: number; customer?: { email?: string } | null };
 
   const emailRaw =
     (typeof order.email === "string" && order.email.trim()) ||
@@ -80,29 +94,30 @@ export default async function orderPlacedResendEmail({
     return;
   }
 
-  const orderNumber =
-    order.display_id != null ? String(order.display_id) : (order.id ?? data.id);
-
   const orderId = String(order.id ?? data.id);
   const url = buildTrackingUrl(storefrontBase, orderId);
   const trackingUrl =
     url ??
     `${storefrontBase.replace(/\/$/, "")}/track/${encodeURIComponent(orderId)}`;
 
-  const resend = new Resend(key);
-  const { error } = await resend.emails.send({
+  const { sendResendTransactionalEmail } = await import(
+    "@apparel-commerce/resend-mail"
+  );
+  const sent = await sendResendTransactionalEmail({
+    apiKey: key,
     from,
     to: emailRaw,
-    subject: `Your order ${orderNumber}: tracking`,
+    subject: `Your order ${orderDisplayLabel}: tracking`,
     html: buildHtml({
-      orderNumber,
+      orderNumber: orderDisplayLabel,
       trackingUrl,
       brandName: brand,
     }),
+    tags: [{ name: "type", value: "order_tracking" }],
   });
 
-  if (error) {
-    logger.warn?.(`[resend] ${error.message ?? String(error)}`);
+  if (!sent.ok) {
+    logger.warn?.(`[resend] ${sent.message}`);
   }
 }
 
