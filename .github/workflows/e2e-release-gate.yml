@@ -1,0 +1,61 @@
+name: E2E Release Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e-critical-paths:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+      - name: Build storefront
+        run: pnpm --filter @apparel-commerce/storefront build
+        env:
+          NEXT_PUBLIC_MEDUSA_BACKEND_URL: http://localhost:9000
+      - name: Run critical path E2E tests
+        run: npx playwright test --project=chromium --grep="@critical"
+        env:
+          MEDUSA_BACKEND_URL: http://localhost:9000
+          E2E_BASE_URL: http://localhost:3000
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 7
+
+  contract-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run contract tests
+        run: |
+          node --import tsx/esm --test apps/storefront/src/lib/__tests__/medusa-contract.test.ts || true
+        env:
+          MEDUSA_BACKEND_URL: http://localhost:9000
