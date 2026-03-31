@@ -4,6 +4,8 @@ const MAX_WISHLIST_SIZE = 200;
 export type WishlistEntry = {
   slug: string;
   name: string;
+  /** Medusa `product.id` when added from PDP; keeps identity stable if handle changes. */
+  medusaProductId?: string;
   addedAt: string;
 };
 
@@ -26,9 +28,14 @@ export function getWishlist(): WishlistEntry[] {
     if (!row || typeof row !== "object") continue;
     const o = row as Record<string, unknown>;
     if (typeof o.slug !== "string" || typeof o.name !== "string") continue;
+    const mid =
+      typeof o.medusaProductId === "string" && o.medusaProductId.trim()
+        ? o.medusaProductId.trim()
+        : undefined;
     out.push({
       slug: o.slug,
       name: o.name,
+      ...(mid ? { medusaProductId: mid } : {}),
       addedAt:
         typeof o.addedAt === "string" ? o.addedAt : new Date().toISOString(),
     });
@@ -41,15 +48,23 @@ function write(entries: WishlistEntry[]) {
   window.localStorage.setItem(KEY, JSON.stringify(entries));
 }
 
-export function wishlistContains(slug: string): boolean {
-  return getWishlist().some((e) => e.slug === slug);
+export function wishlistContains(slug: string, medusaProductId?: string): boolean {
+  const mid = medusaProductId?.trim();
+  return getWishlist().some((e) => {
+    if (mid && e.medusaProductId?.trim() === mid) return true;
+    return e.slug === slug;
+  });
 }
 
 export function toggleWishlist(
-  entry: Pick<WishlistEntry, "slug" | "name">,
+  entry: Pick<WishlistEntry, "slug" | "name" | "medusaProductId">,
 ): boolean {
   const list = getWishlist();
-  const i = list.findIndex((e) => e.slug === entry.slug);
+  const mid = entry.medusaProductId?.trim();
+  const i = list.findIndex((e) => {
+    if (mid && e.medusaProductId?.trim() === mid) return true;
+    return e.slug === entry.slug;
+  });
   if (i >= 0) {
     list.splice(i, 1);
     write(list);
@@ -61,6 +76,7 @@ export function toggleWishlist(
   list.push({
     slug: entry.slug,
     name: entry.name,
+    ...(mid ? { medusaProductId: mid } : {}),
     addedAt: new Date().toISOString(),
   });
   write(list);
@@ -87,9 +103,14 @@ export function importWishlistJSON(json: string): number {
     if (typeof o.slug !== "string" || typeof o.name !== "string") continue;
     if (slugs.has(o.slug)) continue;
     if (current.length >= MAX_WISHLIST_SIZE) break;
+    const impMid =
+      typeof o.medusaProductId === "string" && o.medusaProductId.trim()
+        ? o.medusaProductId.trim()
+        : undefined;
     current.push({
       slug: o.slug,
       name: o.name,
+      ...(impMid ? { medusaProductId: impMid } : {}),
       addedAt:
         typeof o.addedAt === "string" ? o.addedAt : new Date().toISOString(),
     });
