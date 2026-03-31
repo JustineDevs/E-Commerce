@@ -11,11 +11,16 @@
   },
   "scripts": {
     "lint": "eslint src --ext .ts",
-    "test": "node --import tsx/esm --test src/tracking-token.test.ts src/env/medusa-storefront.test.ts src/env/admin-medusa.test.ts"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --import tsx/esm --test src/tracking-token.test.ts src/env/medusa-storefront.test.ts src/env/admin-medusa.test.ts src/cms-helpers.test.ts"
+  },
+  "dependencies": {
+    "@apparel-commerce/platform-data": "workspace:*"
   },
   "devDependencies": {
     "@apparel-commerce/config-eslint": "workspace:*",
     "@apparel-commerce/config-typescript": "workspace:*",
+    "@types/node": "^22.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0"
   }
