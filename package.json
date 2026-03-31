@@ -2,7 +2,8 @@
   "name": "e-commerce-website",
   "private": true,
   "scripts": {
-    "dev": "pnpm kill-ports && pnpm exec turbo dev",
+    "dev": "pnpm kill-ports && node scripts/dev-with-medusa-first.mjs",
+    "dev:parallel": "pnpm kill-ports && pnpm exec turbo dev",
     "kill-ports": "node scripts/kill-project-ports.js",
     "commit": "node scripts/commit/cli/index.js commit",
     "commit:dry": "node scripts/commit/cli/index.js commit --dry-run",
@@ -16,26 +17,52 @@
     "db:migrate": "pnpm --filter @apparel-commerce/database migrate",
     "medusa:seed:categories": "pnpm --filter medusa seed:categories",
     "db:seed": "pnpm --filter @apparel-commerce/database seed",
-    "test": "pnpm --filter @apparel-commerce/platform-data test && pnpm --filter @apparel-commerce/ui build && pnpm --filter @apparel-commerce/sdk test && pnpm --filter @apparel-commerce/validation test && pnpm --filter @apparel-commerce/rate-limits test && pnpm --filter @apparel-commerce/api test && pnpm --filter @apparel-commerce/database test && pnpm --filter @apparel-commerce/admin test && pnpm --filter medusa test:stress",
+    "test": "pnpm --filter @apparel-commerce/platform-data test && pnpm --filter @apparel-commerce/ui build && pnpm --filter @apparel-commerce/sdk test && pnpm --filter @apparel-commerce/validation test && pnpm --filter @apparel-commerce/rate-limits test && pnpm --filter @apparel-commerce/api test && pnpm --filter @apparel-commerce/database test && pnpm --filter @apparel-commerce/payment-connection-crypto test && pnpm --filter @apparel-commerce/admin test && pnpm --filter @apparel-commerce/storefront test && pnpm --filter medusa test:unit && pnpm --filter medusa test:stress",
+    "check:migration-boundary": "node scripts/check-commerce-migration-boundary.mjs",
+    "audit:medusa-schema:copy": "node scripts/copy-medusa-schema-artifact.mjs",
+    "check:storefront-client": "node scripts/check-storefront-client-boundary.mjs",
+    "check:admin-api-guard": "node scripts/check-admin-api-staff-guard.mjs",
     "stress-test": "node scripts/stress-test.js",
     "stress-test:quick": "node scripts/stress-test.js --no-e2e --no-dogfood",
     "release-gate": "node scripts/release-gate.js",
     "release-gate:full": "node scripts/release-gate.js --include-e2e",
-    "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui",
-    "dogfood:screenshots": "playwright test e2e/dogfood --project=chromium",
+    "e2e:prep:medusa": "node scripts/e2e-prep-medusa.mjs",
+    "e2e:prep:medusa:force": "node scripts/e2e-prep-medusa.mjs --force",
+    "e2e:ensure-staff": "pnpm --filter @apparel-commerce/database e2e:ensure-staff",
+    "e2e:prep": "node scripts/e2e-prep-medusa.mjs && pnpm e2e:ensure-staff",
+    "test:psp-sandbox": "node scripts/test-psp-sandbox.cjs",
+    "test:http-flow": "node scripts/run-http-flow.cjs",
+    "test:http-flow:with-webservers": "node scripts/run-e2e.js flows/http-flow-matrix.spec.ts",
+    "stress-test:checkout-providers": "node scripts/stress-checkout-providers.mjs",
+    "test:e2e": "node scripts/run-e2e.js",
+    "test:e2e:ui": "node scripts/run-e2e.js --ui",
+    "dogfood:screenshots": "node scripts/run-e2e.js dogfood --project=chromium",
     "predeploy": "pnpm install && pnpm run build"
   },
   "dependencies": {
-    "vercel": "^32.3.0"
+    "vercel": "^50.0.0"
   },
   "devDependencies": {
+    "dotenv": "^16.4.5",
     "@playwright/test": "^1.49.0",
-    "@typescript-eslint/parser": "^8.0.0",
+    "@typescript-eslint/parser": "^8.18.0",
     "eslint": "^9.0.0",
     "globals": "^15.15.0",
     "prettier": "^3.2.5",
     "turbo": "^2.3.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "@vercel/node>path-to-regexp": "6.3.0",
+      "@vercel/node>undici": "6.24.0",
+      "@vercel/redwood>path-to-regexp": "6.3.0",
+      "@vercel/routing-utils>path-to-regexp": "6.3.0",
+      "@vercel/fun>tar": "7.5.11",
+      "@vercel/fun>semver": "7.6.3",
+      "@mapbox/node-pre-gyp>tar": "7.5.11",
+      "micromatch>picomatch": "2.3.2",
+      "tinyglobby>picomatch": "4.0.4"
+    }
   },
   "packageManager": "pnpm@10.15.1",
   "engines": {
