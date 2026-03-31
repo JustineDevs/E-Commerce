@@ -7,13 +7,14 @@ import {
   getMedusaStoreSdk,
   optionRowsToSizeColor,
   variantPricePhpFromCalculated,
+  withSalesChannelId,
 } from "@/lib/medusa-pos";
-import { requireStaffSession } from "@/lib/requireStaffSession";
+import { requireStaffApiSession } from "@/lib/requireStaffSession";
 import { correlatedJson, tagResponse } from "@/lib/staff-api-response";
 
 export async function POST(req: Request) {
   const correlationId = getCorrelationId(req);
-  const staff = await requireStaffSession();
+  const staff = await requireStaffApiSession("pos:use");
   if (!staff.ok) {
     return tagResponse(staff.response, correlationId);
   }
@@ -65,13 +66,15 @@ export async function POST(req: Request) {
   let productTitle = "";
 
   try {
-    const storeList = await storeSdk.store.product.list({
-      region_id: regionId,
-      q: trimmed,
-      limit: 50,
-      fields:
-        "*variants,*variants.calculated_price,*variants.options,*variants.sku,+title",
-    });
+    const storeList = await storeSdk.store.product.list(
+      withSalesChannelId({
+        region_id: regionId,
+        q: trimmed,
+        limit: 50,
+        fields:
+          "*variants,*variants.calculated_price,*variants.options,*variants.sku,*variants.barcode,+title",
+      }) as Parameters<typeof storeSdk.store.product.list>[0],
+    );
     outerStore: for (const p of storeList.products ?? []) {
       for (const v of p.variants ?? []) {
         const vSku = String(v.sku ?? "").trim();
@@ -95,7 +98,8 @@ export async function POST(req: Request) {
       const adminProducts = await adminSdk.admin.product.list({
         q: trimmed,
         limit: 25,
-        fields: "+variants.id,+variants.sku,+variants.options.*,+title",
+        fields:
+          "+variants.id,+variants.sku,+variants.barcode,+variants.options.*,+title",
       });
       outerAdmin: for (const p of adminProducts.products ?? []) {
         const variants = p.variants ?? [];
@@ -105,11 +109,14 @@ export async function POST(req: Request) {
         const pick = exact ?? variants[0];
         const pid = p.id;
         if (pick?.id && pid) {
-          const prod = await storeSdk.store.product.retrieve(pid, {
-            region_id: regionId,
-            fields:
-              "*variants,*variants.calculated_price,*variants.options,*variants.sku,+title",
-          });
+          const prod = await storeSdk.store.product.retrieve(
+            pid,
+            withSalesChannelId({
+              region_id: regionId,
+              fields:
+                "*variants,*variants.calculated_price,*variants.options,*variants.sku,*variants.barcode,+title",
+            }) as Parameters<typeof storeSdk.store.product.retrieve>[1],
+          );
           const vmatch = prod.product?.variants?.find((x) => x.id === pick.id);
           variant = (vmatch ?? pick) as VariantLike;
           productTitle = prod.product?.title ?? p.title ?? "";
@@ -133,6 +140,9 @@ export async function POST(req: Request) {
 
   const { size, color } = optionRowsToSizeColor(variant.options);
   const price = variantPricePhpFromCalculated(variant.calculated_price);
+  const ext = variant as { barcode?: string | null; ean?: string | null };
+  const barcodeRaw =
+    String(ext.ean ?? "").trim() || String(ext.barcode ?? "").trim();
 
   logAdminApiEvent({
     route: "POST /api/pos/medusa/lookup",
@@ -144,6 +154,7 @@ export async function POST(req: Request) {
   return correlatedJson(correlationId, {
     id: variant.id,
     sku: String(variant.sku ?? ""),
+    barcode: barcodeRaw || undefined,
     size,
     color,
     price,
