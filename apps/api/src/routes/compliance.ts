@@ -4,26 +4,86 @@ import {
   exportDataSubjectByEmail,
   anonymizeStaleOrderAddresses,
 } from "@apparel-commerce/database";
+import { complianceEmailParamSchema } from "@apparel-commerce/validation";
+
+import {
+  deleteMedusaCustomerByEmail,
+  fetchMedusaOrdersForComplianceEmail,
+} from "../lib/medusa-compliance-fetch.js";
 
 export const complianceRouter: ReturnType<typeof Router> = Router();
 
 complianceRouter.get("/export", async (req, res, next) => {
   try {
-    const email =
+    const emailRaw =
       typeof req.query.email === "string" ? req.query.email.trim() : "";
-    if (!email) {
-      res
-        .status(400)
-        .json({ error: "email query required", code: "MISSING_EMAIL" });
+    const emailParsed = complianceEmailParamSchema.safeParse(emailRaw);
+    if (!emailParsed.success) {
+      res.status(400).json({
+        error: "valid email query required",
+        code: "MISSING_EMAIL",
+        details: emailParsed.error.flatten(),
+      });
       return;
     }
+    const email = emailParsed.data;
     const supabase = createSupabaseClient();
     const bundle = await exportDataSubjectByEmail(supabase, email);
     if (!bundle) {
       res.status(404).json({ error: "subject not found", code: "NOT_FOUND" });
       return;
     }
-    res.json(bundle);
+    const medusa = await fetchMedusaOrdersForComplianceEmail(email);
+    res.json({
+      ...bundle,
+      medusa_orders: medusa.orders,
+      medusa_error: medusa.error,
+    });
+  } catch (e) {
+    next(e);
+  }
+});
+
+/**
+ * Erasure: Supabase platform user row + Medusa customer (commerce of record).
+ * Requires INTERNAL_API_KEY + service role in env.
+ */
+complianceRouter.post("/erasure", async (req, res, next) => {
+  try {
+    const emailRaw =
+      typeof req.body?.email === "string" ? req.body.email.trim() : "";
+    const emailParsed = complianceEmailParamSchema.safeParse(emailRaw);
+    if (!emailParsed.success) {
+      res.status(400).json({
+        error: "valid email required",
+        code: "MISSING_EMAIL",
+        details: emailParsed.error.flatten(),
+      });
+      return;
+    }
+    const email = emailParsed.data;
+    const supabase = createSupabaseClient();
+    const { data: user, error: uErr } = await supabase
+      .from("users")
+      .select("id,email")
+      .eq("email", email)
+      .maybeSingle();
+    if (uErr) throw uErr;
+    const medusaDel = await deleteMedusaCustomerByEmail(email);
+    let supabaseDeleted = false;
+    if (user && typeof (user as { id?: string }).id === "string") {
+      const uid = (user as { id: string }).id;
+      const { error: dErr } = await supabase.from("users").delete().eq("id", uid);
+      if (dErr) throw dErr;
+      supabaseDeleted = true;
+    }
+    res.json({
+      ok: true,
+      email,
+      supabase_user_deleted: supabaseDeleted,
+      medusa_customer_deleted: medusaDel.deleted,
+      medusa_error: medusaDel.error,
+    });
   } catch (e) {
     next(e);
   }
