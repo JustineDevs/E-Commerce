@@ -1,14 +1,11 @@
 import { Router } from "express";
 import { createSupabaseClient } from "@apparel-commerce/database";
+import { getMedusaStoreBaseUrl } from "@apparel-commerce/sdk";
 
 export const healthRouter: ReturnType<typeof Router> = Router();
 
 function getMedusaBaseUrl(): string {
-  const url =
-    process.env.MEDUSA_BACKEND_URL ??
-    process.env.NEXT_PUBLIC_MEDUSA_URL ??
-    "http://localhost:9000";
-  return url.replace(/\/$/, "");
+  return getMedusaStoreBaseUrl();
 }
 
 async function checkMedusa(): Promise<{ url: string; ok: boolean }> {
@@ -48,10 +45,26 @@ healthRouter.get("/", async (_req, res) => {
 
   const allOk = medusa.ok && supabaseOk;
   const status = allOk ? "ok" : "degraded";
-  const code = allOk ? 200 : 503;
 
-  res.status(code).json({
+  res.status(200).json({
     status,
+    medusa: medusa.ok ? "ok" : "unavailable",
+    supabase: supabaseOk ? "ok" : "unavailable",
+    timestamp: new Date().toISOString(),
+  });
+});
+
+healthRouter.get("/ready", async (_req, res) => {
+  const [medusa, supabaseOk] = await Promise.all([
+    checkMedusa(),
+    checkSupabase(),
+  ]);
+
+  const allOk = medusa.ok && supabaseOk;
+  const httpStatus = allOk ? 200 : 503;
+
+  res.status(httpStatus).json({
+    ready: allOk,
     medusa: medusa.ok ? "ok" : "unavailable",
     supabase: supabaseOk ? "ok" : "unavailable",
     timestamp: new Date().toISOString(),
