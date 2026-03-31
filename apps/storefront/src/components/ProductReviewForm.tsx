@@ -1,7 +1,10 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { useState } from "react";
+import { REVIEW_STAR_PATH } from "@/components/ReviewStarRatingDisplay";
 
 export function ProductReviewForm({
   productSlug,
@@ -11,12 +14,16 @@ export function ProductReviewForm({
   medusaProductId: string;
 }) {
   const router = useRouter();
-  const [authorName, setAuthorName] = useState("");
+  const pathname = usePathname();
+  const { data: session, status } = useSession();
   const [rating, setRating] = useState(5);
   const [body, setBody] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [verifiedHint, setVerifiedHint] = useState<boolean | null>(null);
+
+  const signInHref = `/sign-in?callbackUrl=${encodeURIComponent(pathname || "/shop")}`;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -29,19 +36,27 @@ export function ProductReviewForm({
         body: JSON.stringify({
           productSlug,
           medusaProductId,
-          authorName: authorName.trim(),
           rating,
           body: body.trim(),
         }),
       });
-      const j = (await res.json()) as { error?: string };
+      const j = (await res.json()) as {
+        error?: string;
+        code?: string;
+        isVerifiedBuyer?: boolean;
+      };
+      if (res.status === 401) {
+        setError(j.error ?? "Sign in required");
+        setSaving(false);
+        return;
+      }
       if (!res.ok) {
         setError(j.error ?? "Unable to submit");
         setSaving(false);
         return;
       }
+      setVerifiedHint(typeof j.isVerifiedBuyer === "boolean" ? j.isVerifiedBuyer : null);
       setDone(true);
-      setAuthorName("");
       setBody("");
       setRating(5);
       router.refresh();
@@ -52,54 +67,123 @@ export function ProductReviewForm({
     }
   }
 
+  if (status === "loading") {
+    return (
+      <div className="border-t border-outline-variant/20 pt-8 text-sm text-on-surface-variant">
+        Checking sign-in…
+      </div>
+    );
+  }
+
+  if (status !== "authenticated" || !session?.user?.email) {
+    return (
+      <div className="space-y-3 border-t border-outline-variant/20 pt-8">
+        <h3 className="font-headline text-sm font-bold uppercase tracking-widest text-primary">
+          Write a review
+        </h3>
+        <p className="text-sm text-on-surface-variant">
+          Sign in with your account to submit a review. Submissions are reviewed before they appear on the product page.
+        </p>
+        <Link
+          href={signInHref}
+          className="inline-flex rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary"
+        >
+          Sign in to review
+        </Link>
+      </div>
+    );
+  }
+
   if (done) {
     return (
-      <p className="text-sm text-on-surface-variant" role="status">
-        Thank you. Your review was posted.
-      </p>
+      <div
+        className="rounded-xl border border-outline-variant/20 bg-surface/30 px-5 py-4 dark:bg-surface/20"
+        role="status"
+      >
+        <p className="text-sm font-medium text-primary">Thank you.</p>
+        <p className="mt-1 text-sm text-on-surface-variant">
+          Your review was received and is pending moderation. It will appear here after staff approval.
+        </p>
+        {verifiedHint === true ? (
+          <p className="mt-2 text-xs text-on-surface-variant">
+            Your purchase of this product was verified from your order history. The verified badge will show after approval.
+          </p>
+        ) : verifiedHint === false ? (
+          <p className="mt-2 text-xs text-on-surface-variant">
+            We could not match a completed order for this product on your account. The review can still be approved without the verified badge.
+          </p>
+        ) : null}
+      </div>
     );
   }
 
   return (
-    <form onSubmit={(e) => void submit(e)} className="space-y-4 border-t border-outline-variant/20 pt-8">
-      <h3 className="font-headline text-sm font-bold uppercase tracking-widest text-primary">
-        Write a review
-      </h3>
+    <form
+      onSubmit={(e) => void submit(e)}
+      className="space-y-6 border-t border-outline-variant/20 pt-8"
+    >
+      <div>
+        <h3 className="font-headline text-sm font-bold uppercase tracking-widest text-primary">
+          Write a review
+        </h3>
+        <p className="mt-1 text-xs text-on-surface-variant">
+          Signed in as {session.user.email}. Your display name comes from your account. Reviews are moderated before they go live.
+        </p>
+      </div>
       {error ? (
-        <p className="text-sm text-red-700" role="alert">
+        <p
+          className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-800 dark:text-red-100"
+          role="alert"
+        >
           {error}
         </p>
       ) : null}
       <div>
-        <label className="block text-xs font-medium text-on-surface-variant mb-1">
-          Your name
-        </label>
-        <input
-          required
-          maxLength={120}
-          value={authorName}
-          onChange={(e) => setAuthorName(e.target.value)}
-          className="w-full rounded border border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-primary"
-        />
-      </div>
-      <div>
-        <label className="block text-xs font-medium text-on-surface-variant mb-1">
+        <span className="mb-2 block text-xs font-medium text-on-surface-variant">
           Rating
-        </label>
-        <select
-          value={rating}
-          onChange={(e) => setRating(Number(e.target.value))}
-          className="w-full rounded border border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-primary"
+        </span>
+        <div
+          role="radiogroup"
+          aria-label={`Rating: ${rating} out of 5 stars`}
+          className="flex flex-wrap items-center gap-2"
         >
-          {[5, 4, 3, 2, 1].map((n) => (
-            <option key={n} value={n}>
-              {n} of 5
-            </option>
-          ))}
-        </select>
+          <div className="flex items-center gap-0.5">
+            {[1, 2, 3, 4, 5].map((n) => {
+              const active = n <= rating;
+              return (
+                <button
+                  key={n}
+                  type="button"
+                  disabled={saving}
+                  role="radio"
+                  aria-checked={rating === n}
+                  aria-label={`Set rating to ${n} out of 5`}
+                  className="rounded-md p-0.5 transition hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus-visible:ring-offset-surface-container-lowest"
+                  onClick={() => setRating(n)}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    className={`h-9 w-9 sm:h-10 sm:w-10 ${
+                      active
+                        ? "text-amber-600 dark:text-amber-400"
+                        : "text-outline-variant/30 dark:text-outline-variant/25"
+                    }`}
+                    fill="currentColor"
+                    aria-hidden
+                  >
+                    <path d={REVIEW_STAR_PATH} />
+                  </svg>
+                </button>
+              );
+            })}
+          </div>
+          <span className="text-sm tabular-nums text-on-surface-variant" aria-live="polite">
+            {rating} / 5
+          </span>
+        </div>
       </div>
       <div>
-        <label className="block text-xs font-medium text-on-surface-variant mb-1">
+        <label className="mb-2 block text-xs font-medium text-on-surface-variant">
           Review
         </label>
         <textarea
@@ -109,15 +193,15 @@ export function ProductReviewForm({
           value={body}
           onChange={(e) => setBody(e.target.value)}
           rows={4}
-          className="w-full rounded border border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-primary"
+          className="w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 py-2.5 text-sm leading-relaxed outline-none transition focus:border-primary/50 focus:ring-2 focus:ring-primary/20"
         />
       </div>
       <button
         type="submit"
         disabled={saving}
-        className="rounded bg-primary px-6 py-2.5 text-sm font-semibold text-on-primary disabled:opacity-50"
+        className="rounded-lg bg-primary px-6 py-2.5 text-sm font-semibold text-on-primary shadow-sm transition hover:opacity-95 disabled:opacity-50"
       >
-        {saving ? "Submitting…" : "Submit review"}
+        {saving ? "Submitting…" : "Submit for moderation"}
       </button>
     </form>
   );
