@@ -1,27 +1,14 @@
+import { resolve } from "node:path";
 import { loadEnv, defineConfig } from "@medusajs/framework/utils";
+import { applyPlatformPaymentCredentialsFromSupabaseSync } from "./src/lib/apply-platform-payment-env";
 import { validateMedusaProcessEnv } from "./src/loaders/validate-process-env";
 
-loadEnv(process.env.NODE_ENV || "development", process.cwd());
+const env = process.env.NODE_ENV || "development";
+loadEnv(env, resolve(process.cwd(), "../.."));
+loadEnv(env, process.cwd());
+// BYOK sync: decrypt platform rows into process.env before provider arrays read env (required contract).
+applyPlatformPaymentCredentialsFromSupabaseSync();
 validateMedusaProcessEnv();
-
-const lemonSqueezyProvider =
-  process.env.LEMONSQUEEZY_API_KEY?.trim() &&
-  process.env.LEMONSQUEEZY_STORE_ID?.trim() &&
-  process.env.LEMONSQUEEZY_CHECKOUT_VARIANT_ID?.trim() &&
-  process.env.LEMONSQUEEZY_WEBHOOK_SECRET?.trim()
-    ? [
-        {
-          resolve: "./src/modules/lemonsqueezy-payment",
-          id: "lemonsqueezy",
-          options: {
-            apiKey: process.env.LEMONSQUEEZY_API_KEY!,
-            storeId: process.env.LEMONSQUEEZY_STORE_ID!,
-            variantId: process.env.LEMONSQUEEZY_CHECKOUT_VARIANT_ID!,
-            webhookSecret: process.env.LEMONSQUEEZY_WEBHOOK_SECRET!,
-          },
-        },
-      ]
-    : [];
 
 const stripeProvider = process.env.STRIPE_API_KEY?.trim()
   ? [
@@ -93,7 +80,6 @@ const mayaProvider =
     : [];
 
 const paymentProviders = [
-  ...lemonSqueezyProvider,
   ...stripeProvider,
   ...codProvider,
   ...paypalProvider,
@@ -101,7 +87,7 @@ const paymentProviders = [
   ...mayaProvider,
 ];
 
-module.exports = defineConfig({
+export default defineConfig({
   projectConfig: {
     databaseUrl: process.env.DATABASE_URL,
     http: {
