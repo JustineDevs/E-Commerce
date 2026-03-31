@@ -46,6 +46,8 @@ export function isAllowedTransition(from: string, to: string): boolean {
   return next ? next.has(to) : false;
 }
 
+const WORKFLOW_UPSERT_ATTEMPTS = 3;
+
 export async function upsertEntityWorkflow(
   client: SupabaseClient,
   input: {
@@ -57,31 +59,52 @@ export async function upsertEntityWorkflow(
     actorEmail?: string | null;
   },
 ): Promise<AdminOperationResult<{ id: string }>> {
-  const { data, error } = await client
-    .from("admin_entity_workflow")
-    .upsert(
-      {
-        entity_type: input.entityType,
-        entity_id: input.entityId,
-        state: input.state,
-        previous_state: input.previousState ?? null,
-        notes: input.notes ?? null,
-        actor_email: input.actorEmail ?? null,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "entity_type,entity_id", ignoreDuplicates: false },
-    )
-    .select("id")
-    .maybeSingle();
+  let lastMessage = "";
+  for (let attempt = 0; attempt < WORKFLOW_UPSERT_ATTEMPTS; attempt++) {
+    const { data, error } = await client
+      .from("admin_entity_workflow")
+      .upsert(
+        {
+          entity_type: input.entityType,
+          entity_id: input.entityId,
+          state: input.state,
+          previous_state: input.previousState ?? null,
+          notes: input.notes ?? null,
+          actor_email: input.actorEmail ?? null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "entity_type,entity_id", ignoreDuplicates: false },
+      )
+      .select("id")
+      .maybeSingle();
 
-  if (error) {
-    return adminErr("WORKFLOW_DB", error.message, 502);
+    if (!error) {
+      const id = data?.id;
+      if (id) {
+        return adminOk({ id: String(id) });
+      }
+      lastMessage = "Upsert returned no id";
+    } else {
+      lastMessage = error.message;
+    }
+
+    if (attempt < WORKFLOW_UPSERT_ATTEMPTS - 1) {
+      await new Promise((r) => setTimeout(r, 50 * (attempt + 1)));
+    }
   }
-  const id = data?.id;
-  if (!id) {
-    return adminErr("WORKFLOW_DB", "Upsert returned no id", 502);
-  }
-  return adminOk({ id: String(id) });
+
+  console.error(
+    JSON.stringify({
+      scope: "admin_entity_workflow",
+      entity_type: input.entityType,
+      entity_id: input.entityId,
+      phase: "upsert_exhausted",
+      attempts: WORKFLOW_UPSERT_ATTEMPTS,
+      error: lastMessage,
+      ts: new Date().toISOString(),
+    }),
+  );
+  return adminErr("WORKFLOW_DB", lastMessage || "workflow upsert failed", 502);
 }
 
 export type EntityWorkflowRow = {
