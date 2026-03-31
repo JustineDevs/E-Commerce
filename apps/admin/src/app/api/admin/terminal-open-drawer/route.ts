@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { getServerSession } from "next-auth/next";
-import { staffHasPermission } from "@apparel-commerce/database";
+import { staffSessionAllows } from "@apparel-commerce/database";
 import { authOptions } from "@/lib/auth";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson } from "@/lib/staff-api-response";
@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
   if (!session?.user) {
     return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
   }
-  if (!staffHasPermission(session.user.permissions ?? [], "pos:use")) {
+  if (!staffSessionAllows(session, "pos:use")) {
     return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
   }
   const base =
