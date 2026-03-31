@@ -5,13 +5,14 @@ import {
   getMedusaStoreSdk,
   optionRowsToSizeColor,
   variantPricePhpFromCalculated,
+  withSalesChannelId,
 } from "@/lib/medusa-pos";
-import { requireStaffSession } from "@/lib/requireStaffSession";
+import { requireStaffApiSession } from "@/lib/requireStaffSession";
 import { correlatedJson, tagResponse } from "@/lib/staff-api-response";
 
 export async function GET(req: Request) {
   const correlationId = getCorrelationId(req);
-  const staff = await requireStaffSession();
+  const staff = await requireStaffApiSession("pos:use");
   if (!staff.ok) {
     return tagResponse(staff.response, correlationId);
   }
@@ -30,17 +31,20 @@ export async function GET(req: Request) {
   }
 
   try {
-    const { products } = await storeSdk.store.product.list({
-      region_id: regionId,
-      limit: 12,
-      fields:
-        "*variants,*variants.calculated_price,*variants.options,*variants.sku,+title,+thumbnail",
-    });
+    const { products } = await storeSdk.store.product.list(
+      withSalesChannelId({
+        region_id: regionId,
+        limit: 12,
+        fields:
+          "*variants,*variants.calculated_price,*variants.options,*variants.sku,*variants.barcode,+title,+thumbnail",
+      }) as Parameters<typeof storeSdk.store.product.list>[0],
+    );
 
     const suggestions: Array<{
       variantId: string;
       name: string;
       sku: string;
+      barcode?: string;
       size: string;
       color: string;
       price: number;
@@ -53,10 +57,14 @@ export async function GET(req: Request) {
         const { size, color } = optionRowsToSizeColor(
           v.options as Parameters<typeof optionRowsToSizeColor>[0],
         );
+        const vb = v as { barcode?: string | null; ean?: string | null };
+        const barcode =
+          String(vb.ean ?? "").trim() || String(vb.barcode ?? "").trim();
         suggestions.push({
           variantId: v.id,
           name: p.title ?? "",
           sku: String(v.sku ?? ""),
+          barcode: barcode || undefined,
           size,
           color,
           price: variantPricePhpFromCalculated(v.calculated_price),
