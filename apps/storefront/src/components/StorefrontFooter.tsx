@@ -1,16 +1,25 @@
-import type { CmsFooterColumn, CmsSocialLink } from "@apparel-commerce/platform-data";
+import type {
+  CmsFooterColumn,
+  CmsNavLink,
+  CmsSocialLink,
+} from "@apparel-commerce/platform-data";
 import Image from "next/image";
 import Link from "next/link";
-import { getInstagramHref } from "@/lib/public-site";
+import { normalizeInstagramHref } from "@/lib/public-site";
 
 export function StorefrontFooter({
   cmsFooterColumns,
+  cmsFooterBottomLinks,
   cmsSocialLinks,
+  instagramUrlRaw,
 }: {
   cmsFooterColumns?: CmsFooterColumn[];
+  cmsFooterBottomLinks?: CmsNavLink[];
   cmsSocialLinks?: CmsSocialLink[];
+  /** From CMS / env (resolved on server). */
+  instagramUrlRaw?: string;
 }) {
-  const instagram = getInstagramHref();
+  const instagram = normalizeInstagramHref(instagramUrlRaw);
 
   return (
     <footer className="w-full border-t border-slate-100 bg-slate-50 px-[clamp(0.75rem,4vw,2rem)] py-16 sm:py-20">
@@ -18,15 +27,16 @@ export function StorefrontFooter({
         <div className="col-span-2 flex flex-col gap-4 md:col-span-1 lg:col-span-2">
           <Link
             href="/"
-            className="relative block h-[5.75rem] w-full max-w-2xl shrink-0 overflow-visible opacity-90 transition-opacity hover:opacity-100 sm:h-[7rem] md:h-[8.5rem] lg:h-[9.5rem]"
+            className="relative block aspect-[1536/1024] w-full max-w-xs shrink-0 overflow-visible opacity-90 transition-opacity hover:opacity-100 sm:max-w-sm md:max-w-md lg:max-w-lg"
           >
             <Image
-              src="/brand/maharlika-logo-horizontal.png"
+              src="/brand/maharlika-logo-design.svg"
               alt="Maharlika Apparel Custom"
-              width={960}
-              height={640}
-              className="h-full w-full max-w-2xl origin-left scale-[1.15] object-contain object-left md:scale-[1.1]"
+              width={1536}
+              height={1024}
+              className="h-full w-full object-contain object-left"
               sizes="(max-width: 768px) 92vw, (max-width: 1280px) 672px, 960px"
+              unoptimized
             />
           </Link>
           <p className="font-body text-sm tracking-wide text-slate-500">
@@ -81,7 +91,7 @@ export function StorefrontFooter({
               href="/wishlist"
               className="text-sm leading-snug text-slate-600 hover:text-primary md:text-base"
             >
-              Wishlist
+              Saved items
             </Link>
           </nav>
         </div>
@@ -240,6 +250,24 @@ export function StorefrontFooter({
           </nav>
         </div>
       </div>
+      {cmsFooterBottomLinks && cmsFooterBottomLinks.length > 0 ? (
+        <div className="mx-auto mt-12 max-w-7xl border-t border-slate-200 pt-6">
+          <nav
+            className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-slate-500 md:justify-start md:text-sm"
+            aria-label="Footer secondary"
+          >
+            {cmsFooterBottomLinks.map((l) => (
+              <Link
+                key={`${l.href}-${l.label}`}
+                href={l.href}
+                className="hover:text-primary"
+              >
+                {l.label}
+              </Link>
+            ))}
+          </nav>
+        </div>
+      ) : null}
     </footer>
   );
 }
