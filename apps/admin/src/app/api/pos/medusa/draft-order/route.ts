@@ -5,12 +5,12 @@ import {
   getMedusaRegionId,
   getMedusaSalesChannelId,
 } from "@/lib/medusa-pos";
-import { requireStaffSession } from "@/lib/requireStaffSession";
+import { requireStaffApiSession } from "@/lib/requireStaffSession";
 import { correlatedJson, tagResponse } from "@/lib/staff-api-response";
 
 export async function POST(req: Request) {
   const correlationId = getCorrelationId(req);
-  const staff = await requireStaffSession();
+  const staff = await requireStaffApiSession("pos:use");
   if (!staff.ok) {
     return tagResponse(staff.response, correlationId);
   }
