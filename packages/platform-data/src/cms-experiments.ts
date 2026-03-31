@@ -8,6 +8,13 @@ export type CmsAbExperimentRow = {
   variants: unknown;
   active: boolean;
   updated_at: string;
+  starts_at: string | null;
+  ends_at: string | null;
+  traffic_cap_pct: number | null;
+  target_page_slug: string | null;
+  target_component_key: string | null;
+  impressions: number;
+  conversions: number;
 };
 
 export async function listCmsAbExperiments(supabase: SupabaseClient): Promise<CmsAbExperimentRow[]> {
@@ -29,6 +36,16 @@ export async function listCmsAbExperiments(supabase: SupabaseClient): Promise<Cm
       variants: x.variants ?? [],
       active: Boolean(x.active),
       updated_at: String(x.updated_at ?? ""),
+      starts_at: x.starts_at != null ? String(x.starts_at) : null,
+      ends_at: x.ends_at != null ? String(x.ends_at) : null,
+      traffic_cap_pct:
+        x.traffic_cap_pct != null && x.traffic_cap_pct !== ""
+          ? Number(x.traffic_cap_pct)
+          : null,
+      target_page_slug: x.target_page_slug != null ? String(x.target_page_slug) : null,
+      target_component_key: x.target_component_key != null ? String(x.target_component_key) : null,
+      impressions: Number(x.impressions) || 0,
+      conversions: Number(x.conversions) || 0,
     };
   });
 }
@@ -41,13 +58,57 @@ export async function upsertCmsAbExperiment(
     name?: string;
     variants: unknown;
     active?: boolean;
+    starts_at?: string | null;
+    ends_at?: string | null;
+    traffic_cap_pct?: number | null;
+    target_page_slug?: string | null;
+    target_component_key?: string | null;
+    impressions?: number;
+    conversions?: number;
   },
 ): Promise<CmsAbExperimentRow | null> {
+  const existing = input.id
+    ? (await supabase.from("cms_ab_experiments").select("*").eq("id", input.id).maybeSingle()).data
+    : null;
+  const ex = existing as Record<string, unknown> | null;
   const row = {
     experiment_key: input.experiment_key,
-    name: input.name ?? "",
-    variants: input.variants ?? [],
-    active: input.active ?? false,
+    name: input.name ?? (ex ? String(ex.name ?? "") : ""),
+    variants: input.variants ?? (ex?.variants ?? []),
+    active: input.active ?? (ex ? Boolean(ex.active) : false),
+    starts_at:
+      input.starts_at !== undefined ? input.starts_at : ex?.starts_at != null ? String(ex.starts_at) : null,
+    ends_at: input.ends_at !== undefined ? input.ends_at : ex?.ends_at != null ? String(ex.ends_at) : null,
+    traffic_cap_pct:
+      input.traffic_cap_pct !== undefined
+        ? input.traffic_cap_pct
+        : ex?.traffic_cap_pct != null
+          ? Number(ex.traffic_cap_pct)
+          : null,
+    target_page_slug:
+      input.target_page_slug !== undefined
+        ? input.target_page_slug
+        : ex?.target_page_slug != null
+          ? String(ex.target_page_slug)
+          : null,
+    target_component_key:
+      input.target_component_key !== undefined
+        ? input.target_component_key
+        : ex?.target_component_key != null
+          ? String(ex.target_component_key)
+          : null,
+    impressions:
+      input.impressions !== undefined
+        ? input.impressions
+        : ex?.impressions != null
+          ? Number(ex.impressions)
+          : 0,
+    conversions:
+      input.conversions !== undefined
+        ? input.conversions
+        : ex?.conversions != null
+          ? Number(ex.conversions)
+          : 0,
     updated_at: new Date().toISOString(),
   };
   if (input.id) {
@@ -69,6 +130,14 @@ export async function upsertCmsAbExperiment(
       variants: x.variants ?? [],
       active: Boolean(x.active),
       updated_at: String(x.updated_at ?? ""),
+      starts_at: x.starts_at != null ? String(x.starts_at) : null,
+      ends_at: x.ends_at != null ? String(x.ends_at) : null,
+      traffic_cap_pct:
+        x.traffic_cap_pct != null && x.traffic_cap_pct !== "" ? Number(x.traffic_cap_pct) : null,
+      target_page_slug: x.target_page_slug != null ? String(x.target_page_slug) : null,
+      target_component_key: x.target_component_key != null ? String(x.target_component_key) : null,
+      impressions: Number(x.impressions) || 0,
+      conversions: Number(x.conversions) || 0,
     };
   }
   const { data, error } = await supabase
@@ -88,5 +157,37 @@ export async function upsertCmsAbExperiment(
     variants: x.variants ?? [],
     active: Boolean(x.active),
     updated_at: String(x.updated_at ?? ""),
+    starts_at: x.starts_at != null ? String(x.starts_at) : null,
+    ends_at: x.ends_at != null ? String(x.ends_at) : null,
+    traffic_cap_pct:
+      x.traffic_cap_pct != null && x.traffic_cap_pct !== "" ? Number(x.traffic_cap_pct) : null,
+    target_page_slug: x.target_page_slug != null ? String(x.target_page_slug) : null,
+    target_component_key: x.target_component_key != null ? String(x.target_component_key) : null,
+    impressions: Number(x.impressions) || 0,
+    conversions: Number(x.conversions) || 0,
   };
+}
+
+/**
+ * Increments the aggregate impressions counter for an experiment (e.g. public assign/track flow).
+ */
+export async function incrementCmsAbExperimentImpressions(
+  supabase: SupabaseClient,
+  experimentKey: string,
+): Promise<boolean> {
+  const key = experimentKey.trim();
+  if (!key) return false;
+  const { data, error: selErr } = await supabase
+    .from("cms_ab_experiments")
+    .select("impressions")
+    .eq("experiment_key", key)
+    .maybeSingle();
+  if (selErr || !data) return false;
+  const row = data as { impressions?: number | null };
+  const next = (Number(row.impressions) || 0) + 1;
+  const { error: upErr } = await supabase
+    .from("cms_ab_experiments")
+    .update({ impressions: next, updated_at: new Date().toISOString() })
+    .eq("experiment_key", key);
+  return !upErr;
 }
