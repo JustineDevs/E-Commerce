@@ -1,6 +1,5 @@
 import type { MetadataRoute } from "next";
-import { loadCmsSitemapEntries } from "@apparel-commerce/platform-data";
-import { DEFAULT_PUBLIC_SITE_ORIGIN } from "@apparel-commerce/sdk";
+import { DEFAULT_PUBLIC_SITE_ORIGIN, loadCmsSitemapEntries } from "@apparel-commerce/sdk";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = (process.env.NEXT_PUBLIC_SITE_URL ?? DEFAULT_PUBLIC_SITE_ORIGIN).replace(/\/$/, "");
