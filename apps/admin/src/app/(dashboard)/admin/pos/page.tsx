@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { PH_VAT_RATE, computeDisplayVat } from "@apparel-commerce/sdk";
 import {
   buildPosReceiptPayloadFromCart,
+  buildProductLabelPayloadFromLineItem,
   fireAndForgetPrint,
+  fireAndForgetPrintLabel,
   openCashDrawerRequest,
 } from "@/lib/terminal-print";
 import { storeOfflineSale, isOnline as checkOnline } from "@/lib/offline-pos";
@@ -18,6 +20,7 @@ type CartItem = {
   size: string;
   color: string;
   sku: string;
+  barcode?: string;
   price: number;
   qty: number;
   imageUrl?: string;
@@ -26,6 +29,7 @@ type CartItem = {
 type VariantLookup = {
   id: string;
   sku: string;
+  barcode?: string;
   size: string;
   color: string;
   price: number;
@@ -39,6 +43,17 @@ type ShiftData = {
   opened_at: string;
   status: string;
   opening_cash: number;
+};
+
+type PosProductHit = {
+  variantId: string;
+  name: string;
+  sku: string;
+  barcode?: string;
+  size: string;
+  color: string;
+  price: number;
+  imageUrl?: string;
 };
 
 export default function POSPage() {
@@ -187,6 +202,7 @@ export default function POSPage() {
         size: variant.size,
         color: variant.color,
         sku: variant.sku,
+        barcode: variant.barcode,
         price: Number(variant.price),
         qty: 1,
       });
@@ -277,9 +293,13 @@ export default function POSPage() {
       return;
     }
 
+    const idempotencyKey = crypto.randomUUID();
     const res = await fetch(`${medusaPosBase}/commit-sale`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": idempotencyKey,
+      },
       body: JSON.stringify({
         items: cart.map((c) => ({
           variantId: c.variantId,
@@ -350,6 +370,29 @@ export default function POSPage() {
     }
   }
 
+  function handlePrintLabelForLine(item: CartItem) {
+    setHardwareMessage(null);
+    fireAndForgetPrintLabel(
+      buildProductLabelPayloadFromLineItem({
+        name: item.name,
+        sku: item.sku,
+        barcode: item.barcode,
+        size: item.size,
+        color: item.color,
+        price: item.price,
+      }),
+      (m) => setHardwareMessage(m),
+    );
+  }
+
+  function printLabelFromQuickProduct(p: PosProductHit) {
+    setHardwareMessage(null);
+    fireAndForgetPrintLabel(
+      buildProductLabelPayloadFromLineItem(p),
+      (m) => setHardwareMessage(m),
+    );
+  }
+
   function removeFromCart(id: string) {
     setCart(cart.filter((c) => c.id !== id));
   }
@@ -370,31 +413,15 @@ export default function POSPage() {
   const tax = computeDisplayVat(subtotal);
   const total = subtotal + tax;
 
-  const [quickProducts, setQuickProducts] = useState<
-    Array<{
-      variantId: string;
-      name: string;
-      sku: string;
-      size: string;
-      color: string;
-      price: number;
-      imageUrl?: string;
-    }>
-  >([]);
+  const [quickProducts, setQuickProducts] = useState<PosProductHit[]>([]);
 
   const [quickProductsError, setQuickProductsError] = useState<string | null>(null);
 
-  const [suggestions, setSuggestions] = useState<
-    Array<{
-      variantId: string;
-      name: string;
-      sku: string;
-      size: string;
-      color: string;
-      price: number;
-      imageUrl?: string;
-    }>
-  >([]);
+  const [suggestions, setSuggestions] = useState<PosProductHit[]>([]);
+
+  const [searchResults, setSearchResults] = useState<PosProductHit[]>([]);
+  const [searchBusy, setSearchBusy] = useState(false);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     fetch(`${medusaPosBase}/suggestions`)
@@ -403,17 +430,7 @@ export default function POSPage() {
         return r.json();
       })
       .then(
-        (data: {
-          suggestions?: Array<{
-            variantId: string;
-            name: string;
-            sku: string;
-            size: string;
-            color: string;
-            price: number;
-            imageUrl?: string;
-          }>;
-        }) => {
+        (data: { suggestions?: PosProductHit[] }) => {
           setSuggestions(data.suggestions ?? []);
         },
       )
@@ -423,23 +440,41 @@ export default function POSPage() {
   }, []);
 
   useEffect(() => {
+    const q = searchInput.trim();
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    if (!q) {
+      setSearchResults([]);
+      setSearchBusy(false);
+      return;
+    }
+    setSearchBusy(true);
+    searchDebounceRef.current = setTimeout(() => {
+      void fetch(
+        `${medusaPosBase}/search?${new URLSearchParams({ q })}`,
+      )
+        .then((r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.json();
+        })
+        .then((data: { products?: PosProductHit[] }) => {
+          setSearchResults(data.products ?? []);
+        })
+        .catch(() => setSearchResults([]))
+        .finally(() => setSearchBusy(false));
+    }, 320);
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    };
+  }, [searchInput]);
+
+  useEffect(() => {
     fetch(`${medusaPosBase}/quick-products`)
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
       })
       .then(
-        (data: {
-          products?: Array<{
-            variantId: string;
-            name: string;
-            sku: string;
-            size: string;
-            color: string;
-            price: number;
-            imageUrl?: string;
-          }>;
-        }) => {
+        (data: { products?: PosProductHit[] }) => {
           setQuickProducts(data.products ?? []);
           setQuickProductsError(null);
         },
@@ -543,6 +578,53 @@ export default function POSPage() {
           </div>
         </div>
 
+        {searchInput.trim() ? (
+          <div className="rounded-lg border border-outline-variant/20 bg-surface-container-lowest p-4 max-h-64 overflow-y-auto">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+                Search results
+              </h3>
+              {searchBusy ? (
+                <span className="text-[10px] text-on-surface-variant">Loading</span>
+              ) : null}
+            </div>
+            {searchResults.length === 0 && !searchBusy ? (
+              <p className="text-sm text-on-surface-variant">No products match this query.</p>
+            ) : (
+              <ul className="space-y-1">
+                {searchResults.map((p) => (
+                  <li key={p.variantId}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        addToCart({
+                          variantId: p.variantId,
+                          name: p.name,
+                          sku: p.sku,
+                          barcode: p.barcode,
+                          size: p.size,
+                          color: p.color,
+                          price: p.price,
+                          qty: 1,
+                        });
+                        setSearchInput("");
+                        setSearchResults([]);
+                      }}
+                      className="w-full text-left rounded px-3 py-2 hover:bg-surface-container-high transition-colors flex justify-between gap-4"
+                    >
+                      <span className="text-sm font-medium line-clamp-2">{p.name}</span>
+                      <span className="text-xs text-on-surface-variant shrink-0">
+                        {p.sku ? `${p.sku} · ` : ""}
+                        PHP {p.price.toLocaleString("en-PH")}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ) : null}
+
         <section className="mt-12">
           <h3 className="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-6">
             Quick Select / Recent Items
@@ -552,29 +634,42 @@ export default function POSPage() {
           )}
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6">
             {quickProducts.map((p) => (
-              <button
+              <div
                 key={p.variantId}
-                onClick={() =>
-                  addToCart({
-                    variantId: p.variantId,
-                    name: p.name,
-                    sku: p.sku,
-                    size: p.size,
-                    color: p.color,
-                    price: p.price,
-                    qty: 1,
-                  })
-                }
-                className="bg-surface-container-lowest p-4 group cursor-pointer transition-all hover:bg-surface-container-low text-left"
+                className="relative bg-surface-container-lowest p-4 transition-all hover:bg-surface-container-low"
               >
-                <div className="aspect-square mb-4 overflow-hidden rounded bg-surface-container-high" />
-                <p className="text-xs font-bold uppercase tracking-tighter font-headline">
-                  {p.name}
-                </p>
-                <p className="text-sm text-on-surface-variant mt-1">
-                  PHP {p.price.toLocaleString("en-PH")}
-                </p>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => printLabelFromQuickProduct(p)}
+                  className="absolute right-2 top-2 z-10 rounded bg-surface-container-high px-2 py-1 text-[10px] font-bold uppercase tracking-tighter text-on-surface-variant hover:bg-surface-dim"
+                >
+                  Label
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    addToCart({
+                      variantId: p.variantId,
+                      name: p.name,
+                      sku: p.sku,
+                      barcode: p.barcode,
+                      size: p.size,
+                      color: p.color,
+                      price: p.price,
+                      qty: 1,
+                    })
+                  }
+                  className="w-full text-left"
+                >
+                  <div className="aspect-square mb-4 overflow-hidden rounded bg-surface-container-high" />
+                  <p className="text-xs font-bold uppercase tracking-tighter font-headline">
+                    {p.name}
+                  </p>
+                  <p className="text-sm text-on-surface-variant mt-1">
+                    PHP {p.price.toLocaleString("en-PH")}
+                  </p>
+                </button>
+              </div>
             ))}
           </div>
         </section>
@@ -586,28 +681,41 @@ export default function POSPage() {
             </h3>
             <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
               {suggestions.map((p) => (
-                <button
+                <div
                   key={`s-${p.variantId}`}
-                  onClick={() =>
-                    addToCart({
-                      variantId: p.variantId,
-                      name: p.name,
-                      sku: p.sku,
-                      size: p.size,
-                      color: p.color,
-                      price: p.price,
-                      qty: 1,
-                    })
-                  }
-                  className="bg-surface-container-lowest border border-outline-variant/20 p-3 text-left hover:border-primary/40 transition-colors"
+                  className="relative border border-outline-variant/20 bg-surface-container-lowest p-3 hover:border-primary/40 transition-colors"
                 >
-                  <p className="text-xs font-bold uppercase tracking-tighter font-headline line-clamp-2">
-                    {p.name}
-                  </p>
-                  <p className="text-xs text-on-surface-variant mt-1">
-                    PHP {p.price.toLocaleString("en-PH")}
-                  </p>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => printLabelFromQuickProduct(p)}
+                    className="absolute right-2 top-2 z-10 rounded bg-surface-container-high px-2 py-0.5 text-[9px] font-bold uppercase tracking-tighter text-on-surface-variant hover:bg-surface-dim"
+                  >
+                    Label
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      addToCart({
+                        variantId: p.variantId,
+                        name: p.name,
+                        sku: p.sku,
+                        barcode: p.barcode,
+                        size: p.size,
+                        color: p.color,
+                        price: p.price,
+                        qty: 1,
+                      })
+                    }
+                    className="w-full pr-12 text-left"
+                  >
+                    <p className="text-xs font-bold uppercase tracking-tighter font-headline line-clamp-2">
+                      {p.name}
+                    </p>
+                    <p className="text-xs text-on-surface-variant mt-1">
+                      PHP {p.price.toLocaleString("en-PH")}
+                    </p>
+                  </button>
+                </div>
               ))}
             </div>
           </section>
@@ -643,6 +751,14 @@ export default function POSPage() {
                         {item.name}
                       </h4>
                       <div className="flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handlePrintLabelForLine(item)}
+                          className="text-on-surface-variant hover:text-primary transition-colors"
+                          title="Print shelf label to thermal printer"
+                        >
+                          <span className="material-symbols-outlined text-sm">label</span>
+                        </button>
                         <button
                           onClick={() => { setVoidTarget(item.id); setShowVoidModal(true); }}
                           className="text-on-surface-variant hover:text-amber-600 transition-colors"
@@ -738,10 +854,12 @@ export default function POSPage() {
               Open cash drawer
             </button>
             <p className="text-[10px] text-on-surface-variant leading-relaxed px-1">
-              Receipt printing uses the local terminal agent on this machine (default{" "}
+              Receipt and product labels use the local terminal agent (default{" "}
               <span className="font-mono">127.0.0.1:17711</span>). Configure{" "}
-              <span className="font-mono">NEXT_PUBLIC_TERMINAL_AGENT_URL</span> and thermal printer{" "}
-              <span className="font-mono">PRINTER_TCP_HOST</span> on the agent process.
+              <span className="font-mono">NEXT_PUBLIC_TERMINAL_AGENT_URL</span>, optional{" "}
+              <span className="font-mono">NEXT_PUBLIC_TERMINAL_PRINT_VIA_API=true</span>, and printer{" "}
+              <span className="font-mono">PRINTER_TCP_HOST</span> on the agent. Labels print ESC/POS text
+              (barcode digits from Medusa when set).
             </p>
             {hardwareMessage ? (
               <p className="text-xs text-amber-800 px-1">{hardwareMessage}</p>
