@@ -5,31 +5,39 @@ import {
   getMedusaSalesChannelId,
   getMedusaSecretApiKey,
   getMedusaStoreBaseUrl,
+  withSalesChannelId,
 } from "@apparel-commerce/sdk";
 
 export function getMedusaSecretKey(): string | undefined {
   return getMedusaSecretApiKey();
 }
 
+let _storeSdk: Medusa | null | undefined;
+let _adminSdk: Medusa | null | undefined;
+
 export function getMedusaStoreSdk(): Medusa | null {
+  if (_storeSdk !== undefined) return _storeSdk;
   const pk = getMedusaPublishableKey();
-  if (!pk) return null;
-  return new Medusa({
+  if (!pk) { _storeSdk = null; return null; }
+  _storeSdk = new Medusa({
     baseUrl: getMedusaStoreBaseUrl(),
     publishableKey: pk,
   });
+  return _storeSdk;
 }
 
 export function getMedusaAdminSdk(): Medusa | null {
+  if (_adminSdk !== undefined) return _adminSdk;
   const secret = getMedusaSecretKey();
-  if (!secret) return null;
-  return new Medusa({
+  if (!secret) { _adminSdk = null; return null; }
+  _adminSdk = new Medusa({
     baseUrl: getMedusaStoreBaseUrl(),
     apiKey: secret,
   });
+  return _adminSdk;
 }
 
-export { getMedusaRegionId, getMedusaSalesChannelId };
+export { getMedusaRegionId, getMedusaSalesChannelId, withSalesChannelId };
 
 type OptionRow = {
   option?: { title?: string | null } | null;
