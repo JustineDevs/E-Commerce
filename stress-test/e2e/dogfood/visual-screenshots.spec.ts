@@ -7,7 +7,6 @@ const OUT_DIR = path.join(process.cwd(), "stress-test", "dogfood-output", "scree
 const ROUTES: { path: string; file: string }[] = [
   { path: "/", file: "home" },
   { path: "/shop", file: "shop" },
-  { path: "/shop/classic-shorts", file: "shop-pdp-classic-shorts" },
   { path: "/collections", file: "collections" },
   { path: "/checkout", file: "checkout" },
   { path: "/contact", file: "contact" },
@@ -44,3 +43,22 @@ for (const { path: routePath, file } of ROUTES) {
     await page.screenshot({ path: out, fullPage: true });
   });
 }
+
+test("screenshot first catalog PDP", async ({ page }) => {
+  await page.goto("/shop", { waitUntil: "load" });
+  const first = page.locator("[data-product-slug]").first();
+  try {
+    await first.waitFor({ state: "visible", timeout: 90_000 });
+  } catch {
+    test.skip(true, "No products for PDP screenshot (run pnpm e2e:prep:medusa).");
+  }
+  const slug = (await first.getAttribute("data-product-slug"))?.trim();
+  if (!slug) {
+    test.skip(true, "No product slug on shop page.");
+  }
+  await page.goto(`/shop/${slug}`, { waitUntil: "load" });
+  await page.locator("body").waitFor({ state: "visible" });
+  await page.evaluate(() => document.fonts?.ready ?? Promise.resolve());
+  const out = path.join(OUT_DIR, "shop-pdp.png");
+  await page.screenshot({ path: out, fullPage: true });
+});
