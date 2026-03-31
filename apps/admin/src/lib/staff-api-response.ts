@@ -16,3 +16,34 @@ export function correlatedJson(
   const res = NextResponse.json(body, init);
   return tagResponse(res, correlationId);
 }
+
+export type AdminApiErrorCode =
+  | "UNAUTHORIZED"
+  | "FORBIDDEN"
+  | "MISSING_PERMISSION"
+  | "NOT_FOUND"
+  | "BAD_REQUEST"
+  | "CONFLICT"
+  | "RATE_LIMITED"
+  | "SERVICE_UNAVAILABLE"
+  | "INTERNAL_ERROR"
+  | "SUPABASE_NOT_CONFIGURED"
+  | "MEDUSA_UNAVAILABLE"
+  | "VALIDATION_ERROR";
+
+/**
+ * Standard error response for admin API routes.
+ * All error responses follow `{ error: string, code: AdminApiErrorCode, requestId: string }`.
+ */
+export function correlatedError(
+  correlationId: string,
+  status: number,
+  message: string,
+  code: AdminApiErrorCode,
+): NextResponse {
+  return correlatedJson(
+    correlationId,
+    { error: message, code, requestId: correlationId },
+    { status },
+  );
+}
