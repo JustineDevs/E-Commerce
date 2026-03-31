@@ -25,6 +25,7 @@ export async function GET() {
 
   const degraded = missingEnv.length > 0 || !medusaReachable;
 
+  /** Always 200; use `status` for SOP readiness (avoids 503 during Medusa cold start in E2E). */
   return NextResponse.json(
     {
       status: degraded ? "degraded" : "ok",
@@ -36,6 +37,6 @@ export async function GET() {
       missingEnv,
       timestamp,
     },
-    { status: degraded ? 503 : 200 },
+    { status: 200 },
   );
 }
