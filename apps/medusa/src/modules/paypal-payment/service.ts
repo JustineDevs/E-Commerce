@@ -35,50 +35,18 @@ import {
   buildPayPalWebhookDedupId,
   claimPayPalWebhookDedup,
 } from "../../lib/paypal-webhook-dedup";
+import {
+  createPayPalOrder,
+  capturePayPalOrder,
+  verifyPayPalWebhookSignature,
+  type PayPalClientOptions,
+} from "../../lib/paypal-sdk-client";
 
 export type PayPalPaymentOptions = {
   clientId: string;
   clientSecret: string;
-  /** When true, use api-m.sandbox.paypal.com */
   sandbox: boolean;
 };
-
-function paypalApiBase(sandbox: boolean): string {
-  return sandbox
-    ? "https://api-m.sandbox.paypal.com"
-    : "https://api-m.paypal.com";
-}
-
-async function getPayPalAccessToken(options: PayPalPaymentOptions): Promise<string> {
-  const base = paypalApiBase(options.sandbox);
-  const auth = Buffer.from(
-    `${options.clientId}:${options.clientSecret}`,
-    "utf8",
-  ).toString("base64");
-  const res = await fetch(`${base}/v1/oauth2/token`, {
-    method: "POST",
-    headers: {
-      Authorization: `Basic ${auth}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: "grant_type=client_credentials",
-  });
-  const text = await res.text();
-  if (!res.ok) {
-    throw new MedusaError(
-      MedusaError.Types.INVALID_DATA,
-      `PayPal OAuth failed: ${res.status} ${text}`,
-    );
-  }
-  const json = JSON.parse(text) as { access_token?: string };
-  if (!json.access_token) {
-    throw new MedusaError(
-      MedusaError.Types.INVALID_DATA,
-      "PayPal OAuth response missing access_token.",
-    );
-  }
-  return json.access_token;
-}
 
 function minorToMajor(amountMinor: number, currency: string): string {
   const decimals = currency.toLowerCase() === "jpy" ? 0 : 2;
@@ -94,6 +62,14 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
   constructor(cradle: Record<string, unknown>, options: PayPalPaymentOptions) {
     super(cradle, options);
     this.options_ = options;
+  }
+
+  private get sdkOptions(): PayPalClientOptions {
+    return {
+      clientId: this.options_.clientId,
+      clientSecret: this.options_.clientSecret,
+      sandbox: this.options_.sandbox,
+    };
   }
 
   static validateOptions(options: Record<string, unknown>): void {
@@ -141,63 +117,36 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
       process.env.PAYPAL_CANCEL_URL?.trim() ||
       `${returnUrl.replace(/\/$/, "")}?paypal=cancel`;
 
-    const token = await getPayPalAccessToken(this.options_);
-    const base = paypalApiBase(this.options_.sandbox);
     const value = minorToMajor(amountMinor, currency);
 
-    const res = await fetch(`${base}/v2/checkout/orders`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        intent: "CAPTURE",
-        purchase_units: [
-          {
-            custom_id: sessionId.slice(0, 127),
-            amount: {
-              currency_code: currency,
-              value: value,
-            },
-          },
-        ],
-        application_context: {
-          return_url: returnUrl,
-          cancel_url: cancelUrl,
-          user_action: "PAY_NOW",
+    try {
+      const { orderId, approvalUrl } = await createPayPalOrder(
+        this.sdkOptions,
+        {
+          sessionId,
+          amountMajor: value,
+          currencyCode: currency,
+          returnUrl,
+          cancelUrl,
         },
-      }),
-    });
-    const text = await res.text();
-    if (!res.ok) {
-      throw new MedusaError(
-        MedusaError.Types.INVALID_DATA,
-        `PayPal create order failed: ${res.status} ${text}`,
       );
-    }
-    const json = JSON.parse(text) as {
-      id?: string;
-      links?: Array<{ href?: string; rel?: string }>;
-    };
-    const orderId = json.id;
-    const approval = json.links?.find((l) => l.rel === "approve")?.href;
-    if (!orderId || !approval) {
-      throw new MedusaError(
-        MedusaError.Types.INVALID_DATA,
-        "PayPal create order response missing id or approve link.",
-      );
-    }
 
-    return {
-      id: orderId,
-      status: PaymentSessionStatus.REQUIRES_MORE,
-      data: {
-        session_id: sessionId,
-        paypal_order_id: orderId,
-        approval_url: approval,
-      },
-    };
+      return {
+        id: orderId,
+        status: PaymentSessionStatus.REQUIRES_MORE,
+        data: {
+          session_id: sessionId,
+          paypal_order_id: orderId,
+          approval_url: approvalUrl,
+          checkout_url: approvalUrl,
+        },
+      };
+    } catch (err) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        `PayPal create order failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   async authorizePayment(
@@ -213,50 +162,35 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
       );
     }
 
-    const token = await getPayPalAccessToken(this.options_);
-    const base = paypalApiBase(this.options_.sandbox);
-    const res = await fetch(`${base}/v2/checkout/orders/${orderId}/capture`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-    });
-    const text = await res.text();
-    if (!res.ok) {
+    try {
+      const { status, captureAmountMinor } = await capturePayPalOrder(
+        this.sdkOptions,
+        orderId,
+      );
+      if (status !== "COMPLETED") {
+        throw new MedusaError(
+          MedusaError.Types.NOT_ALLOWED,
+          `PayPal order not completed after capture: ${status}`,
+        );
+      }
+
+      return {
+        status: PaymentSessionStatus.AUTHORIZED,
+        data: {
+          ...((input.data as Record<string, unknown>) ?? {}),
+          paypal_order_id: orderId,
+          ...(captureAmountMinor != null && Number.isFinite(captureAmountMinor)
+            ? { captured_amount_minor: captureAmountMinor }
+            : {}),
+        },
+      };
+    } catch (err) {
+      if (err instanceof MedusaError) throw err;
       throw new MedusaError(
         MedusaError.Types.NOT_ALLOWED,
-        `PayPal capture failed: ${res.status} ${text}`,
+        `PayPal capture failed: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
-    const json = JSON.parse(text) as {
-      status?: string;
-      purchase_units?: Array<{ payments?: { captures?: Array<{ amount?: { value?: string } }> } }>;
-    };
-    const status = (json.status ?? "").toUpperCase();
-    if (status !== "COMPLETED") {
-      throw new MedusaError(
-        MedusaError.Types.NOT_ALLOWED,
-        `PayPal order not completed after capture: ${json.status ?? "unknown"}`,
-      );
-    }
-
-    const captureAmount = json.purchase_units?.[0]?.payments?.captures?.[0]?.amount?.value;
-    const amountMinor =
-      captureAmount != null
-        ? Math.round(parseFloat(captureAmount) * 100)
-        : undefined;
-
-    return {
-      status: PaymentSessionStatus.AUTHORIZED,
-      data: {
-        ...((input.data as Record<string, unknown>) ?? {}),
-        paypal_order_id: orderId,
-        ...(amountMinor != null && Number.isFinite(amountMinor)
-          ? { captured_amount_minor: amountMinor }
-          : {}),
-      },
-    };
   }
 
   async capturePayment(input: CapturePaymentInput): Promise<CapturePaymentOutput> {
@@ -323,6 +257,27 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
         : Buffer.isBuffer(payload.rawData)
           ? payload.rawData.toString("utf8")
           : JSON.stringify(payload.rawData);
+
+    const webhookId = process.env.PAYPAL_WEBHOOK_ID?.trim();
+    if (webhookId) {
+      const valid = await verifyPayPalWebhookSignature(
+        this.sdkOptions,
+        payload.headers,
+        raw,
+        webhookId,
+      );
+      if (!valid) {
+        throw new MedusaError(
+          MedusaError.Types.NOT_ALLOWED,
+          "PayPal webhook signature invalid.",
+        );
+      }
+    } else if (process.env.NODE_ENV === "production") {
+      throw new MedusaError(
+        MedusaError.Types.NOT_ALLOWED,
+        "PAYPAL_WEBHOOK_ID is required in production for webhook signature verification.",
+      );
+    }
 
     let body: Record<string, unknown>;
     try {
