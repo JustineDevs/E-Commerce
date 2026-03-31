@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
+  AuthSplitShell,
   Card,
   CardContent,
   CardDescription,
@@ -24,15 +25,16 @@ export default async function RegisterPage({
       ? sp.callbackUrl
       : "/account";
   return (
-    <main className="storefront-page-shell max-w-md">
+    <AuthSplitShell>
       <Card>
         <CardHeader>
           <CardTitle className="font-headline text-3xl font-bold tracking-tight sm:text-4xl">
             Create account
           </CardTitle>
           <CardDescription className="font-body text-sm leading-relaxed">
-            Maharlika uses Google sign-in to secure your profile. No separate
-            password is stored on our servers.
+            This site uses Google sign-in for your account. No separate
+            password is stored on our servers. After your first sign-in, you may
+            be asked to confirm name, mobile number, and a delivery address.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -49,6 +51,6 @@ export default async function RegisterPage({
           </p>
         </CardContent>
       </Card>
-    </main>
+    </AuthSplitShell>
   );
 }
