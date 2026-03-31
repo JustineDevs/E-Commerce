@@ -1,5 +1,6 @@
 import { AdminBreadcrumbs, AdminPageShell, AuditTimeline } from "@/components/admin-console";
 import { PaymentProviderLabel } from "@/components/PaymentProviderLabel";
+import { PaymentConnectionsManager } from "@/components/PaymentConnectionsManager";
 import { fetchMedusaPaymentProvidersBundle } from "@/lib/payment-providers-bridge";
 import { requirePagePermission } from "@/lib/require-page-permission";
 
@@ -155,6 +156,8 @@ export default async function PaymentSettingsPage() {
           </table>
         </div>
       </section>
+
+      <PaymentConnectionsManager />
     </AdminPageShell>
   );
 }
