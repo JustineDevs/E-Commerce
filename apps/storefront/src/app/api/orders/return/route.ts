@@ -17,7 +17,7 @@ type ReturnItem = {
 
 export async function POST(req: Request) {
   const ip = getRequestIp(req);
-  const rl = rateLimitFixedWindow(`order-return:${ip}`, 10, 60_000);
+  const rl = await rateLimitFixedWindow(`order-return:${ip}`, 10, 60_000);
   if (!rl.ok) {
     return NextResponse.json(
       { error: "Too many requests", retryAfter: rl.retryAfterSec },
