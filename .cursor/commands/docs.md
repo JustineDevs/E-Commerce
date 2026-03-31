@@ -14,7 +14,6 @@ LLM context and indexed project/docs. Read everything under `.cursor/llm/`.
 
 ### `.cursor/llm/*` (all files)
 - `AfterShip-Tracking-API-AfterShip-Docs-*.txt`
-- `Guides-Guides-and-Tutorials-•-Lemon-Squeezy.txt`
 - Any other `.txt` files in this directory
 
 ---
