@@ -33,31 +33,17 @@ import {
   PaymentSessionStatus,
 } from "@medusajs/framework/utils";
 import { buildMayaWebhookDedupId, claimMayaWebhookDedup } from "../../lib/maya-webhook-dedup";
-
-const MAYA_SANDBOX_API = "https://pg-sandbox.paymaya.com";
-const MAYA_PROD_API = "https://pg.paymaya.com";
-const MAYA_SANDBOX_CHECKOUT = "https://payments-web-sandbox.paymaya.com/invoice";
-const MAYA_PROD_CHECKOUT = "https://payments.paymaya.com/invoice";
+import {
+  createMayaInvoice,
+  getMayaInvoice,
+  type MayaClientOptions,
+} from "../../lib/maya-sdk-client";
 
 export type MayaPaymentOptions = {
   secretKey: string;
-  /** Used to verify webhooks */
   webhookSecret: string;
-  /** Use sandbox when true */
   sandbox?: boolean;
 };
-
-function getMayaApiBase(sandbox: boolean): string {
-  return sandbox ? MAYA_SANDBOX_API : MAYA_PROD_API;
-}
-
-function getMayaCheckoutBase(sandbox: boolean): string {
-  return sandbox ? MAYA_SANDBOX_CHECKOUT : MAYA_PROD_CHECKOUT;
-}
-
-function basicAuth(secretKey: string): string {
-  return `Basic ${Buffer.from(`${secretKey}:`).toString("base64")}`;
-}
 
 function parseSessionFromRequestRef(ref: string | undefined): string | undefined {
   const prefix = "medusa_ps:";
@@ -107,6 +93,13 @@ export default class MayaPaymentProviderService extends AbstractPaymentProvider<
     }
   }
 
+  private get clientOptions(): MayaClientOptions {
+    return {
+      secretKey: this.options_.secretKey,
+      sandbox: this.options_.sandbox ?? process.env.NODE_ENV !== "production",
+    };
+  }
+
   async initiatePayment(
     input: InitiatePaymentInput,
   ): Promise<InitiatePaymentOutput> {
@@ -126,60 +119,34 @@ export default class MayaPaymentProviderService extends AbstractPaymentProvider<
     }
 
     const amountValue = Number(((amountMinor / 100).toFixed(2)));
-    const sandbox = this.options_.sandbox ?? process.env.NODE_ENV !== "production";
-    const apiBase = getMayaApiBase(sandbox);
     const storefrontUrl = process.env.STOREFRONT_PUBLIC_URL ?? "https://maharlika-apparel-custom.vercel.app";
 
-    const res = await fetch(`${apiBase}/invoice/v2/invoices`, {
-      method: "POST",
-      headers: {
-        Authorization: basicAuth(this.options_.secretKey),
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({
-        invoiceNumber: `INV-${sessionId.slice(0, 12)}-${Date.now().toString(36)}`,
-        type: "SINGLE",
-        totalAmount: { value: amountValue, currency: "PHP" },
-        redirectUrl: {
-          success: `${storefrontUrl}/checkout?maya=success`,
-          failure: `${storefrontUrl}/checkout?maya=failure`,
-          cancel: `${storefrontUrl}/checkout?maya=cancel`,
+    try {
+      const { invoiceId, checkoutUrl } = await createMayaInvoice(
+        this.clientOptions,
+        {
+          sessionId,
+          amountValue,
+          currency: "PHP",
+          storefrontUrl,
         },
-        requestReferenceNumber: `medusa_ps:${sessionId}`,
-        metadata: {},
-      }),
-    });
+      );
 
-    const text = await res.text();
-    if (!res.ok) {
+      return {
+        id: invoiceId,
+        status: PaymentSessionStatus.REQUIRES_MORE,
+        data: {
+          session_id: sessionId,
+          maya_invoice_id: invoiceId,
+          checkout_url: checkoutUrl,
+        },
+      };
+    } catch (err) {
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
-        `Maya create invoice failed: ${res.status} ${text}`,
+        `Maya create invoice failed: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
-
-    const json = JSON.parse(text) as { id?: string };
-    const invoiceId = json.id;
-    if (!invoiceId) {
-      throw new MedusaError(
-        MedusaError.Types.INVALID_DATA,
-        "Maya create invoice response missing id.",
-      );
-    }
-
-    const checkoutBase = getMayaCheckoutBase(sandbox);
-    const checkoutUrl = `${checkoutBase}?id=${encodeURIComponent(invoiceId)}`;
-
-    return {
-      id: invoiceId,
-      status: PaymentSessionStatus.REQUIRES_MORE,
-      data: {
-        session_id: sessionId,
-        maya_invoice_id: invoiceId,
-        checkout_url: checkoutUrl,
-      },
-    };
   }
 
   async authorizePayment(
@@ -193,51 +160,46 @@ export default class MayaPaymentProviderService extends AbstractPaymentProvider<
       );
     }
 
-    const sandbox = this.options_.sandbox ?? process.env.NODE_ENV !== "production";
-    const apiBase = getMayaApiBase(sandbox);
+    try {
+      const { status, amountMinor, paymentStatus } = await getMayaInvoice(
+        this.clientOptions,
+        invoiceId,
+      );
 
-    const res = await fetch(`${apiBase}/invoice/v2/invoices/${encodeURIComponent(invoiceId)}`, {
-      method: "GET",
-      headers: {
-        Authorization: basicAuth(this.options_.secretKey),
-        Accept: "application/json",
-      },
-    });
-    const text = await res.text();
-    if (!res.ok) {
+      if (status !== "COMPLETED") {
+        console.error(
+          "[payment-pipeline] authorize_failed provider=maya reason=invoice_not_paid status=",
+          status,
+          "payment=",
+          paymentStatus ?? "unknown",
+        );
+        throw new MedusaError(
+          MedusaError.Types.NOT_ALLOWED,
+          `Maya invoice is not paid yet (status=${status}, payment=${paymentStatus ?? "unknown"}).`,
+        );
+      }
+
+      return {
+        status: PaymentSessionStatus.AUTHORIZED,
+        data: {
+          ...((input.data as Record<string, unknown>) ?? {}),
+          maya_invoice_id: invoiceId,
+          ...(typeof amountMinor === "number" && Number.isFinite(amountMinor)
+            ? { captured_amount_minor: amountMinor }
+            : {}),
+        },
+      };
+    } catch (err) {
+      if (err instanceof MedusaError) throw err;
+      console.error(
+        "[payment-pipeline] authorize_failed provider=maya reason=invoice_http",
+        err,
+      );
       throw new MedusaError(
         MedusaError.Types.NOT_ALLOWED,
-        `Maya retrieve invoice failed: ${res.status} ${text}`,
+        `Maya retrieve invoice failed: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
-
-    const json = JSON.parse(text) as {
-      status?: string;
-      totalAmount?: { value?: string };
-      payments?: Array<{ status?: string }>;
-    };
-    const status = (json.status ?? "").toUpperCase();
-    if (status !== "COMPLETED") {
-      const payStatus = json.payments?.[0]?.status ?? "unknown";
-      throw new MedusaError(
-        MedusaError.Types.NOT_ALLOWED,
-        `Maya invoice is not paid yet (status=${status}, payment=${payStatus}).`,
-      );
-    }
-
-    const amountStr = json.totalAmount?.value;
-    const amountMinor = amountStr != null ? Math.round(parseFloat(String(amountStr)) * 100) : undefined;
-
-    return {
-      status: PaymentSessionStatus.AUTHORIZED,
-      data: {
-        ...((input.data as Record<string, unknown>) ?? {}),
-        maya_invoice_id: invoiceId,
-        ...(typeof amountMinor === "number" && Number.isFinite(amountMinor)
-          ? { captured_amount_minor: amountMinor }
-          : {}),
-      },
-    };
   }
 
   async capturePayment(input: CapturePaymentInput): Promise<CapturePaymentOutput> {
@@ -310,6 +272,9 @@ export default class MayaPaymentProviderService extends AbstractPaymentProvider<
 
     if (this.options_.webhookSecret && this.options_.webhookSecret.trim()) {
       if (!verifyMayaSignature(raw, signatureHeader, this.options_.webhookSecret)) {
+        console.error(
+          "[payment-webhook] verification_failed provider=maya reason=invalid_signature",
+        );
         throw new MedusaError(
           MedusaError.Types.NOT_ALLOWED,
           "Maya webhook signature verification failed.",
