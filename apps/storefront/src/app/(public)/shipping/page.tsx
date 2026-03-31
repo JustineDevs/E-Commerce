@@ -7,8 +7,8 @@ export default function ShippingPage() {
         Shipping
       </h1>
       <p className="mb-6">
-        Maharlika Apparel Custom ships apparel across the Philippines. We use
-        trusted couriers (including <strong>J&amp;T</strong>
+        We ship apparel across the Philippines using third-party couriers
+        (including <strong>J&amp;T</strong>
         where available) and coordinate <strong>pickup from Cavite</strong> for
         wholesale or arranged collections when that option is confirmed on your
         order.
