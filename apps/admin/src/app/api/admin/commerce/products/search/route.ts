@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { getServerSession } from "next-auth/next";
-import { staffHasPermission } from "@apparel-commerce/database";
+import { staffSessionAllows } from "@apparel-commerce/database";
 import { authOptions } from "@/lib/auth";
 import { medusaAdminFetch } from "@/lib/medusa-admin-http";
 import { getCorrelationId } from "@/lib/request-correlation";
@@ -12,7 +12,11 @@ export async function GET(req: NextRequest) {
   if (!session?.user) {
     return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
   }
-  if (!staffHasPermission(session.user.permissions ?? [], "content:read")) {
+  const can =
+    staffSessionAllows(session, "catalog:read") ||
+    staffSessionAllows(session, "content:read") ||
+    staffSessionAllows(session, "pos:use");
+  if (!can) {
     return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
   }
   const q = req.nextUrl.searchParams.get("q") ?? "";
