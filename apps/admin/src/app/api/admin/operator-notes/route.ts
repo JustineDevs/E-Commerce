@@ -1,5 +1,5 @@
 import { getServerSession } from "next-auth/next";
-import { staffHasPermission } from "@apparel-commerce/database";
+import { staffSessionAllows } from "@apparel-commerce/database";
 import {
   createOperatorNote,
   listOperatorNotes,
@@ -47,7 +47,7 @@ export async function GET(req: Request) {
     return correlatedJson(correlationId, { error: "Invalid entity_type" }, { status: 400 });
   }
   const readPerm = ENTITY_NOTE_PERMS[entityType].read;
-  if (!staffHasPermission(session.user.permissions ?? [], readPerm)) {
+  if (!staffSessionAllows(session, readPerm)) {
     return correlatedJson(correlationId, { error: "Forbidden" }, { status: 403 });
   }
 
@@ -81,7 +81,7 @@ export async function POST(req: Request) {
     return correlatedJson(correlationId, { error: "Invalid entity_type" }, { status: 400 });
   }
   const writePerm = ENTITY_NOTE_PERMS[entityType].write;
-  if (!staffHasPermission(session.user.permissions ?? [], writePerm)) {
+  if (!staffSessionAllows(session, writePerm)) {
     return correlatedJson(correlationId, { error: "Forbidden" }, { status: 403 });
   }
 
