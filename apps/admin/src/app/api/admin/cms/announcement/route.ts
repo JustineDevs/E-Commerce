@@ -1,7 +1,12 @@
 import { NextRequest } from "next/server";
 import { getServerSession } from "next-auth/next";
-import { staffHasPermission } from "@apparel-commerce/database";
-import { getCmsAnnouncement, upsertCmsAnnouncement } from "@apparel-commerce/platform-data";
+import { staffSessionAllows } from "@apparel-commerce/database";
+import {
+  deleteCmsAnnouncement,
+  getCmsAnnouncementAnalyticsMap,
+  listCmsAnnouncementsAdmin,
+  upsertCmsAnnouncement,
+} from "@apparel-commerce/platform-data";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { authOptions } from "@/lib/auth";
 import { getCorrelationId } from "@/lib/request-correlation";
@@ -13,13 +18,24 @@ export async function GET(req: NextRequest) {
   if (!session?.user) {
     return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
   }
-  if (!staffHasPermission(session.user.permissions ?? [], "content:read")) {
+  if (!staffSessionAllows(session, "content:read")) {
     return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
   }
   const sup = adminSupabaseOr503(cid);
   if ("response" in sup) return sup.response;
-  const data = await getCmsAnnouncement(sup.client);
-  return correlatedJson(cid, { data });
+  const [rows, analyticsMap] = await Promise.all([
+    listCmsAnnouncementsAdmin(sup.client),
+    getCmsAnnouncementAnalyticsMap(sup.client),
+  ]);
+  const analytics: Record<string, { impressions: number; clicks: number; dismisses: number }> = {};
+  for (const [k, v] of analyticsMap) {
+    analytics[k] = {
+      impressions: v.impressions,
+      clicks: v.clicks,
+      dismisses: v.dismisses,
+    };
+  }
+  return correlatedJson(cid, { data: { rows, analytics } });
 }
 
 export async function PUT(req: NextRequest) {
@@ -28,7 +44,7 @@ export async function PUT(req: NextRequest) {
   if (!session?.user) {
     return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
   }
-  if (!staffHasPermission(session.user.permissions ?? [], "content:write")) {
+  if (!staffSessionAllows(session, "content:write")) {
     return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
   }
   let body: unknown;
@@ -48,6 +64,36 @@ export async function PUT(req: NextRequest) {
       { status: 500 },
     );
   }
-  const data = await getCmsAnnouncement(sup.client);
-  return correlatedJson(cid, { data });
+  const rows = await listCmsAnnouncementsAdmin(sup.client);
+  const analyticsMap = await getCmsAnnouncementAnalyticsMap(sup.client);
+  const analytics: Record<string, { impressions: number; clicks: number; dismisses: number }> = {};
+  for (const [k, v] of analyticsMap) {
+    analytics[k] = {
+      impressions: v.impressions,
+      clicks: v.clicks,
+      dismisses: v.dismisses,
+    };
+  }
+  return correlatedJson(cid, { data: { rows, analytics } });
+}
+
+export async function DELETE(req: NextRequest) {
+  const cid = getCorrelationId(req);
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
+  }
+  if (!staffSessionAllows(session, "content:write")) {
+    return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
+  }
+  const id = req.nextUrl.searchParams.get("id")?.trim();
+  const locale = req.nextUrl.searchParams.get("locale")?.trim() || "en";
+  if (!id) {
+    return correlatedJson(cid, { error: "Missing id" }, { status: 400 });
+  }
+  const sup = adminSupabaseOr503(cid);
+  if ("response" in sup) return sup.response;
+  const ok = await deleteCmsAnnouncement(sup.client, id, locale);
+  if (!ok) return correlatedJson(cid, { error: "Unable to delete" }, { status: 500 });
+  return correlatedJson(cid, { ok: true });
 }
