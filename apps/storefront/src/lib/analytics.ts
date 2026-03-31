@@ -7,7 +7,7 @@ export function trackProductClick(payload: {
 }): void {
   if (typeof window === "undefined") return;
   const w = window as Window & {
-    va?: (action: string, data?: Record<string, unknown>) => void;
+    va?: (_action: string, _data?: Record<string, unknown>) => void;
   };
   if (typeof w.va === "function") {
     w.va("event", { name: "product_click", ...payload });
@@ -17,7 +17,7 @@ export function trackProductClick(payload: {
 export function trackProductView(payload: { slug: string; id: string }): void {
   if (typeof window === "undefined") return;
   const w = window as Window & {
-    va?: (action: string, data?: Record<string, unknown>) => void;
+    va?: (_action: string, _data?: Record<string, unknown>) => void;
   };
   if (typeof w.va === "function") {
     w.va("event", { name: "product_view", ...payload });
