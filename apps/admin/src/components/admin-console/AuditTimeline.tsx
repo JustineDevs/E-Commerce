@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatAuditActorLabel } from "@/lib/audit-actor-format";
+import {
+  formatAuditActionLabel,
+  formatAuditResourceLabel,
+} from "@/lib/audit-display-format";
 
 export type AuditEntry = {
   id: string;
@@ -8,6 +13,9 @@ export type AuditEntry = {
   resource: string | null;
   details: Record<string, unknown> | null;
   created_at: string;
+  actor_id?: string | null;
+  /** Joined from `users` when the API selects `users(email,name)`. */
+  users?: { email?: string | null; name?: string | null } | null;
 };
 
 export function AuditTimeline({
@@ -75,12 +83,16 @@ export function AuditTimeline({
         <ul className="mt-3 max-h-64 space-y-3 overflow-y-auto text-xs">
           {entries.map((e) => (
             <li key={e.id} className="border-b border-outline-variant/10 pb-2 last:border-0">
-              <p className="font-medium text-primary">{e.action}</p>
+              <p className="font-medium text-primary">
+                {formatAuditActionLabel(e.action)}
+              </p>
               {e.resource ? (
-                <p className="text-on-surface-variant">{e.resource}</p>
+                <p className="text-on-surface-variant">
+                  {formatAuditResourceLabel(e.resource)}
+                </p>
               ) : null}
               <p className="text-[10px] text-on-surface-variant/80">
-                {new Date(e.created_at).toLocaleString()}
+                By {formatAuditActorLabel(e)} · {new Date(e.created_at).toLocaleString()}
               </p>
             </li>
           ))}
