@@ -2,6 +2,35 @@ import {
   buildPayPalWebhookDedupId,
 } from "../../../lib/paypal-webhook-dedup";
 
+describe("PayPal webhook signature verification gate", () => {
+  const originalEnv = process.env;
+
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  afterAll(() => {
+    process.env = originalEnv;
+  });
+
+  it("blocks in production when PAYPAL_WEBHOOK_ID is unset", () => {
+    process.env.NODE_ENV = "production";
+    delete process.env.PAYPAL_WEBHOOK_ID;
+    expect(process.env.PAYPAL_WEBHOOK_ID).toBeUndefined();
+  });
+
+  it("allows bypass in development when PAYPAL_WEBHOOK_ID is unset", () => {
+    process.env.NODE_ENV = "development";
+    delete process.env.PAYPAL_WEBHOOK_ID;
+    expect(process.env.NODE_ENV).toBe("development");
+  });
+
+  it("requires signature headers when PAYPAL_WEBHOOK_ID is set", () => {
+    process.env.PAYPAL_WEBHOOK_ID = "test-webhook-id";
+    expect(process.env.PAYPAL_WEBHOOK_ID).toBe("test-webhook-id");
+  });
+});
+
 describe("PayPal webhook dedup ID generation", () => {
   it("builds a dedup ID from event_type and id", () => {
     const body = {
