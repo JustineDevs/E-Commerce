@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { getServerSession } from "next-auth/next";
-import { staffHasPermission } from "@apparel-commerce/database";
-import { insertCmsMedia, listCmsMedia } from "@apparel-commerce/platform-data";
+import { staffSessionAllows } from "@apparel-commerce/database";
+import { insertCmsMedia, listCmsMedia, type ListCmsMediaOptions } from "@apparel-commerce/platform-data";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { authOptions } from "@/lib/auth";
 import { getCorrelationId } from "@/lib/request-correlation";
@@ -13,12 +13,20 @@ export async function GET(req: NextRequest) {
   if (!session?.user) {
     return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
   }
-  if (!staffHasPermission(session.user.permissions ?? [], "content:read")) {
+  if (!staffSessionAllows(session, "content:read")) {
     return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
   }
   const sup = adminSupabaseOr503(cid);
   if ("response" in sup) return sup.response;
-  const data = await listCmsMedia(sup.client);
+  const sp = req.nextUrl.searchParams;
+  const opts: ListCmsMediaOptions = {
+    limit: Math.min(Number(sp.get("limit")) || 200, 500),
+    search: sp.get("q") ?? undefined,
+    mimePrefix: sp.get("mime") ?? undefined,
+    sort: (sp.get("sort") as ListCmsMediaOptions["sort"]) || "created_desc",
+    tag: sp.get("tag") ?? undefined,
+  };
+  const data = await listCmsMedia(sup.client, opts);
   return correlatedJson(cid, { data });
 }
 
@@ -28,7 +36,7 @@ export async function POST(req: NextRequest) {
   if (!session?.user) {
     return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
   }
-  if (!staffHasPermission(session.user.permissions ?? [], "content:write")) {
+  if (!staffSessionAllows(session, "content:write")) {
     return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
   }
   const sup = adminSupabaseOr503(cid);
@@ -45,6 +53,22 @@ export async function POST(req: NextRequest) {
   const altText = typeof form.get("alt") === "string" ? (form.get("alt") as string) : "";
   if (!(file instanceof Blob) || file.size === 0) {
     return correlatedJson(cid, { error: "Missing file" }, { status: 400 });
+  }
+  const mime = (file as File).type || "";
+  if (mime.startsWith("image/") && altText.trim().length === 0) {
+    return correlatedJson(
+      cid,
+      { error: "Alt text is required for image uploads" },
+      { status: 400 },
+    );
+  }
+  const MAX_BYTES = 25 * 1024 * 1024;
+  if (file.size > MAX_BYTES) {
+    return correlatedJson(
+      cid,
+      { error: `File exceeds limit of ${MAX_BYTES} bytes` },
+      { status: 400 },
+    );
   }
 
   const rawName = typeof (file as File).name === "string" ? (file as File).name : "upload";
@@ -70,6 +94,8 @@ export async function POST(req: NextRequest) {
     mime_type: (file as File).type || null,
     width: null,
     height: null,
+    display_name: safe,
+    byte_size: file.size,
   });
   if (!row) return correlatedJson(cid, { error: "Unable to save metadata" }, { status: 500 });
   return correlatedJson(cid, { data: row });
