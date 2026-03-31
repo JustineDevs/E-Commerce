@@ -26,7 +26,7 @@ This document is the **complete high-level reference** for `apps/admin` (Next.js
 15. [Data ownership (ADR summary)](#15-data-ownership-adr-summary)
 16. [Environment variables (admin-relevant)](#16-environment-variables-admin-relevant)
 17. [Failure modes (commerce unavailable)](#17-failure-modes-commerce-unavailable)
-18. [Product editor and catalog API (planned wiring)](#18-product-editor-and-catalog-api-planned-wiring)
+18. [Product editor and catalog API](#18-product-editor-and-catalog-api)
 19. [Feature areas: architecture, layout ASCII, flow, Medusa wiring](#19-feature-areas-architecture-layout-ascii-flow-medusa-wiring)
 20. [MoSCoW prioritization (by area)](#20-moscow-prioritization-by-area)
 
@@ -251,7 +251,7 @@ All authenticated admin UI lives under the **route group** `src/app/(dashboard)/
 **Block 1 — Brand (top, not scrollable with nav)**
 
 - Wrapper: `div.px-2.py-5`.
-- **Logo:** `Link` to `/admin` wraps an `<img>` whose `src` comes from a static import of `public/Maharlika Logo Design.png` (`width`/`height` from the import), with `className="block h-28 w-auto max-w-none object-contain object-left"` (height-first sizing so wide logos shrink correctly in the narrow column).
+- **Logo:** `Link` to `/admin` wraps `next/image` with `src="/brand/maharlika-logo-design.svg"` (served from `apps/admin/public/brand/`), `unoptimized`, intrinsic 1536×1024, `className="block h-28 w-auto max-w-[min(100%,260px)] object-contain object-left"`.
 - **Tagline:** `p` with `text-[10px] text-slate-400 font-medium tracking-widest uppercase` — text **"Store back office"**.
 
 **Block 2 — Navigation (middle, scrolls if needed)**
@@ -394,7 +394,7 @@ Short guide to **what appears to the right of the sidebar** for every staff dest
 
 - **`/admin/catalog` (Products):** Search field (GET `?q=`). Table of products from Medusa with links to **open the Medusa Admin** product editor (external URL from bridge). Server-rendered; `catalog:read`.
 
-- **`/admin/catalog/new` (Add product):** **Client** `ProductEditorForm` for create. Intended to POST to `/api/admin/catalog/products` (routes not present in repo yet; see §18). Requires `catalog:write`.
+- **`/admin/catalog/new` (Add product):** **Client** `ProductEditorForm` for create. **POST** `/api/admin/catalog/products` (see §18). Requires `catalog:write`.
 
 - **`/admin/inventory`:** **Client** `InventoryTableWithRefresh` — variant-level stock table, refresh via `/api/admin/inventory`. Server prefetch from Medusa bridge. `inventory:read`.
 
@@ -608,7 +608,7 @@ receipts:send
 | `InventoryTableWithRefresh.tsx` | Client inventory table + refresh via `/api/admin/inventory` |
 | `FulfillmentPanel.tsx` | Order fulfillment; `fetch` to `/api/medusa/shipments`, `/api/integrations/couriers` |
 | `AnalyticsChartsPanel.tsx` | Renders chart payload from `analytics-bridge` |
-| `catalog/ProductEditorForm.tsx` | Client: create/edit product form; **intended** `fetch` to `/api/admin/catalog/products` (see [section 18](#18-product-editor-and-catalog-api-planned-wiring)) |
+| `catalog/ProductEditorForm.tsx` | Client: create/edit product form; `fetch` to `/api/admin/catalog/products` and `/api/admin/catalog/products/[id]` (see [section 18](#18-product-editor-and-catalog-api)) |
 | `cms/CmsPagesManager.tsx` | CMS pages CRUD UI |
 | `cms/CmsNavigationEditor.tsx` | Navigation JSON |
 | `cms/CmsAnnouncementEditor.tsx` | Announcement bar |
@@ -644,7 +644,7 @@ Legend: **Perm** = `requirePagePermission`. **Data** = primary backend. **Medusa
 | `/` | RSC | — | `redirect("/admin")` | — | — |
 | `/admin` | RSC | `dashboard:read` | KPI cards, recent orders, stock alerts | Orders + inventory bridges | `fetchMedusaOrdersForAdmin`, `fetchMedusaInventoryForAdmin` |
 | `/admin/catalog` | RSC | `catalog:read` | Product table, search form GET `?q=`, links to Medusa Dashboard | `fetchMedusaProductsListForAdmin` | Admin API |
-| `/admin/catalog/new` | RSC | `catalog:write` | `ProductEditorForm` mode create | Form → API (see §18) | Intended |
+| `/admin/catalog/new` | RSC | `catalog:write` | `ProductEditorForm` mode create | Form → `POST /api/admin/catalog/products` (§18) | Implemented |
 | `/admin/orders` | RSC | `orders:read` | Orders table | `fetchMedusaOrdersForAdmin` | Admin API |
 | `/admin/orders/[orderId]` | RSC | `orders:read` | Order detail + `FulfillmentPanel` | `fetchMedusaOrderDetailForAdmin`, APIs | Admin API + metadata routes |
 | `/admin/inventory` | RSC | `inventory:read` | `InventoryTableWithRefresh` | `fetchMedusaInventoryForAdmin`, `/api/admin/inventory` | Admin API |
