@@ -10,6 +10,11 @@ const sections: { href: string; title: string; description: string }[] = [
     description: "Extra pages on your site: policies, landing pages, and custom URLs.",
   },
   {
+    href: "/admin/cms/site-map",
+    title: "Site map",
+    description: "See every CMS page, parent slug health, and which slugs appear in navigation.",
+  },
+  {
     href: "/admin/cms/navigation",
     title: "Navigation & footer",
     description: "Menu links, footer columns, and social links visitors see in the header and footer.",
