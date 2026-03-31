@@ -23,7 +23,7 @@ Apparel Commerce Platform:
 
 - Serves a shorts/apparel retail business in the Philippines with unified online and in-store sales.
 - Uses one shared source of truth for products, variants, inventory, orders, payments, and shipments.
-- Integrates Lemon Squeezy for hosted payments and payment webhooks.
+- Integrates Medusa payment providers (e.g. Stripe, PayPal, PayMongo, Maya) with webhook-verified capture where applicable.
 - Integrates AfterShip with J&T Express Philippines for shipment tracking.
 - Uses NextAuth/Auth.js with Google OAuth for staff and customers.
 - Requires webhook verification before mutating order, shipment, or inventory state.
@@ -44,7 +44,7 @@ Evaluate and comment on each of the following, assuming the code and services ar
    - Do RLS policies on Supabase tables (`users`, `orders`, `inventory_movements`, `payments`, `shipments`) guarantee that users only see and mutate their own data where appropriate?
 
 3. **Order and inventory flow correctness**
-   - For a single order, does the flow consistently follow: **reserve stock → create pending order → Lemon Squeezy checkout → verified webhook → payment confirmed → order paid → inventory committed → fulfillment → shipment**?
+   - For a single order, does the flow consistently follow: **reserve stock → create pending order → hosted checkout / payment session → verified webhook → payment confirmed → order paid → inventory committed → fulfillment → shipment**?
    - Are **orders**, **inventory movements**, **payments**, and **shipments** all persisted with proper references, enabling audit and replay?
    - Does the system never mark an order as paid solely from client-side redirect state?
 
@@ -54,7 +54,7 @@ Evaluate and comment on each of the following, assuming the code and services ar
    - Does the API avoid exposing internal stack traces or raw service errors to end users, while still providing enough context to debug?
 
 5. **Payment and webhook safety**
-   - Is Lemon Squeezy webhook signature verification performed before any order or payment state change?
+   - Is payment webhook signature verification performed before any order or payment state change?
    - Are webhook events logged for idempotency and replay safety?
    - Are there any paths where payment or order state could be mutated without verified webhook confirmation?
 
