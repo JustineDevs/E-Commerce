@@ -1,25 +1,29 @@
 "use client";
 
+import { useSession } from "next-auth/react";
 import { useEffect, useRef } from "react";
 import { readCart } from "@/lib/cart";
 
 /**
  * Sends a best-effort event when the visitor leaves the tab with items still in the cart.
- * Requires `SUPABASE_SERVICE_ROLE_KEY` on the server route.
+ * The server handler for POST /api/cart/abandonment must be configured with secrets (not in the client bundle).
  */
 export function CartAbandonmentBeacon() {
   const sentRef = useRef(false);
+  const { data: session } = useSession();
 
   useEffect(() => {
     function payload() {
       const lines = readCart();
       if (lines.length === 0) return null;
+      const accountEmail = session?.user?.email?.trim() ?? null;
       return JSON.stringify({
         lines: lines.map((l) => ({
           variantId: l.variantId,
           quantity: l.quantity,
           price: l.price,
         })),
+        email: accountEmail,
         path: typeof window !== "undefined" ? window.location.pathname : "",
         referrer:
           typeof document !== "undefined" ? document.referrer || null : null,
@@ -56,7 +60,7 @@ export function CartAbandonmentBeacon() {
       document.removeEventListener("visibilitychange", onHidden);
       window.removeEventListener("pagehide", onPageHide);
     };
-  }, []);
+  }, [session?.user?.email]);
 
   return null;
 }
