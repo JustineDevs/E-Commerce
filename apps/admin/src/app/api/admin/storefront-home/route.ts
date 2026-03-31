@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { getServerSession } from "next-auth/next";
-import { staffHasPermission } from "@apparel-commerce/database";
+import { staffSessionAllows } from "@apparel-commerce/database";
 import {
   getStorefrontHomeContent,
   mergeStorefrontHomePayload,
@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
   if (!session?.user) {
     return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
   }
-  if (!staffHasPermission(session.user.permissions ?? [], "settings:read")) {
+  if (!staffSessionAllows(session, "settings:read")) {
     return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
   }
   const sup = adminSupabaseOr503(cid);
@@ -33,7 +33,7 @@ export async function PUT(req: NextRequest) {
   if (!session?.user) {
     return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
   }
-  if (!staffHasPermission(session.user.permissions ?? [], "settings:write")) {
+  if (!staffSessionAllows(session, "settings:write")) {
     return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
   }
   let body: unknown;
