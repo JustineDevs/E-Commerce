@@ -13,10 +13,10 @@ export default function AccessibilityPage() {
       </h1>
       <div className="mt-8 space-y-6 font-body text-sm leading-relaxed text-on-surface-variant">
         <p>
-          Maharlika is committed to making <strong>maharlika.app</strong> (and
-          our storefront domains) perceivable, operable, and understandable for
-          people with disabilities. We target <strong>WCAG 2.1 Level AA</strong>{" "}
-          as our north star and test with keyboard navigation, screen readers,
+          We aim to make <strong>maharlika.app</strong> (and related storefront
+          domains) perceivable, operable, and understandable for people with
+          disabilities. We use <strong>WCAG 2.1 Level AA</strong> as the
+          reference standard and test with keyboard navigation, screen readers,
           and responsive zoom up to 200%.
         </p>
         <section>
