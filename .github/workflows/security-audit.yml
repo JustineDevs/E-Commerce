@@ -23,3 +23,9 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Audit (triage check)
         run: node scripts/check-audit-triage.js
+      - name: Storefront client boundary (no server secrets in client graph)
+        run: node scripts/check-storefront-client-boundary.mjs
+      - name: Supabase migrations (no parallel Medusa commerce tables)
+        run: node scripts/check-commerce-migration-boundary.mjs
+      - name: Admin API staff / internal guard patterns
+        run: node scripts/check-admin-api-staff-guard.mjs
