@@ -3,6 +3,9 @@
 import { useSession } from "next-auth/react";
 import { staffHasPermission } from "@apparel-commerce/platform-data";
 import { useCallback, useEffect, useState } from "react";
+import type { CmsBlock } from "@apparel-commerce/platform-data";
+import { getStorefrontPublicOrigin } from "@/lib/storefront-public-url";
+import { CmsPageBlocksEditor } from "./CmsPageBlocksEditor";
 
 type CmsPageRow = {
   id: string;
@@ -21,6 +24,8 @@ type CmsPageRow = {
   canonical_url: string | null;
   og_image_url: string | null;
   json_ld: unknown | null;
+  parent_slug: string | null;
+  breadcrumb_label: string | null;
 };
 
 export function CmsPagesManager() {
@@ -32,7 +37,10 @@ export function CmsPagesManager() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [blocksJson, setBlocksJson] = useState("[]");
+  const [showBlocksAdvancedJson, setShowBlocksAdvancedJson] = useState(false);
   const [jsonLdText, setJsonLdText] = useState("");
+  const [slugWhenOpened, setSlugWhenOpened] = useState<string | null>(null);
+  const [redirectMessage, setRedirectMessage] = useState<string | null>(null);
 
   const load = useCallback(() => {
     fetch("/api/admin/cms/pages")
@@ -54,6 +62,7 @@ export function CmsPagesManager() {
   useEffect(() => {
     if (!editing) return;
     setBlocksJson(JSON.stringify(editing.blocks ?? [], null, 2));
+    setShowBlocksAdvancedJson(false);
     setJsonLdText(
       editing.json_ld != null ? JSON.stringify(editing.json_ld, null, 2) : "",
     );
@@ -64,12 +73,16 @@ export function CmsPagesManager() {
     setSaving(true);
     setSaveError(null);
     let blocks: unknown = [];
-    try {
-      blocks = JSON.parse(blocksJson) as unknown;
-    } catch {
-      setSaveError("Blocks must be valid JSON array");
-      setSaving(false);
-      return;
+    if (showBlocksAdvancedJson) {
+      try {
+        blocks = JSON.parse(blocksJson) as unknown;
+      } catch {
+        setSaveError("Blocks must be valid JSON array");
+        setSaving(false);
+        return;
+      }
+    } else {
+      blocks = editing.blocks ?? [];
     }
     let json_ld: unknown | null = null;
     if (jsonLdText.trim()) {
@@ -97,6 +110,8 @@ export function CmsPagesManager() {
       canonical_url: editing.canonical_url,
       og_image_url: editing.og_image_url,
       json_ld,
+      parent_slug: editing.parent_slug,
+      breadcrumb_label: editing.breadcrumb_label,
     };
     if (editing.id.trim()) payload.id = editing.id;
     const method = editing.id.trim() ? "PUT" : "POST";
@@ -109,7 +124,10 @@ export function CmsPagesManager() {
       });
       const j = (await r.json()) as { data?: CmsPageRow; error?: string };
       if (!r.ok) throw new Error(j.error ?? r.statusText);
-      if (j.data) setEditing(j.data);
+      if (j.data) {
+        setEditing(j.data as CmsPageRow);
+        setSlugWhenOpened(j.data.slug);
+      }
       load();
     } catch (e: unknown) {
       setSaveError(e instanceof Error ? e.message : "Unable to save");
@@ -130,6 +148,25 @@ export function CmsPagesManager() {
     load();
   };
 
+  const createSlugRedirect = async () => {
+    if (!editing?.id || !slugWhenOpened || slugWhenOpened === editing.slug || !canWrite) return;
+    setRedirectMessage(null);
+    const from_path = `/p/${slugWhenOpened.replace(/^\/+/, "").replace(/^p\//, "")}`;
+    const toSlug = editing.slug.replace(/^\/+/, "").replace(/^p\//, "");
+    const to_path = `/p/${toSlug}`;
+    const r = await fetch("/api/admin/cms/redirects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ from_path, to_path, status_code: 301, active: true }),
+    });
+    const j = (await r.json()) as { error?: string };
+    if (!r.ok) {
+      setRedirectMessage(j.error ?? "Could not create redirect");
+      return;
+    }
+    setRedirectMessage(`Redirect saved: ${from_path} -> ${to_path}`);
+  };
+
   if (status === "loading") {
     return <p className="text-sm text-slate-600">Loading session…</p>;
   }
@@ -140,7 +177,8 @@ export function CmsPagesManager() {
         <button
           type="button"
           className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white"
-          onClick={() =>
+          onClick={() => {
+            setSlugWhenOpened(null);
             setEditing({
               id: "",
               slug: "new-page",
@@ -158,8 +196,10 @@ export function CmsPagesManager() {
               canonical_url: null,
               og_image_url: null,
               json_ld: null,
-            })
-          }
+              parent_slug: null,
+              breadcrumb_label: null,
+            });
+          }}
         >
           New page
         </button>
@@ -176,7 +216,15 @@ export function CmsPagesManager() {
                 <button
                   type="button"
                   className="text-left text-sm text-slate-800 underline"
-                  onClick={() => setEditing(p)}
+                  onClick={() => {
+                    setSlugWhenOpened(p.slug);
+                    setRedirectMessage(null);
+                    setEditing({
+                      ...p,
+                      parent_slug: p.parent_slug ?? null,
+                      breadcrumb_label: p.breadcrumb_label ?? null,
+                    });
+                  }}
                 >
                   {p.slug} ({p.status})
                 </button>
@@ -205,6 +253,34 @@ export function CmsPagesManager() {
               />
             </label>
             <label className="block text-xs font-medium text-slate-600">
+              Parent page slug (optional, for breadcrumbs)
+              <input
+                className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-sm font-mono"
+                value={editing.parent_slug ?? ""}
+                onChange={(e) =>
+                  setEditing({
+                    ...editing,
+                    parent_slug: e.target.value.trim() || null,
+                  })
+                }
+                placeholder="e.g. about (not /p/about)"
+              />
+            </label>
+            <label className="block text-xs font-medium text-slate-600">
+              Breadcrumb label override
+              <input
+                className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-sm"
+                value={editing.breadcrumb_label ?? ""}
+                onChange={(e) =>
+                  setEditing({
+                    ...editing,
+                    breadcrumb_label: e.target.value.trim() || null,
+                  })
+                }
+                placeholder="Shorter label in the trail; defaults to title"
+              />
+            </label>
+            <label className="block text-xs font-medium text-slate-600">
               Body (HTML)
               <textarea
                 className="mt-1 w-full min-h-[120px] rounded border border-slate-200 px-3 py-2 text-sm font-mono"
@@ -212,14 +288,40 @@ export function CmsPagesManager() {
                 onChange={(e) => setEditing({ ...editing, body: e.target.value })}
               />
             </label>
-            <label className="block text-xs font-medium text-slate-600">
-              Blocks (JSON array)
-              <textarea
-                className="mt-1 w-full min-h-[160px] rounded border border-slate-200 px-3 py-2 text-sm font-mono"
-                value={blocksJson}
-                onChange={(e) => setBlocksJson(e.target.value)}
+            <div className="space-y-2">
+              <span className="block text-xs font-medium text-slate-600">
+                Page blocks (drag to reorder)
+              </span>
+              <CmsPageBlocksEditor
+                value={editing.blocks ?? []}
+                disabled={!canWrite}
+                onChange={(next: CmsBlock[]) =>
+                  setEditing({ ...editing, blocks: next })
+                }
               />
-            </label>
+              <button
+                type="button"
+                className="text-xs font-medium text-slate-500 underline"
+                onClick={() => {
+                  setShowBlocksAdvancedJson((v) => {
+                    const next = !v;
+                    if (next && editing) {
+                      setBlocksJson(JSON.stringify(editing.blocks ?? [], null, 2));
+                    }
+                    return next;
+                  });
+                }}
+              >
+                {showBlocksAdvancedJson ? "Hide" : "Show"} advanced blocks JSON
+              </button>
+              {showBlocksAdvancedJson ? (
+                <textarea
+                  className="mt-1 w-full min-h-[160px] rounded border border-slate-200 px-3 py-2 text-sm font-mono"
+                  value={blocksJson}
+                  onChange={(e) => setBlocksJson(e.target.value)}
+                />
+              ) : null}
+            </div>
             <label className="block text-xs font-medium text-slate-600">
               Status
               <select
@@ -231,19 +333,6 @@ export function CmsPagesManager() {
                 <option value="published">published</option>
                 <option value="scheduled">scheduled</option>
               </select>
-            </label>
-            <label className="block text-xs font-medium text-slate-600">
-              Preview token (UUID)
-              <input
-                className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-sm font-mono"
-                value={editing.preview_token ?? ""}
-                onChange={(e) =>
-                  setEditing({
-                    ...editing,
-                    preview_token: e.target.value.trim() || null,
-                  })
-                }
-              />
             </label>
             <label className="block text-xs font-medium text-slate-600">
               Meta title
@@ -279,6 +368,94 @@ export function CmsPagesManager() {
                 onChange={(e) => setEditing({ ...editing, og_image_url: e.target.value || null })}
               />
             </label>
+            <div className="rounded-lg border border-slate-100 bg-slate-50/80 p-3">
+              <p className="text-xs font-semibold text-slate-700">SEO checklist</p>
+              <ul className="mt-2 list-inside list-disc space-y-1 text-xs text-slate-600">
+                <li className={editing.meta_title?.trim() ? "text-green-800" : ""}>
+                  Meta title {editing.meta_title?.trim() ? "set" : "missing"}
+                </li>
+                <li
+                  className={
+                    (editing.meta_description?.trim().length ?? 0) >= 50 &&
+                    (editing.meta_description?.trim().length ?? 0) <= 170
+                      ? "text-green-800"
+                      : ""
+                  }
+                >
+                  Meta description length (aim 50–170 chars):{" "}
+                  {editing.meta_description?.trim().length ?? 0}
+                </li>
+                <li className={editing.canonical_url?.trim() ? "text-green-800" : ""}>
+                  Canonical URL {editing.canonical_url?.trim() ? "set" : "optional but recommended"}
+                </li>
+                <li className={editing.og_image_url?.trim() ? "text-green-800" : ""}>
+                  OG image {editing.og_image_url?.trim() ? "set" : "optional"}
+                </li>
+              </ul>
+            </div>
+            <label className="block text-xs font-medium text-slate-600">
+              Preview token (UUID)
+              <input
+                className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-sm font-mono"
+                value={editing.preview_token ?? ""}
+                onChange={(e) =>
+                  setEditing({
+                    ...editing,
+                    preview_token: e.target.value.trim() || null,
+                  })
+                }
+              />
+            </label>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                disabled={!canWrite}
+                onClick={() =>
+                  setEditing({
+                    ...editing,
+                    preview_token:
+                      typeof crypto !== "undefined" && crypto.randomUUID
+                        ? crypto.randomUUID()
+                        : `pv_${Date.now()}`,
+                  })
+                }
+              >
+                Generate preview token
+              </button>
+              <a
+                className="inline-flex items-center rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
+                href={`${getStorefrontPublicOrigin()}/p/${encodeURIComponent(editing.slug)}${
+                  editing.preview_token?.trim()
+                    ? `?preview=${encodeURIComponent(editing.preview_token.trim())}`
+                    : ""
+                }`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Open storefront preview
+              </a>
+            </div>
+            {editing.id &&
+            slugWhenOpened &&
+            editing.slug !== slugWhenOpened &&
+            slugWhenOpened.length > 0 ? (
+              <div className="rounded-lg border border-amber-200 bg-amber-50/80 p-3 text-xs text-amber-950">
+                <p className="font-medium">Slug changed from {slugWhenOpened}</p>
+                <p className="mt-1 text-amber-900/90">
+                  Add a 301 redirect so old links keep working.
+                </p>
+                <button
+                  type="button"
+                  disabled={!canWrite}
+                  className="mt-2 rounded border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-950 hover:bg-amber-100 disabled:opacity-50"
+                  onClick={() => void createSlugRedirect()}
+                >
+                  Create redirect /p/{slugWhenOpened} to /p/{editing.slug}
+                </button>
+                {redirectMessage ? <p className="mt-2 text-slate-700">{redirectMessage}</p> : null}
+              </div>
+            ) : null}
             <label className="block text-xs font-medium text-slate-600">
               JSON-LD (optional)
               <textarea
@@ -315,10 +492,9 @@ export function CmsPagesManager() {
               </button>
             </div>
             <p className="text-xs text-slate-500">
-              Public URL: <code>/p/{editing.slug || "slug"}</code>. Preview:{" "}
-              <code>
-                /api/cms/preview?slug={editing.slug}&token=TOKEN&kind=page
-              </code>
+              Public URL when published: <code>/p/{editing.slug || "slug"}</code>. Draft preview uses{" "}
+              <code>?preview=</code> with your preview token on that path (see Open storefront preview
+              above).
             </p>
           </div>
         ) : null}
