@@ -6,10 +6,22 @@ export type ProductReviewRow = {
   author_name: string;
   body: string;
   created_at: string;
+  /** True when staff-approved row was backed by Medusa order evidence at submit time. */
+  is_verified_buyer?: boolean;
 };
 
+export function summarizeProductReviews(reviews: ProductReviewRow[]): {
+  count: number;
+  average: number;
+} {
+  const count = reviews.length;
+  const average =
+    count > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / count : 0;
+  return { count, average };
+}
+
 /**
- * Loads reviews for a PDP: matches Medusa product id when provided (canonical), else slug-only rows.
+ * Loads **approved** reviews for a PDP (anon Supabase + RLS).
  */
 export async function fetchProductReviews(
   productSlug: string,
@@ -24,7 +36,8 @@ export async function fetchProductReviews(
   const sb = createClient(url, key);
   let q = sb
     .from("product_reviews")
-    .select("id,rating,author_name,body,created_at")
+    .select("id,rating,author_name,body,created_at,is_verified_buyer")
+    .eq("status", "approved")
     .order("created_at", { ascending: false })
     .limit(limit);
   if (mid && slug) {
