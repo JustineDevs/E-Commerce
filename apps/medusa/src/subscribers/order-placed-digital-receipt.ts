@@ -68,16 +68,23 @@ export default async function orderPlacedDigitalReceipt({
     });
 
     if (email && resendKey) {
-      const { Resend } = await import("resend");
-      const resend = new Resend(resendKey);
-      await resend.emails.send({
+      const { sendResendTransactionalEmail } = await import(
+        "@apparel-commerce/resend-mail"
+      );
+      const sent = await sendResendTransactionalEmail({
+        apiKey: resendKey,
         from: fromAddr,
         to: email,
         subject: `Your receipt for Order #${order.display_id ?? order.id ?? data.id}`,
         html,
+        tags: [{ name: "type", value: "digital_receipt" }],
       });
-      await markReceiptSent(sb, receipt.id);
-      logger.info?.(`[receipt] sent to ${email} for order ${data.id}`);
+      if (sent.ok) {
+        await markReceiptSent(sb, receipt.id);
+        logger.info?.(`[receipt] sent to ${email} for order ${data.id}`);
+      } else {
+        logger.warn?.(`[receipt] Resend failed for ${email}: ${sent.message}`);
+      }
     }
   } catch (err) {
     logger.warn?.(`[receipt] ${err instanceof Error ? err.message : String(err)}`);
