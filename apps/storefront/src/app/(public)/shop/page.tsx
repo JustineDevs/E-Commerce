@@ -13,25 +13,27 @@ import {
   fetchCategorySummaries,
   fetchVariantFacets,
 } from "@/lib/catalog-fetch";
-import { firstCommerceFailure } from "@/lib/catalog-fetch-helpers";
+import {
+  primaryCommerceFailure,
+  secondaryCommerceFailure,
+} from "@/lib/catalog-fetch-helpers";
 import type { ShopQuery } from "@/lib/shop-url";
 import { shopHref } from "@/lib/shop-url";
 import { CatalogSearchTypeahead } from "@/components/CatalogSearchTypeahead";
 import { ShopPriceRangeForm } from "@/components/ShopPriceRangeForm";
 import { ShopSortSelect } from "@/components/ShopSortSelect";
 import { StorefrontCommerceAlert } from "@/components/StorefrontCommerceAlert";
-import { canonicalUrl } from "@/lib/seo";
+import { canonicalUrl, SITE_DESCRIPTION, SITE_NAME } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Shop — All Products",
-  description:
-    "Browse all apparel: shorts, shirts, jackets. Maharlika Apparel Custom — structural silhouettes and everyday craft. Filter by category, size, color.",
+  description: SITE_DESCRIPTION,
   alternates: { canonical: canonicalUrl("/shop") },
   openGraph: {
-    title: "Shop | Maharlika Apparel Custom",
-    description: "Browse custom apparel. Shorts, shirts, jackets.",
+    title: `Shop | ${SITE_NAME}`,
+    description: SITE_DESCRIPTION,
     url: canonicalUrl("/shop"),
   },
 };
@@ -41,6 +43,7 @@ export default async function ShopPage({
 }: {
   searchParams: Promise<{
     category?: string;
+    locale?: string;
     size?: string;
     color?: string;
     brand?: string;
@@ -52,6 +55,7 @@ export default async function ShopPage({
   }>;
 }) {
   const sp = await searchParams;
+  const cmsLocale = (sp.locale ?? "en").trim() || "en";
   const parsed = productListQuerySchema.safeParse({
     limit: SHOP_PRODUCT_PAGE_SIZE,
     offset: sp.offset,
@@ -98,15 +102,15 @@ export default async function ShopPage({
     }),
     fetchCategorySummaries(),
     fetchVariantFacets(category),
-    category ? loadCmsCategoryContentPublic(category, "en") : Promise.resolve(null),
+    category ? loadCmsCategoryContentPublic(category, cmsLocale) : Promise.resolve(null),
   ]);
 
-  const failure = firstCommerceFailure(pageRes, catRes, facetRes);
-  if (failure) {
+  const blockingFailure = primaryCommerceFailure(pageRes);
+  if (blockingFailure) {
     return (
       <main className="storefront-page-shell max-w-[1600px] pb-12 sm:pb-16 md:pb-24">
         <div className="mx-auto max-w-2xl pt-8">
-          <StorefrontCommerceAlert failure={failure} />
+          <StorefrontCommerceAlert failure={blockingFailure} />
         </div>
       </main>
     );
@@ -114,10 +118,20 @@ export default async function ShopPage({
 
   const okPage = pageRes as Extract<typeof pageRes, { kind: "ok" }>;
   const { products, total } = okPage;
-  const categories = (catRes as Extract<typeof catRes, { kind: "ok" }>).summaries;
-  const facets = (facetRes as Extract<typeof facetRes, { kind: "ok" }>).facets;
+  const categories =
+    catRes.kind === "ok"
+      ? catRes.summaries
+      : ([] as Extract<typeof catRes, { kind: "ok" }>["summaries"]);
+  const facets =
+    facetRes.kind === "ok"
+      ? facetRes.facets
+      : { sizes: [] as string[], colors: [] as string[], brands: [] as string[] };
+
+  const sidebarWarning = secondaryCommerceFailure(catRes, facetRes);
 
   const totalActive = categories.reduce((s, c) => s + c.count, 0);
+  const allProductsCountLabel =
+    categories.length > 0 ? totalActive : total;
   const hasMore = offset + products.length < total;
 
   const base = (): ShopQuery => ({
@@ -135,6 +149,11 @@ export default async function ShopPage({
 
   return (
     <main className="storefront-page-shell max-w-[1600px] pb-12 sm:pb-16 md:pb-24">
+      {sidebarWarning ? (
+        <div className="mx-auto mb-8 max-w-3xl px-4 sm:px-6 lg:px-8">
+          <StorefrontCommerceAlert failure={sidebarWarning} />
+        </div>
+      ) : null}
       {cmsCategory?.banner_url ? (
         <div className="relative mb-10 aspect-[21/9] w-full overflow-hidden rounded-2xl bg-surface-container-low">
           <Image
@@ -150,10 +169,10 @@ export default async function ShopPage({
       <header className="mb-12 grid grid-cols-1 items-end gap-8 sm:mb-16 lg:mb-20 lg:grid-cols-12">
         <div className="min-w-0 lg:col-span-8">
           <h1 className="font-headline text-[clamp(2rem,6.5vw,4.5rem)] font-bold leading-[1.05] tracking-tighter text-primary">
-            Maharlika
+            Shop
             <br />
             <span className="text-[clamp(1.2rem,4vw,2.75rem)] font-bold">
-              Apparel Custom
+              All products
             </span>
           </h1>
           {searchQ ? (
@@ -169,9 +188,8 @@ export default async function ShopPage({
             />
           ) : (
             <p className="mt-4 max-w-xl font-body text-base leading-relaxed text-on-surface-variant md:text-lg">
-              Structural silhouettes and quiet luxury-shorts, shirts, and layers
-              built for everyday precision. Every piece reflects Maharlika Apparel
-              Custom craft.
+              Browse the catalog with filters for category, size, color, and price.
+              Product details, stock, and checkout use the live store system.
             </p>
           )}
         </div>
@@ -223,7 +241,7 @@ export default async function ShopPage({
                 >
                   <span>All</span>
                   <span className="text-[10px] text-on-surface-variant">
-                    ({totalActive})
+                    ({allProductsCountLabel})
                   </span>
                 </Link>
               </li>
