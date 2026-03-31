@@ -4,6 +4,7 @@ import {
   Alert,
   AlertDescription,
   AlertTitle,
+  AuthSplitShell,
   Card,
   CardContent,
   CardDescription,
@@ -30,15 +31,16 @@ export default async function SignInPage({
   const authErr = describeAuthSignInError(sp.error);
 
   return (
-    <main className="storefront-page-shell max-w-md">
+    <AuthSplitShell>
       <Card>
         <CardHeader>
           <CardTitle className="font-headline text-3xl font-bold tracking-tight sm:text-4xl">
             Sign in
           </CardTitle>
           <CardDescription className="font-body text-sm leading-relaxed">
-            Access your account and order history with Google. By continuing you
-            agree to our{" "}
+            Access your account and order history with Google. After you sign in,
+            you will be asked for a short delivery profile (name, mobile, address)
+            if anything is still missing. By continuing you agree to our{" "}
             <Link href="/terms" className="underline hover:text-primary">
               Terms
             </Link>{" "}
@@ -57,7 +59,7 @@ export default async function SignInPage({
                 <p className="leading-relaxed opacity-95">{authErr.hint}</p>
                 <details className="mt-3 text-xs">
                   <summary className="cursor-pointer font-medium opacity-80">
-                    Technical code
+                    Details for support
                   </summary>
                   <p className="mt-2 font-mono opacity-80">{authErr.codeLabel}</p>
                 </details>
@@ -76,6 +78,6 @@ export default async function SignInPage({
           </p>
         </CardContent>
       </Card>
-    </main>
+    </AuthSplitShell>
   );
 }
