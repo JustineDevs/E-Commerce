@@ -10,7 +10,7 @@ import {
 import { logAdminApiEvent } from "@/lib/admin-api-log";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { requireStaffSession } from "@/lib/requireStaffSession";
-import { correlatedJson, tagResponse } from "@/lib/staff-api-response";
+import { correlatedJson, correlatedError, tagResponse } from "@/lib/staff-api-response";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 
@@ -32,7 +32,7 @@ export async function POST(req: Request) {
     const session = await getServerSession(authOptions);
     const perms = session?.user?.permissions;
     if (!staffHasPermission(perms ?? [], "chat_orders:manage")) {
-      return correlatedJson(correlationId, { error: "Forbidden" }, { status: 403 });
+      return correlatedError(correlationId, 403, "Forbidden", "MISSING_PERMISSION");
     }
   }
 
@@ -41,22 +41,30 @@ export async function POST(req: Request) {
     raw_text?: string;
     phone?: string;
     address?: string;
-    items?: IntakeItem[];
+    items?: unknown[];
   };
 
   const source = typeof body.source === "string" ? body.source.trim() : "chat";
-  const items = Array.isArray(body.items) ? body.items : [];
+  const items: IntakeItem[] = [];
+  if (Array.isArray(body.items)) {
+    for (const row of body.items) {
+      if (!row || typeof row !== "object") continue;
+      const o = row as { variantId?: string; quantity?: unknown };
+      const variantId =
+        typeof o.variantId === "string" ? o.variantId.trim() : "";
+      if (!variantId) continue;
+      const q = Number(o.quantity);
+      const quantity = Math.max(
+        1,
+        Math.floor(Number.isFinite(q) ? q : 1),
+      );
+      items.push({ variantId, quantity });
+    }
+  }
 
   const supabase = tryCreateSupabaseClient();
   if (!supabase) {
-    return correlatedJson(
-      correlationId,
-      {
-        error: "Supabase is not configured",
-        code: "SUPABASE_NOT_CONFIGURED",
-      },
-      { status: 503 },
-    );
+    return correlatedError(correlationId, 503, "Supabase is not configured", "SUPABASE_NOT_CONFIGURED");
   }
   const { data: inserted, error: insErr } = await supabase
     .from("chat_order_intake")
@@ -79,10 +87,11 @@ export async function POST(req: Request) {
       phase: "error",
       detail: { db: insErr?.message },
     });
-    return correlatedJson(
+    return correlatedError(
       correlationId,
-      { error: insErr?.message ?? "Unable to record chat order" },
-      { status: 502 },
+      502,
+      insErr?.message ?? "Unable to record chat order",
+      "INTERNAL_ERROR",
     );
   }
 
