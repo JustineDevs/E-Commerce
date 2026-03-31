@@ -1,40 +1,29 @@
 import type { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
+import {
+  loadGoogleCredentials,
+  buildSharedJwtCallback,
+  buildSharedSessionCallback,
+} from "@apparel-commerce/sdk";
 
-const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim() ?? "";
-const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim() ?? "";
+const google = loadGoogleCredentials("storefront");
 
-if (process.env.NODE_ENV === "development" && (!googleClientId || !googleClientSecret)) {
-  console.warn(
-    "[storefront auth] GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET is empty. Google sign-in will not work. Check root .env.",
-  );
-}
+const sharedJwt = buildSharedJwtCallback();
+const sharedSession = buildSharedSessionCallback();
 
 export const authOptions: NextAuthOptions = {
   debug: process.env.NODE_ENV === "development",
   providers: [
     GoogleProvider({
-      clientId: googleClientId,
-      clientSecret: googleClientSecret,
+      clientId: google.clientId,
+      clientSecret: google.clientSecret,
     }),
   ],
   secret: process.env.NEXTAUTH_SECRET?.trim(),
   session: { strategy: "jwt", maxAge: 60 * 60 * 24 * 7 },
   pages: { signIn: "/sign-in" },
   callbacks: {
-    async jwt({ token, user }) {
-      if (user?.email) token.email = user.email;
-      if (user?.name) token.name = user.name;
-      if (user?.image) token.picture = user.image;
-      return token;
-    },
-    async session({ session, token }) {
-      if (session.user) {
-        session.user.email = token.email as string | undefined;
-        session.user.name = token.name as string | undefined;
-        session.user.image = token.picture as string | undefined;
-      }
-      return session;
-    },
+    jwt: sharedJwt as NextAuthOptions["callbacks"] extends { jwt?: infer J } ? J : never,
+    session: sharedSession as NextAuthOptions["callbacks"] extends { session?: infer S } ? S : never,
   },
 };
