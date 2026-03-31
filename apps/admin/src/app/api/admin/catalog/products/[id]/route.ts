@@ -1,5 +1,5 @@
 import { getServerSession } from "next-auth/next";
-import { staffHasPermission } from "@apparel-commerce/database";
+import { staffSessionAllows } from "@apparel-commerce/database";
 import { createMedusaCatalogOperations } from "@/domain/operations/catalog-operations";
 import { upsertEntityWorkflow } from "@/lib/admin-workflow";
 import { authOptions } from "@/lib/auth";
@@ -7,11 +7,15 @@ import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { jsonFromAdminOperationResult } from "@/lib/staff-api-operation";
 import { insertStaffAuditLog } from "@/lib/staff-audit";
-import { parseOptionalStockQuantity } from "@/lib/parse-optional-stock-quantity";
+import {
+  parseOptionalStockQuantity,
+  parseOptionalVariantStocks,
+} from "@/lib/parse-optional-stock-quantity";
 import {
   parseStorefrontMetadataFromBody,
   parseVariantBarcodeFromBody,
 } from "@/lib/parse-catalog-product-body";
+import { parseCatalogOptionArray } from "@/lib/parse-catalog-option-array";
 import { correlatedJson } from "@/lib/staff-api-response";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +28,7 @@ export async function PATCH(req: Request, ctx: RouteParams) {
   if (!session?.user) {
     return correlatedJson(correlationId, { error: "Unauthorized" }, { status: 401 });
   }
-  if (!staffHasPermission(session.user.permissions ?? [], "catalog:write")) {
+  if (!staffSessionAllows(session, "catalog:write")) {
     return correlatedJson(correlationId, { error: "Forbidden" }, { status: 403 });
   }
   const { id: productId } = await ctx.params;
@@ -42,18 +46,43 @@ export async function PATCH(req: Request, ctx: RouteParams) {
         (x): x is string => typeof x === "string" && x.trim().length > 0,
       )
     : [];
-  const sizeLabel =
-    typeof body.sizeLabel === "string" ? body.sizeLabel : undefined;
-  const colorLabel =
-    typeof body.colorLabel === "string" ? body.colorLabel : undefined;
+  const sizeLabelsArr = parseCatalogOptionArray(body.sizeLabels);
+  const colorLabelsArr = parseCatalogOptionArray(body.colorLabels);
+  if (
+    !sizeLabelsArr ||
+    !colorLabelsArr ||
+    sizeLabelsArr.length < 1 ||
+    colorLabelsArr.length < 1
+  ) {
+    return correlatedJson(
+      correlationId,
+      { error: "Select at least one size and one color." },
+      { status: 400 },
+    );
+  }
 
   const stockParsed = parseOptionalStockQuantity(body);
   if (!stockParsed.ok) {
     return correlatedJson(correlationId, { error: stockParsed.error }, { status: 400 });
   }
+  const variantStocksParsed = parseOptionalVariantStocks(body);
+  if (!variantStocksParsed.ok) {
+    return correlatedJson(
+      correlationId,
+      { error: variantStocksParsed.error },
+      { status: 400 },
+    );
+  }
 
   const storefrontMetadata = parseStorefrontMetadataFromBody(body);
   const variantBarcode = parseVariantBarcodeFromBody(body);
+
+  const imageUrlsRaw = body.imageUrls;
+  const imageUrls = Array.isArray(imageUrlsRaw)
+    ? imageUrlsRaw
+        .filter((x): x is string => typeof x === "string" && x.trim().length > 0)
+        .map((s) => s.trim())
+    : undefined;
 
   const ops = createMedusaCatalogOperations();
   const result = await ops.updateProduct(productId, {
@@ -64,12 +93,14 @@ export async function PATCH(req: Request, ctx: RouteParams) {
     status,
     pricePhp: Number.isFinite(pricePhp) ? pricePhp : NaN,
     sku: typeof body.sku === "string" ? body.sku : null,
+    imageUrls,
     thumbnail:
       typeof body.thumbnail === "string" ? body.thumbnail : null,
     categoryIds,
-    sizeLabel,
-    colorLabel,
+    sizeLabels: sizeLabelsArr,
+    colorLabels: colorLabelsArr,
     stockQuantity: stockParsed.value,
+    variantStocks: variantStocksParsed.value,
     variantBarcode,
     storefrontMetadata,
   });
@@ -106,7 +137,7 @@ export async function DELETE(req: Request, ctx: RouteParams) {
   if (!session?.user) {
     return correlatedJson(correlationId, { error: "Unauthorized" }, { status: 401 });
   }
-  if (!staffHasPermission(session.user.permissions ?? [], "catalog:write")) {
+  if (!staffSessionAllows(session, "catalog:write")) {
     return correlatedJson(correlationId, { error: "Forbidden" }, { status: 403 });
   }
   const { id: productId } = await ctx.params;

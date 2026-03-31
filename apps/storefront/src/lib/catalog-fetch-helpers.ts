@@ -5,14 +5,24 @@ import type {
   VariantFacetsResult,
 } from "./catalog-fetch";
 
-export function firstCommerceFailure(
+/**
+ * Only the primary product list should block the whole shop. Category and facet
+ * fetches are sidecars; if they fail while products succeed, callers should
+ * degrade (empty sidebar) and optionally show a secondary warning.
+ */
+export function primaryCommerceFailure(
   page: ProductsPageResult,
-  categories: CategorySummariesResult,
-  facets: VariantFacetsResult,
 ): CommerceFetchFailure | null {
   if (page.kind !== "ok") {
     return page;
   }
+  return null;
+}
+
+export function secondaryCommerceFailure(
+  categories: CategorySummariesResult,
+  facets: VariantFacetsResult,
+): CommerceFetchFailure | null {
   if (categories.kind !== "ok") {
     return categories;
   }

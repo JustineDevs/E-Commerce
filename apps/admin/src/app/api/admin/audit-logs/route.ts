@@ -1,7 +1,12 @@
 import { getServerSession } from "next-auth/next";
-import { staffHasPermission, staffPermissionListForSession } from "@apparel-commerce/database";
+import {
+  checkStaffRole,
+  staffHasPermission,
+  staffPermissionListForSession,
+} from "@apparel-commerce/database";
 import { authOptions } from "@/lib/auth";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
+import { auditActorCsvCell } from "@/lib/audit-actor-format";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson } from "@/lib/staff-api-response";
 
@@ -21,8 +26,14 @@ function escapeCsvCell(value: string): string {
 export async function GET(req: Request) {
   const correlationId = getCorrelationId(req);
   const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    return correlatedJson(correlationId, { error: "Unauthorized" }, { status: 401 });
+  const roleCheck = checkStaffRole(session);
+  if (!roleCheck.ok) {
+    const status = roleCheck.status === 401 ? 401 : 403;
+    return correlatedJson(
+      correlationId,
+      { error: status === 401 ? "Unauthorized" : "Forbidden", code: roleCheck.code },
+      { status },
+    );
   }
 
   const url = new URL(req.url);
@@ -53,7 +64,7 @@ export async function GET(req: Request) {
 
   let q = sup.client
     .from("audit_logs")
-    .select("id,action,resource,details,created_at")
+    .select("id,action,resource,details,created_at,actor_id,users(email,name)")
     .order("created_at", { ascending: false })
     .limit(limit);
 
@@ -80,14 +91,21 @@ export async function GET(req: Request) {
   const rows = data ?? [];
 
   if (isCsv) {
-    const header = ["id", "created_at", "action", "resource", "details_json"].join(",");
+    const header = ["id", "created_at", "actor", "action", "resource", "details_json"].join(",");
     const lines = rows.map((r) => {
       const rec = r as Record<string, unknown>;
       const details =
         rec.details != null ? JSON.stringify(rec.details) : "";
+      const actor = auditActorCsvCell(
+        rec as {
+          users?: { email?: string | null; name?: string | null } | null;
+          details: Record<string, unknown> | null;
+        },
+      );
       return [
         escapeCsvCell(String(rec.id ?? "")),
         escapeCsvCell(String(rec.created_at ?? "")),
+        escapeCsvCell(actor),
         escapeCsvCell(String(rec.action ?? "")),
         escapeCsvCell(String(rec.resource ?? "")),
         escapeCsvCell(details),

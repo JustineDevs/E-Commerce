@@ -5,7 +5,7 @@ import type { AdminOperationResult } from "@/lib/admin-operation-result";
 import {
   createCatalogProduct,
   deleteCatalogProduct,
-  updateCatalogProductSimple,
+  updateCatalogProduct,
   type CreateCatalogProductBody,
   type UpdateCatalogProductBody,
 } from "@/lib/catalog-product-mutations";
@@ -26,7 +26,7 @@ export type CatalogOperations = {
 export function createMedusaCatalogOperations(): CatalogOperations {
   return {
     createProduct: createCatalogProduct,
-    updateProduct: updateCatalogProductSimple,
+    updateProduct: updateCatalogProduct,
     deleteProduct: deleteCatalogProduct,
   };
 }

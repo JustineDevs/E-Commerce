@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useSession } from "next-auth/react";
+import { staffHasPermission } from "@apparel-commerce/platform-data";
 import { useCallback, useEffect, useState } from "react";
 
 type Post = {
@@ -9,12 +10,15 @@ type Post = {
   slug: string;
   title: string;
   status: string;
+  locale?: string;
 };
 
 export function CmsBlogManager() {
-  const { status } = useSession();
+  const { data: session, status } = useSession();
+  const canWrite = staffHasPermission(session?.user?.permissions ?? [], "content:write");
   const [rows, setRows] = useState<Post[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const load = useCallback(() => {
     fetch("/api/admin/cms/blog")
@@ -31,36 +35,110 @@ export function CmsBlogManager() {
     load();
   }, [load]);
 
+  const toggle = (id: string) => {
+    setSelected((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  };
+
+  const exportHref =
+    selected.size > 0
+      ? `/api/admin/cms/blog/export?ids=${encodeURIComponent(Array.from(selected).join(","))}`
+      : "/api/admin/cms/blog/export";
+
   if (status === "loading") return <p className="text-sm text-slate-600">Loading…</p>;
 
   return (
     <div className="space-y-6">
       {error ? <p className="text-sm text-red-700">{error}</p> : null}
       <p className="text-sm text-slate-600">
-        Draft and publish posts that appear on your public blog. Open a post to edit content. This list
-        shows what is live or in draft.
+        Draft and publish posts. Use Edit for the in-admin editor, scheduling, SEO fields, and preview
+        links.
       </p>
-      <details className="text-xs text-slate-500 mt-2">
-        <summary className="cursor-pointer font-medium text-slate-700 select-none">
-          Details for IT or your developer
-        </summary>
-        <p className="mt-2 border-l-2 border-slate-200 pl-3 leading-relaxed">
-          Full create/update flows can also use the admin JSON APIs if you automate publishing from
-          another tool.
-        </p>
-      </details>
+      <div className="flex flex-wrap gap-3">
+        <a
+          href={exportHref}
+          className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm"
+          download
+        >
+          Export CSV{selected.size ? ` (${selected.size})` : " (all)"}
+        </a>
+        <button
+          type="button"
+          disabled={!canWrite || selected.size === 0}
+          className="rounded-lg border border-red-200 px-3 py-1.5 text-sm text-red-800 disabled:opacity-50"
+          onClick={async () => {
+            if (!confirm(`Delete ${selected.size} post(s)?`)) return;
+            const r = await fetch("/api/admin/cms/blog/bulk", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ ids: Array.from(selected) }),
+            });
+            if (r.ok) {
+              setSelected(new Set());
+              load();
+            } else setError("Bulk delete failed");
+          }}
+        >
+          Delete selected
+        </button>
+      </div>
       <ul className="space-y-2">
         {rows.map((p) => (
-          <li key={p.id} className="flex items-center justify-between rounded border border-slate-200 px-4 py-2">
-            <span className="text-sm">
-              {p.title} <span className="text-slate-500">({p.status})</span>
-            </span>
-            <Link href={`/blog/${p.slug}`} className="text-xs text-primary underline" target="_blank">
-              View storefront
-            </Link>
+          <li
+            key={p.id}
+            className="flex flex-wrap items-center justify-between gap-2 rounded border border-slate-200 px-4 py-2"
+          >
+            <label className="flex flex-1 items-center gap-3 text-sm">
+              <input
+                type="checkbox"
+                checked={selected.has(p.id)}
+                onChange={() => toggle(p.id)}
+                className="rounded border-slate-300"
+              />
+              <span>
+                {p.title} <span className="text-slate-500">({p.status})</span>
+              </span>
+            </label>
+            <div className="flex flex-wrap gap-3 text-xs">
+              <Link href={`/admin/cms/blog/${p.id}`} className="text-primary underline">
+                Edit
+              </Link>
+              <Link href={`/blog/${p.slug}`} className="text-primary underline" target="_blank">
+                View storefront
+              </Link>
+            </div>
           </li>
         ))}
       </ul>
+      {canWrite ? (
+        <button
+          type="button"
+          className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white"
+          onClick={async () => {
+            const slug = `draft-${Date.now()}`;
+            const r = await fetch("/api/admin/cms/blog", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                slug,
+                title: "New draft",
+                locale: "en",
+                status: "draft",
+              }),
+            });
+            const j = (await r.json()) as { data?: { id: string }; error?: string };
+            if (r.ok && j.data?.id) {
+              window.location.href = `/admin/cms/blog/${j.data.id}`;
+            } else setError(j.error ?? "Could not create");
+          }}
+        >
+          New post
+        </button>
+      ) : null}
     </div>
   );
 }

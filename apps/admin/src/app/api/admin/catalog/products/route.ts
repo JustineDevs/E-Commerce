@@ -1,5 +1,5 @@
 import { getServerSession } from "next-auth/next";
-import { staffHasPermission } from "@apparel-commerce/database";
+import { staffSessionAllows } from "@apparel-commerce/database";
 import { createMedusaCatalogOperations } from "@/domain/operations/catalog-operations";
 import { upsertEntityWorkflow } from "@/lib/admin-workflow";
 import { authOptions } from "@/lib/auth";
@@ -12,6 +12,7 @@ import {
   parseStorefrontMetadataFromBody,
   parseVariantBarcodeFromBody,
 } from "@/lib/parse-catalog-product-body";
+import { parseCatalogOptionArray } from "@/lib/parse-catalog-option-array";
 import { correlatedJson } from "@/lib/staff-api-response";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +23,7 @@ export async function POST(req: Request) {
   if (!session?.user) {
     return correlatedJson(correlationId, { error: "Unauthorized" }, { status: 401 });
   }
-  if (!staffHasPermission(session.user.permissions ?? [], "catalog:write")) {
+  if (!staffSessionAllows(session, "catalog:write")) {
     return correlatedJson(correlationId, { error: "Forbidden" }, { status: 403 });
   }
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
@@ -38,6 +39,8 @@ export async function POST(req: Request) {
     typeof body.sizeLabel === "string" ? body.sizeLabel : undefined;
   const colorLabel =
     typeof body.colorLabel === "string" ? body.colorLabel : undefined;
+  const sizeLabelsArr = parseCatalogOptionArray(body.sizeLabels);
+  const colorLabelsArr = parseCatalogOptionArray(body.colorLabels);
 
   const stockParsed = parseOptionalStockQuantity(body);
   if (!stockParsed.ok) {
@@ -46,6 +49,13 @@ export async function POST(req: Request) {
 
   const storefrontMetadata = parseStorefrontMetadataFromBody(body);
   const variantBarcode = parseVariantBarcodeFromBody(body);
+
+  const imageUrlsRaw = body.imageUrls;
+  const imageUrls = Array.isArray(imageUrlsRaw)
+    ? imageUrlsRaw
+        .filter((x): x is string => typeof x === "string" && x.trim().length > 0)
+        .map((s) => s.trim())
+    : undefined;
 
   const ops = createMedusaCatalogOperations();
   const result = await ops.createProduct({
@@ -56,11 +66,14 @@ export async function POST(req: Request) {
     status,
     pricePhp: Number.isFinite(pricePhp) ? pricePhp : NaN,
     sku: typeof body.sku === "string" ? body.sku : null,
+    imageUrls,
     thumbnail:
       typeof body.thumbnail === "string" ? body.thumbnail : null,
     categoryIds,
     sizeLabel,
     colorLabel,
+    sizeLabels: sizeLabelsArr,
+    colorLabels: colorLabelsArr,
     stockQuantity: stockParsed.value,
     variantBarcode: variantBarcode ?? null,
     storefrontMetadata,
