@@ -41,30 +41,6 @@ function productionPaymongoSchema() {
     );
 }
 
-function productionLemonSqueezySchema() {
-  return z
-    .object({
-      LEMONSQUEEZY_API_KEY: z.string().optional(),
-      LEMONSQUEEZY_STORE_ID: z.string().optional(),
-      LEMONSQUEEZY_CHECKOUT_VARIANT_ID: z.string().optional(),
-      LEMONSQUEEZY_WEBHOOK_SECRET: z.string().optional(),
-    })
-    .refine(
-      (d) => {
-        if (!d.LEMONSQUEEZY_API_KEY?.trim()) return true;
-        return (
-          Boolean(d.LEMONSQUEEZY_STORE_ID?.trim()) &&
-          Boolean(d.LEMONSQUEEZY_CHECKOUT_VARIANT_ID?.trim()) &&
-          Boolean(d.LEMONSQUEEZY_WEBHOOK_SECRET?.trim())
-        );
-      },
-      {
-        message:
-          "LEMONSQUEEZY_STORE_ID, LEMONSQUEEZY_CHECKOUT_VARIANT_ID, and LEMONSQUEEZY_WEBHOOK_SECRET are required when LEMONSQUEEZY_API_KEY is set",
-      },
-    );
-}
-
 function productionMayaSchema() {
   return z
     .object({
@@ -88,6 +64,7 @@ function productionPayPalSchema() {
     .object({
       PAYPAL_CLIENT_ID: z.string().optional(),
       PAYPAL_CLIENT_SECRET: z.string().optional(),
+      PAYPAL_WEBHOOK_ID: z.string().optional(),
     })
     .refine(
       (d) => {
@@ -97,6 +74,16 @@ function productionPayPalSchema() {
       {
         message:
           "PAYPAL_CLIENT_SECRET is required in production when PAYPAL_CLIENT_ID is set",
+      },
+    )
+    .refine(
+      (d) => {
+        if (!d.PAYPAL_CLIENT_ID?.trim()) return true;
+        return Boolean(d.PAYPAL_WEBHOOK_ID?.trim());
+      },
+      {
+        message:
+          "PAYPAL_WEBHOOK_ID is required in production when PAYPAL_CLIENT_ID is set (webhook signature verification)",
       },
     );
 }
@@ -124,6 +111,35 @@ export function validateMedusaProcessEnv(): void {
     throw new Error(
       `Medusa: DATABASE_URL is required — ${r.error.message}`,
     );
+  }
+
+  const credSrc = process.env.PAYMENT_CREDENTIALS_SOURCE?.trim().toLowerCase();
+
+  if (process.env.NODE_ENV === "production") {
+    const mandateOff = process.env.MEDUSA_BYOK_MANDATE_OFF?.trim() === "1";
+    if (!mandateOff) {
+      if (credSrc !== "platform" && credSrc !== "supabase") {
+        throw new Error(
+          "Medusa: production requires PAYMENT_CREDENTIALS_SOURCE=platform or supabase (BYOK via Supabase payment_connections). " +
+            "Remove plaintext PSP keys from deployment env when using platform source. " +
+            "Break-glass only: MEDUSA_BYOK_MANDATE_OFF=1.",
+        );
+      }
+    }
+  }
+
+  if (credSrc === "platform" || credSrc === "supabase") {
+    const need = [
+      "SUPABASE_URL",
+      "SUPABASE_SERVICE_ROLE_KEY",
+      "PAYMENT_CONNECTIONS_ENCRYPTION_KEY",
+    ] as const;
+    const missing = need.filter((k) => !process.env[k]?.trim());
+    if (missing.length > 0) {
+      throw new Error(
+        `Medusa: PAYMENT_CREDENTIALS_SOURCE=platform requires ${missing.join(", ")}`,
+      );
+    }
   }
 
   if (process.env.NODE_ENV === "production") {
@@ -167,13 +183,6 @@ export function validateMedusaProcessEnv(): void {
       );
     }
 
-    const lemon = productionLemonSqueezySchema().safeParse(process.env);
-    if (!lemon.success) {
-      throw new Error(
-        `Medusa: ${lemon.error.issues[0]?.message ?? "Lemon Squeezy env invalid"}`,
-      );
-    }
-
     const paypal = productionPayPalSchema().safeParse(process.env);
     if (!paypal.success) {
       throw new Error(
@@ -192,12 +201,16 @@ export function validateMedusaProcessEnv(): void {
   const resendKeys = ["RESEND_API_KEY", "RESEND_FROM_EMAIL"];
   warnPartialOptionalProvider("Resend", resendKeys, process.env as Record<string, string | undefined>);
   if (
-    process.env.NODE_ENV === "production" &&
     resendKeys.every((k) => process.env[k]?.trim()) &&
-    !process.env.TRACKING_LINK_SECRET?.trim()
+    !process.env.TRACKING_HMAC_SECRET?.trim()
   ) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "Medusa: TRACKING_HMAC_SECRET is required in production when Resend is configured — tracking links would be unsigned without it",
+      );
+    }
     console.warn(
-      "[env] Resend is configured but TRACKING_LINK_SECRET is not set — order confirmation emails will send tracking links without scoped tokens; set TRACKING_LINK_SECRET for spec compliance",
+      "[env] Resend is configured but TRACKING_HMAC_SECRET is not set — order tracking links will be unsigned; set TRACKING_HMAC_SECRET before production",
     );
   }
 
