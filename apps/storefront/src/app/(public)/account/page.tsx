@@ -1,19 +1,27 @@
 import Link from "next/link";
 import Image from "next/image";
 import { getServerSession } from "next-auth/next";
+import { AccountProfilePanel } from "@/components/AccountProfilePanel";
 import { authOptions } from "@/lib/auth";
 import { SignOutButton } from "@/components/SignOutButton";
 import { PreferencesControls } from "@/components/PreferencesControls";
-import { fetchCustomerOrders } from "@/lib/medusa-account-orders";
+import {
+  computeAccountOrderStats,
+  fetchCustomerOrders,
+} from "@/lib/medusa-account-orders";
+import { loadCustomerProfile } from "@/lib/server-customer-profile";
 
 export const dynamic = "force-dynamic";
 
 export default async function AccountPage() {
   const session = await getServerSession(authOptions);
   const user = session?.user;
-  const { orders } = user?.email
-    ? await fetchCustomerOrders(user.email)
+  const userEmail = user?.email?.trim() ?? "";
+  const { orders } = userEmail
+    ? await fetchCustomerOrders(userEmail)
     : { orders: [] };
+  const profile = userEmail ? await loadCustomerProfile(userEmail) : null;
+  const stats = computeAccountOrderStats(orders);
 
   return (
     <main className="storefront-page-shell max-w-4xl">
@@ -21,8 +29,55 @@ export default async function AccountPage() {
         Account
       </h1>
       <p className="font-body text-on-surface-variant mb-12">
-        Manage your profile and orders.
+        Manage your profile, saved addresses, and orders. Payment cards stay with
+        your checkout provider.
       </p>
+
+      {user && orders.length > 0 ? (
+        <section className="mb-10 rounded-lg border border-outline-variant/20 bg-surface-container-low/50 p-6 md:col-span-2">
+          <h2 className="font-headline text-sm font-bold uppercase tracking-widest text-primary">
+            Your shopping KPIs
+          </h2>
+          <p className="mt-1 text-xs text-on-surface-variant">
+            Based on orders linked to this email in our store (same currency as
+            listed).
+          </p>
+          <dl className="mt-4 grid gap-4 sm:grid-cols-3">
+            <div>
+              <dt className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+                Orders placed
+              </dt>
+              <dd className="mt-1 font-headline text-2xl font-bold tabular-nums text-primary">
+                {stats.orderCount}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+                Lifetime value (sum of totals)
+              </dt>
+              <dd className="mt-1 font-headline text-2xl font-bold tabular-nums text-primary">
+                {orders[0]?.currency ?? "PHP"}{" "}
+                {stats.lifetimeSpend.toLocaleString("en-PH", {
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 2,
+                })}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+                Average order value
+              </dt>
+              <dd className="mt-1 font-headline text-2xl font-bold tabular-nums text-primary">
+                {orders[0]?.currency ?? "PHP"}{" "}
+                {stats.averageOrderValue.toLocaleString("en-PH", {
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 2,
+                })}
+              </dd>
+            </div>
+          </dl>
+        </section>
+      ) : null}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <section className="bg-surface-container-lowest rounded shadow-[0px_20px_40px_rgba(0,0,0,0.02)] p-8 md:col-span-2">
@@ -76,6 +131,16 @@ export default async function AccountPage() {
             </>
           )}
         </section>
+
+        {user ? (
+          <AccountProfilePanel
+            initial={{
+              displayName: profile?.displayName ?? null,
+              phone: profile?.phone ?? null,
+              shippingAddresses: profile?.shippingAddresses ?? [],
+            }}
+          />
+        ) : null}
 
         <section className="bg-surface-container-lowest rounded shadow-[0px_20px_40px_rgba(0,0,0,0.02)] p-8">
           <h2 className="font-headline text-sm font-bold uppercase tracking-widest text-primary mb-6">
