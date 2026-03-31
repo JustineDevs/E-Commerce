@@ -24,16 +24,26 @@ export function AdminEmptyState({ title, description, action }: AdminEmptyStateP
 export type AdminErrorStateProps = {
   title: string;
   detail?: string;
+  onRetry?: () => void;
 };
 
-export function AdminErrorState({ title, detail }: AdminErrorStateProps) {
+export function AdminErrorState({ title, detail, onRetry }: AdminErrorStateProps) {
   return (
     <div
       role="alert"
-      className="rounded-lg border border-outline-variant/30 bg-surface-container-low p-6 text-sm text-on-surface"
+      className="rounded-lg border border-error/20 bg-error-container/10 p-6 text-sm text-on-surface"
     >
       <p className="font-semibold">{title}</p>
       {detail ? <p className="mt-2 text-on-surface-variant">{detail}</p> : null}
+      {onRetry ? (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="mt-4 rounded-md bg-primary px-4 py-2 text-xs font-medium text-on-primary transition-colors hover:bg-primary/90"
+        >
+          Retry
+        </button>
+      ) : null}
     </div>
   );
 }
