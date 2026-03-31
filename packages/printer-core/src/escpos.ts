@@ -1,3 +1,4 @@
+import type { ProductLabelPayload } from "./label.js";
 import type { ReceiptPayload } from "./receipt.js";
 
 const ESC = 0x1b;
@@ -93,6 +94,71 @@ export function encodeEscPosReceipt(payload: ReceiptPayload): Uint8Array {
     parts.push(textBytes(payload.footer.trim() + "\n"));
   }
   parts.push(lineFeed(), lineFeed(), cutPartial());
+
+  return concat(parts);
+}
+
+/** ESC/POS: select justification (0 left, 1 center, 2 right). */
+function align(n: 0 | 1 | 2): Uint8Array {
+  return u8(ESC, 0x61, n);
+}
+
+/** Character size: ESC ! n (Epson: combined empha + double width/height bits). */
+function charSize(normal: boolean): Uint8Array {
+  return normal ? u8(ESC, 0x21, 0) : u8(ESC, 0x21, 0x30);
+}
+
+const MAX_LABEL_NAME_LINE = 22;
+
+/**
+ * Encode a compact product label for thermal printers (shelf stickers, receiving).
+ * Uses text only for broad printer compatibility; barcode symbology is not embedded.
+ */
+export function encodeEscPosProductLabel(payload: ProductLabelPayload): Uint8Array {
+  const parts: Uint8Array[] = [init(), align(1), charSize(false)];
+
+  const name = payload.productName.trim() || "Product";
+  const lines: string[] = [];
+  for (let i = 0; i < name.length; i += MAX_LABEL_NAME_LINE) {
+    lines.push(name.slice(i, i + MAX_LABEL_NAME_LINE));
+  }
+  const titleLines = lines.slice(0, 3);
+  for (const line of titleLines) {
+    parts.push(charSize(true));
+    parts.push(textBytes(line + "\n"));
+  }
+  parts.push(charSize(false));
+  parts.push(align(0));
+  parts.push(lineFeed());
+
+  const sku = payload.sku.trim();
+  if (sku) {
+    parts.push(bold(true));
+    parts.push(textBytes("SKU\n"));
+    parts.push(bold(false));
+    parts.push(textBytes(sku + "\n"));
+  }
+
+  const bc = payload.barcode?.trim();
+  if (bc) {
+    parts.push(bold(true));
+    parts.push(textBytes("Barcode\n"));
+    parts.push(bold(false));
+    parts.push(textBytes(bc + "\n"));
+  }
+
+  const sz = payload.size?.trim();
+  const col = payload.color?.trim();
+  if (sz || col) {
+    if (sz) parts.push(textBytes(`Size: ${sz}\n`));
+    if (col) parts.push(textBytes(`Color: ${col}\n`));
+  }
+
+  parts.push(lineFeed());
+  parts.push(bold(true));
+  parts.push(textBytes(payload.priceDisplay.trim() + "\n"));
+  parts.push(bold(false));
+  parts.push(lineFeed(), lineFeed(), lineFeed(), cutPartial());
 
   return concat(parts);
 }
