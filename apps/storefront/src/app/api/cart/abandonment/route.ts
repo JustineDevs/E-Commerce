@@ -1,44 +1,26 @@
-import { createClient } from "@supabase/supabase-js";
-
-import {
-  getRequestIp,
-  rateLimitFixedWindow,
-} from "@/lib/storefront-api-rate-limit";
+import { sendCartRecoveryEmail } from "@/lib/cart-recovery-email";
+import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
+import { applyRateLimit, parseJsonBody } from "@/lib/cart-api-helpers";
 
 const WINDOW_MS = 3_600_000;
 const MAX_PER_WINDOW = 80;
 
-function serviceSupabase() {
-  const url = process.env.SUPABASE_URL?.trim();
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  if (!url || !key) return null;
-  return createClient(url, key);
-}
-
 type LinePayload = { variantId?: string; quantity?: number; price?: number };
 
 export async function POST(req: Request) {
-  const ip = getRequestIp(req);
-  const rl = rateLimitFixedWindow(`cart-abandon:${ip}`, MAX_PER_WINDOW, WINDOW_MS);
-  if (!rl.ok) {
-    return Response.json(
-      { error: "Too many requests", retryAfter: rl.retryAfterSec },
-      { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } },
-    );
-  }
+  const rl = await applyRateLimit(req, "cart-abandon", MAX_PER_WINDOW, WINDOW_MS);
+  if (!rl.ok) return rl.response;
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return Response.json({ error: "Invalid JSON" }, { status: 400 });
-  }
+  const parsed = await parseJsonBody(req);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   if (body === null || typeof body !== "object") {
     return Response.json({ error: "Invalid payload" }, { status: 400 });
   }
   const o = body as Record<string, unknown>;
-  const email =
-    typeof o.email === "string" ? o.email.trim().slice(0, 320) : null;
+  const rawEmail =
+    typeof o.email === "string" ? o.email.trim().slice(0, 320) : "";
+  const email = rawEmail ? rawEmail.toLowerCase() : null;
   const path = typeof o.path === "string" ? o.path.slice(0, 2000) : null;
   const referrer =
     typeof o.referrer === "string" ? o.referrer.slice(0, 2000) : null;
@@ -68,20 +50,52 @@ export async function POST(req: Request) {
     subtotalCents = sum;
   }
 
-  const sb = serviceSupabase();
+  const sb = createStorefrontServiceSupabase();
   if (!sb) {
     return Response.json({ ok: false, skipped: true });
   }
-  const { error } = await sb.from("cart_abandonment_events").insert({
-    email: email || null,
-    line_count: lineCount,
-    subtotal_cents: subtotalCents,
-    path,
-    referrer,
-    client_timestamp: clientTimestamp,
-  });
-  if (error) {
+  const { data: inserted, error } = await sb
+    .from("cart_abandonment_events")
+    .insert({
+      email: email || null,
+      line_count: lineCount,
+      subtotal_cents: subtotalCents,
+      path,
+      referrer,
+      client_timestamp: clientTimestamp,
+    })
+    .select("id")
+    .single();
+
+  if (error || !inserted?.id) {
     return Response.json({ error: "Unable to record" }, { status: 500 });
   }
+
+  const rowId = String(inserted.id);
+  const em = email ?? "";
+  if (
+    em &&
+    lineCount > 0 &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)
+  ) {
+    const since = new Date(Date.now() - 48 * 3600 * 1000).toISOString();
+    const { count: priorSent, error: countErr } = await sb
+      .from("cart_abandonment_events")
+      .select("id", { count: "exact", head: true })
+      .eq("email", em)
+      .not("recovery_email_sent_at", "is", null)
+      .gte("created_at", since);
+    const n = countErr ? 99 : priorSent ?? 0;
+    if (n < 2) {
+      const sent = await sendCartRecoveryEmail({ to: em, lineCount });
+      if (sent) {
+        await sb
+          .from("cart_abandonment_events")
+          .update({ recovery_email_sent_at: new Date().toISOString() })
+          .eq("id", rowId);
+      }
+    }
+  }
+
   return Response.json({ ok: true });
 }
