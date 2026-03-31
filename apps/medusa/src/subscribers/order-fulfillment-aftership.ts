@@ -1,5 +1,6 @@
 import type { SubscriberArgs, SubscriberConfig } from "@medusajs/framework";
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils";
+import { createTracking, detectCourier } from "../lib/aftership-sdk-client";
 
 type FulfillmentCreatedData = {
   order_id: string;
@@ -35,43 +36,43 @@ export default async function orderFulfillmentAftershipHandler({
     return;
   }
 
-  const slug = process.env.AFTERSHIP_COURIER_SLUG?.trim() || "jtexpress-ph";
-
-  const res = await fetch("https://api.aftership.com/v4/trackings", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "aftership-api-key": apiKey,
-    },
-    body: JSON.stringify({
-      tracking_number: trackingNumber,
-      slug,
-      custom_fields: { medusa_order_id: data.order_id },
-    }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    logger.warn?.(`[aftership] create tracking failed ${res.status} ${text}`);
-    return;
+  let slug = process.env.AFTERSHIP_COURIER_SLUG?.trim() || "";
+  if (!slug) {
+    const couriers = await detectCourier(trackingNumber);
+    slug = couriers[0]?.slug || "jtexpress-ph";
+    if (couriers.length > 0) {
+      logger.info?.(
+        `[aftership] auto-detected courier ${slug} (${couriers[0]?.name}) for ${trackingNumber}`
+      );
+    }
   }
 
-  const json = (await res.json().catch(() => null)) as {
-    data?: { id?: string };
-  } | null;
-  const trackingId = json?.data?.id;
+  try {
+    const result = await createTracking({
+      trackingNumber,
+      slug,
+      orderId: data.order_id,
+    });
 
-  await fulfillmentModule.updateFulfillment(data.fulfillment_id, {
-    metadata: {
-      ...((fulfillment.metadata as Record<string, unknown>) ?? {}),
-      aftership_tracking_id: trackingId ?? null,
-      aftership_registered_at: new Date().toISOString(),
-    },
-  });
+    await fulfillmentModule.updateFulfillment(data.fulfillment_id, {
+      metadata: {
+        ...((fulfillment.metadata as Record<string, unknown>) ?? {}),
+        aftership_tracking_id: result.id ?? null,
+        aftership_slug: result.slug,
+        aftership_registered_at: new Date().toISOString(),
+      },
+    });
 
-  logger.info?.(
-    `[aftership] registered ${trackingNumber} for order ${data.order_id} fulfillment ${data.fulfillment_id}`
-  );
+    logger.info?.(
+      `[aftership] registered ${trackingNumber} (${slug}) for order ${data.order_id} fulfillment ${data.fulfillment_id}`
+    );
+  } catch (err) {
+    logger.warn?.(
+      `[aftership] create tracking failed for ${trackingNumber}: ${
+        err instanceof Error ? err.message : String(err)
+      }`
+    );
+  }
 }
 
 export const config: SubscriberConfig = {
