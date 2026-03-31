@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { getServerSession } from "next-auth/next";
-import { staffHasPermission } from "@apparel-commerce/database";
+import { staffSessionAllows } from "@apparel-commerce/database";
 import { closeShift } from "@apparel-commerce/platform-data";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { authOptions } from "@/lib/auth";
@@ -13,7 +13,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
   const cid = getCorrelationId(req);
   const session = await getServerSession(authOptions);
   if (!session?.user) return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
-  if (!staffHasPermission(session.user.permissions ?? [], "pos:shift_manage")) {
+  if (!staffSessionAllows(session, "pos:shift_manage")) {
     return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
   }
   const { id } = await ctx.params;
