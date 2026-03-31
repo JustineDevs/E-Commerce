@@ -1,13 +1,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import type { Product } from "@apparel-commerce/types";
 import { addCartLine, type CartLine } from "@/lib/cart";
 import { WishlistToggle } from "@/components/WishlistToggle";
 
 export function AddToCartSection({ product }: { product: Product }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const { status } = useSession();
   const sizes = useMemo(
     () => [...new Set(product.variants.map((v) => v.size))].sort(),
     [product.variants],
@@ -26,6 +29,11 @@ export function AddToCartSection({ product }: { product: Product }) {
 
   function handleAddToBag() {
     if (!variant) return;
+    if (status !== "authenticated") {
+      const next = pathname || `/shop/${product.slug}`;
+      router.push(`/sign-in?callbackUrl=${encodeURIComponent(next)}`);
+      return;
+    }
     const line: CartLine = {
       variantId: variant.id,
       quantity: 1,
@@ -96,16 +104,21 @@ export function AddToCartSection({ product }: { product: Product }) {
         <WishlistToggle
           slug={product.slug}
           name={product.name}
+          medusaProductId={product.id}
           className="min-[400px]:shrink-0"
         />
         <button
           type="button"
           data-testid="pdp-add-to-bag"
-          disabled={!variant}
+          disabled={!variant || status === "loading"}
           onClick={handleAddToBag}
           className="min-h-[52px] flex-1 py-4 px-4 bg-primary text-on-primary font-headline font-bold tracking-tight rounded text-center hover:opacity-90 active:scale-[0.99] transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100"
         >
-          Add to bag and checkout
+          {status === "authenticated"
+            ? "Add to bag and checkout"
+            : status === "loading"
+              ? "Loading…"
+              : "Sign in to add to bag"}
         </button>
       </div>
     </div>
