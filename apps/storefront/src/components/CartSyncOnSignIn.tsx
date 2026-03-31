@@ -19,7 +19,6 @@ export function CartSyncOnSignIn() {
       return;
     }
     ran.current = true;
-    const email = session.user.email;
     void (async () => {
       try {
         const guestLines = readCart();
@@ -40,11 +39,7 @@ export function CartSyncOnSignIn() {
             await refresh();
           }
         } else {
-          await fetch("/api/cart/attach-customer", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email }),
-          });
+          await fetch("/api/cart/attach-customer", { method: "POST" });
         }
       } catch {
         ran.current = false;
