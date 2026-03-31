@@ -25,7 +25,7 @@ export function AdminCommandPalette({
   onOpenChange,
 }: {
   open: boolean;
-  onOpenChange: (open: boolean) => void;
+  onOpenChange: (_isOpen: boolean) => void;
 }) {
   const router = useRouter();
   const { data: session } = useSession();
