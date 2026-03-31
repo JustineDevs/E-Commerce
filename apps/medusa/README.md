@@ -40,7 +40,7 @@ This app lives under **`apparel-commerce/apps/medusa`**. Migration phases, ADR, 
 
 ### Philippines foundation + legacy import (from `apps/medusa`)
 
-From this directory, with `apps/medusa/.env` created from `.env.template` (commerce DB + Lemon/AfterShip/Resend are documented only here; root `.env` is for Next/Express/legacy DB):
+From this directory, with `apps/medusa/.env` created from `.env.template` (commerce DB + payment providers / AfterShip / Resend are documented only here; root `.env` is for Next/Express/legacy DB):
 
 1. **`pnpm seed:ph`**: Region **Philippines** (`php`), sales channel **Web PH**, stock location **Warehouse PH** (metadata `legacy_inventory_location_code`, default `WH1`), flat **Standard PH** shipping, tax region `ph`, store default currency PHP, publishable API key linked to **Web PH**. Env: `MEDUSA_SEED_LEGACY_LOCATION_CODE`, `MEDUSA_PH_FLAT_SHIPPING_MINOR` (amount in **minor** php units; default `15000` = ₱150.00).
 2. **Export legacy JSONL:** use `internal/docs/migration/` tooling or custom scripts (contact platform team).
