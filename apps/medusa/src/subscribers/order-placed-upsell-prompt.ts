@@ -56,18 +56,21 @@ export default async function orderPlacedUpsellPrompt({
   <p style="font-size:12px;color:#94a3b8;margin-top:24px">Maharlika Apparel Custom</p>
 </body></html>`;
 
-  try {
-    const { Resend } = await import("resend");
-    const resend = new Resend(resendKey);
-    await resend.emails.send({
-      from: fromAddr,
-      to: email,
-      subject: `Complete your look, ${firstName}`,
-      html,
-    });
+  const { sendResendTransactionalEmail } = await import(
+    "@apparel-commerce/resend-mail"
+  );
+  const sent = await sendResendTransactionalEmail({
+    apiKey: resendKey,
+    from: fromAddr,
+    to: email,
+    subject: `Complete your look, ${firstName}`,
+    html,
+    tags: [{ name: "type", value: "order_upsell" }],
+  });
+  if (sent.ok) {
     logger.info?.(`[upsell] sent cross-sell email to ${email}`);
-  } catch (err) {
-    logger.warn?.(`[upsell] ${err instanceof Error ? err.message : String(err)}`);
+  } else {
+    logger.warn?.(`[upsell] ${sent.message}`);
   }
 }
 
