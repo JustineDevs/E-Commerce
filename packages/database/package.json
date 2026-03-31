@@ -11,8 +11,9 @@
   },
   "scripts": {
     "migrate": "tsx scripts/run-migrations.ts",
-    "migrate:cli": "supabase db push",
+    "migrate:cli": "npx supabase db push",
     "seed": "tsx scripts/seed.ts",
+    "e2e:ensure-staff": "tsx scripts/e2e-ensure-staff-user.ts",
     "apply-rls": "tsx scripts/apply-sql.ts supabase/migrations/enable_rls.sql",
     "lint": "eslint src --ext .ts",
     "test": "node --import tsx/esm --test src/compliance.test.ts"
