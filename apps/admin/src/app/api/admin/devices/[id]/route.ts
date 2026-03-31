@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { getServerSession } from "next-auth/next";
-import { staffHasPermission } from "@apparel-commerce/database";
+import { staffSessionAllows } from "@apparel-commerce/database";
 import { updateDevice } from "@apparel-commerce/platform-data";
 import { authOptions } from "@/lib/auth";
 import { getCorrelationId } from "@/lib/request-correlation";
@@ -16,7 +16,7 @@ export async function PATCH(
   if (!session?.user) {
     return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
   }
-  if (!staffHasPermission(session.user.permissions ?? [], "devices:manage")) {
+  if (!staffSessionAllows(session, "devices:manage")) {
     return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
   }
   const { id } = await ctx.params;
