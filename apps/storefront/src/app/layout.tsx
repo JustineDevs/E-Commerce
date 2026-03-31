@@ -1,13 +1,15 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
 import { Plus_Jakarta_Sans, Inter } from "next/font/google";
 import { DEFAULT_PUBLIC_SITE_ORIGIN } from "@apparel-commerce/sdk";
+import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/seo";
 import { SmoothScrollProvider } from "@/components/SmoothScrollProvider";
 import { StorefrontPreferenceSync } from "@/components/StorefrontPreferenceSync";
 import { NextAuthSessionProvider } from "@/components/NextAuthSessionProvider";
 import { CartAbandonmentBeacon } from "@/components/CartAbandonmentBeacon";
 import { CartSyncOnSignIn } from "@/components/CartSyncOnSignIn";
+import { OnboardingGuard } from "@/components/OnboardingGuard";
 import { MedusaCartProvider } from "@/context/MedusaCartContext";
-import { ClarityScript } from "@/components/ClarityScript";
 import { VercelWebAnalytics } from "@/components/VercelWebAnalytics";
 import "./globals.css";
 
@@ -39,13 +41,12 @@ export const metadata: Metadata = {
     google: "8JhcF2FV7sdKYLW9doHSZnPM3yp3K0LlEusSBI-ZT6g",
   },
   title: {
-    default: "Maharlika Apparel Custom",
-    template: "%s | Maharlika Apparel Custom",
+    default: SITE_NAME,
+    template: `%s | ${SITE_NAME}`,
   },
-  description:
-    "Custom apparel and everyday craft. Shorts, shirts, jackets built for precision. Shop Maharlika Apparel Custom — structural silhouettes for the Philippines.",
+  description: SITE_DESCRIPTION,
   keywords: [
-    "Maharlika Apparel Custom",
+    SITE_NAME,
     "custom apparel Philippines",
     "uniforms",
     "corporate wear",
@@ -55,20 +56,19 @@ export const metadata: Metadata = {
     "Philippines clothing",
     "custom shorts",
   ],
-  applicationName: "Maharlika Apparel Custom",
+  applicationName: SITE_NAME,
   openGraph: {
     type: "website",
     locale: "en_PH",
-    siteName: "Maharlika Apparel Custom",
-    title: "Maharlika Apparel Custom — Custom Apparel Philippines",
-    description:
-      "Custom shorts, shirts, and jackets. Structural silhouettes and everyday craft. Shop online with nationwide shipping.",
-    images: [{ url: "/brand/maharlika-logo-horizontal.png", alt: "Maharlika Apparel Custom" }],
+    siteName: SITE_NAME,
+    title: `${SITE_NAME} — Apparel store`,
+    description: SITE_DESCRIPTION,
+    images: [{ url: "/brand/maharlika-logo-design.svg", alt: SITE_NAME }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Maharlika Apparel Custom",
-    description: "Custom apparel Philippines. Shorts, shirts, jackets.",
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
   },
   alternates: {
     canonical: siteUrl,
@@ -95,7 +95,7 @@ export const metadata: Metadata = {
   manifest: "/icons/site.webmanifest",
   appleWebApp: {
     capable: true,
-    title: "Maharlika Apparel Custom",
+    title: SITE_NAME,
     statusBarStyle: "default",
   },
 };
@@ -119,10 +119,13 @@ export default function RootLayout({
             <CartSyncOnSignIn />
             <StorefrontPreferenceSync />
             <CartAbandonmentBeacon />
-            <SmoothScrollProvider>{children}</SmoothScrollProvider>
+            <Suspense fallback={null}>
+              <OnboardingGuard>
+                <SmoothScrollProvider>{children}</SmoothScrollProvider>
+              </OnboardingGuard>
+            </Suspense>
           </MedusaCartProvider>
         </NextAuthSessionProvider>
-        <ClarityScript />
         <VercelWebAnalytics />
       </body>
     </html>
