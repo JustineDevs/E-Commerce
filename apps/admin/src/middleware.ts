@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server";
 import type { NextFetchEvent, NextRequest } from "next/server";
 import { withAuth } from "next-auth/middleware";
+import { isEmailAllowedForGuideDemos } from "@/lib/admin-allowed-emails";
 
 const authMiddleware = withAuth({
-  pages: { signIn: "/api/auth/signin" },
+  pages: { signIn: "/sign-in" },
   callbacks: {
-    authorized: ({ token }) => {
+    authorized: ({ token, req }) => {
+      const p = req.nextUrl.pathname;
+      if (p.startsWith("/guide-demos")) {
+        const email = token?.email as string | undefined;
+        return isEmailAllowedForGuideDemos(email);
+      }
       const r = token?.role as string | undefined;
       return r === "admin" || r === "staff";
     },
@@ -35,6 +41,7 @@ export default function middleware(req: NextRequest, event: NextFetchEvent) {
 export const config = {
   matcher: [
     "/admin/:path*",
+    "/guide-demos/:path*",
     "/api/admin/:path*",
     "/api/integrations/:path*",
   ],
