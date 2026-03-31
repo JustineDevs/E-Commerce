@@ -74,8 +74,12 @@ export async function syncPendingSales(): Promise<{
     try {
       const res = await fetch("/api/pos/medusa/commit-sale", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": `offline-sync-${sale.id}`,
+        },
         body: JSON.stringify({
+          offlineSaleId: sale.id,
           items: sale.items.map((i) => ({
             variantId: i.variantId,
             quantity: i.quantity,
