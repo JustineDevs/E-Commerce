@@ -1,4 +1,5 @@
 import { createStorefrontMedusaSdk } from "./medusa-sdk";
+import { medusaMinorToMajor } from "./medusa-money";
 import { getMedusaPublishableKey } from "./storefront-medusa-env";
 
 export type AccountOrder = {
@@ -10,6 +11,19 @@ export type AccountOrder = {
   createdAt: string;
   itemCount: number;
 };
+
+/** Simple shopper-facing KPIs from Medusa order list (same currency assumed). */
+export function computeAccountOrderStats(orders: AccountOrder[]): {
+  orderCount: number;
+  lifetimeSpend: number;
+  averageOrderValue: number;
+} {
+  const orderCount = orders.length;
+  const lifetimeSpend = orders.reduce((s, o) => s + (o.total || 0), 0);
+  const averageOrderValue =
+    orderCount > 0 ? Math.round((lifetimeSpend / orderCount) * 100) / 100 : 0;
+  return { orderCount, lifetimeSpend, averageOrderValue };
+}
 
 /** Store API order list rows (snake_case fields from expanded list query). */
 type OrderListRow = {
@@ -59,7 +73,13 @@ export async function fetchCustomerOrders(
         displayId:
           o.display_id != null ? String(o.display_id) : String(o.id ?? ""),
         status: String(o.status ?? "unknown"),
-        total: typeof o.total === "number" ? o.total / 100 : 0,
+        total:
+          typeof o.total === "number"
+            ? medusaMinorToMajor(
+                o.total,
+                String(o.currency_code ?? "PHP"),
+              )
+            : 0,
         currency: String(o.currency_code ?? "PHP").toUpperCase(),
         createdAt: String(o.created_at ?? ""),
         itemCount: Array.isArray(o.items) ? o.items.length : 0,
