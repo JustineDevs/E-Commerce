@@ -1,7 +1,11 @@
+const path = require("path");
+require("dotenv").config({ path: path.resolve(__dirname, "../../.env") });
 const { loadEnv } = require("@medusajs/utils");
 loadEnv("test", process.cwd());
 
 module.exports = {
+  /** Keep haste-map / Jest cache inside the app (avoids EPERM when Node runs from Cursor’s install dir on Windows). */
+  cacheDirectory: path.join(__dirname, ".jest-cache"),
   transform: {
     "^.+\\.[jt]s$": [
       "@swc/jest",
