@@ -69,6 +69,7 @@ export {
   isStaffRbacStrictEnv,
   staffHasPermission,
   staffPermissionListForSession,
+  staffSessionAllows,
   resolveStaffPermissionsForUserId,
   type StaffPermissionKey,
   type StaffSessionLike,
@@ -208,15 +209,30 @@ export {
   type StorefrontHomeTile,
 } from "./storefront-home-cms";
 
+export {
+  EMPTY_STOREFRONT_PUBLIC_METADATA,
+  mergeStorefrontPublicMetadataPayload,
+  getStorefrontPublicMetadata,
+  upsertStorefrontPublicMetadata,
+  resolveStorefrontPublicMetadataWithEnv,
+  loadStorefrontPublicMetadataForPublic,
+  loadStorefrontPublicMetadataResolvedForPublic,
+  type StorefrontPublicMetadataPayload,
+} from "./storefront-public-metadata";
+
+export { isCmsPubliclyVisible } from "./cms-public-visibility";
+
 export type {
   CmsPageType,
   CmsPublishStatus,
   CmsNavLink,
+  CmsNavFeatured,
   CmsFooterColumn,
   CmsSocialLink,
   CmsNavigationPayload,
   CmsBlock,
   CmsPageRow,
+  CmsPageBlockPresetRow,
   CmsBlogPostRow,
 } from "./cms-types";
 
@@ -230,15 +246,43 @@ export {
   deleteCmsPage,
   listCmsPageVersions,
   getCmsPageBySlugPreview,
+  getCmsPageAncestorTrail,
+  getCmsPageBreadcrumbTrail,
   type UpsertCmsPageInput,
 } from "./cms-pages";
 
-export { getCmsNavigationPayload, upsertCmsNavigationPayload } from "./cms-navigation";
+export {
+  getCmsNavigationPayload,
+  getCmsNavigationPayloadAdmin,
+  upsertCmsNavigationPayload,
+  normalizeNavigationPayloadInput,
+  getCmsNavigationDraftPayload,
+  mergeNavigationDraftOverLive,
+  upsertCmsNavigationDraftPayload,
+  publishCmsNavigationDraft,
+  parseNavLink,
+  type CmsNavigationDraftPayload,
+} from "./cms-navigation";
 
 export {
+  listCmsPageBlockPresets,
+  insertCmsPageBlockPreset,
+  deleteCmsPageBlockPreset,
+} from "./cms-page-block-presets";
+
+export {
+  CMS_ANNOUNCEMENT_DEFAULT_ID,
   getCmsAnnouncement,
+  listCmsAnnouncementsAdmin,
+  listCmsAnnouncementsForLocalePublic,
+  resolveAnnouncementStack,
   upsertCmsAnnouncement,
+  deleteCmsAnnouncement,
+  getCmsAnnouncementAnalyticsMap,
+  incrementCmsAnnouncementMetric,
   type CmsAnnouncementRow,
+  type CmsAnnouncementAnalyticsRow,
+  type UpsertCmsAnnouncementInput,
 } from "./cms-announcement";
 
 export {
@@ -248,7 +292,17 @@ export {
   type CmsCategoryContentRow,
 } from "./cms-category";
 
-export { listCmsMedia, insertCmsMedia, type CmsMediaRow } from "./cms-media";
+export {
+  listCmsMedia,
+  insertCmsMedia,
+  getCmsMediaById,
+  updateCmsMedia,
+  softDeleteCmsMedia,
+  findCmsMediaReferences,
+  type CmsMediaRow,
+  type ListCmsMediaOptions,
+  type CmsMediaReferenceHit,
+} from "./cms-media";
 
 export {
   listCmsBlogPosts,
@@ -266,9 +320,14 @@ export {
 export {
   listCmsFormSubmissions,
   insertCmsFormSubmission,
+  updateCmsFormSubmission,
+  getCmsFormSettings,
+  upsertCmsFormSettings,
   CMS_FORM_KEYS,
   type CmsFormKey,
   type CmsFormSubmissionRow,
+  type CmsFormSettingsRow,
+  type ListCmsFormSubmissionsOptions,
 } from "./cms-forms";
 
 export {
@@ -282,12 +341,15 @@ export {
 export {
   listCmsAbExperiments,
   upsertCmsAbExperiment,
+  incrementCmsAbExperimentImpressions,
   type CmsAbExperimentRow,
 } from "./cms-experiments";
 
 export {
   loadCmsPagePublic,
+  loadCmsPagePreviewPublic,
   loadCmsNavigationPublic,
+  loadCmsAnnouncementsPublic,
   loadCmsAnnouncementPublic,
   loadCmsCategoryContentPublic,
   loadCmsBlogListPublic,
