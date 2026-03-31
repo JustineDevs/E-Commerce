@@ -1,16 +1,27 @@
-export function getInstagramHref(): string | undefined {
-  const raw = process.env.NEXT_PUBLIC_INSTAGRAM_URL?.trim();
-  if (!raw) return undefined;
-  if (raw.startsWith("http://") || raw.startsWith("https://")) return raw;
-  if (raw.startsWith("@")) return `https://instagram.com/${raw.slice(1)}`;
-  return `https://instagram.com/${raw.replace(/^\/+/, "")}`;
+/**
+ * Normalize a storefront Instagram value to an https href.
+ * Accepts full URL, @handle, or bare handle.
+ */
+export function normalizeInstagramHref(raw: string | undefined): string | undefined {
+  const trimmed = raw?.trim();
+  if (!trimmed) return undefined;
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
+  if (trimmed.startsWith("@")) return `https://instagram.com/${trimmed.slice(1)}`;
+  return `https://instagram.com/${trimmed.replace(/^\/+/, "")}`;
 }
 
+/** @deprecated Prefer server-loaded metadata via getCachedPublicSiteMetadata + normalizeInstagramHref */
+export function getInstagramHref(): string | undefined {
+  return normalizeInstagramHref(process.env.NEXT_PUBLIC_INSTAGRAM_URL);
+}
+
+/** @deprecated Prefer server-loaded metadata */
 export function getSupportEmail(): string | undefined {
   const raw = process.env.NEXT_PUBLIC_SUPPORT_EMAIL?.trim();
   return raw && raw.includes("@") ? raw : undefined;
 }
 
+/** @deprecated Prefer server-loaded metadata */
 export function getSupportPhoneDisplay(): string | undefined {
   const raw = process.env.NEXT_PUBLIC_SUPPORT_PHONE?.trim();
   return raw || undefined;
