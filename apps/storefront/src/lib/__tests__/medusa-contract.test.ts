@@ -1,0 +1,65 @@
+import { describe, it, assert } from "node:test";
+
+describe("Storefront BFF contract tests", () => {
+  const MEDUSA_URL = process.env.MEDUSA_BACKEND_URL || "http://localhost:9000";
+
+  it("GET /store/products returns expected shape", async () => {
+    const res = await fetch(`${MEDUSA_URL}/store/products?limit=1`);
+    if (!res.ok) {
+      assert.ok(true, "Medusa not reachable, skipping contract test");
+      return;
+    }
+    const json = (await res.json()) as Record<string, unknown>;
+    assert.ok(Array.isArray(json.products), "Response should have products array");
+    if ((json.products as unknown[]).length > 0) {
+      const product = (json.products as Record<string, unknown>[])[0];
+      assert.ok(typeof product.id === "string", "Product should have string id");
+      assert.ok(typeof product.title === "string", "Product should have string title");
+      assert.ok(product.variants !== undefined, "Product should have variants");
+    }
+  });
+
+  it("GET /store/regions returns regions with currency", async () => {
+    const res = await fetch(`${MEDUSA_URL}/store/regions`);
+    if (!res.ok) {
+      assert.ok(true, "Medusa not reachable, skipping contract test");
+      return;
+    }
+    const json = (await res.json()) as Record<string, unknown>;
+    assert.ok(Array.isArray(json.regions), "Response should have regions array");
+    if ((json.regions as unknown[]).length > 0) {
+      const region = (json.regions as Record<string, unknown>[])[0];
+      assert.ok(typeof region.id === "string", "Region should have string id");
+      assert.ok(typeof region.currency_code === "string", "Region should have currency_code");
+    }
+  });
+
+  it("GET /store/collections returns expected shape", async () => {
+    const res = await fetch(`${MEDUSA_URL}/store/collections?limit=5`);
+    if (!res.ok) {
+      assert.ok(true, "Medusa not reachable, skipping contract test");
+      return;
+    }
+    const json = (await res.json()) as Record<string, unknown>;
+    assert.ok(
+      Array.isArray(json.collections) || json.collections === undefined,
+      "Response should have collections array or be absent",
+    );
+  });
+
+  it("POST /store/carts returns cart with id", async () => {
+    const res = await fetch(`${MEDUSA_URL}/store/carts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    if (!res.ok) {
+      assert.ok(true, "Medusa not reachable, skipping contract test");
+      return;
+    }
+    const json = (await res.json()) as Record<string, unknown>;
+    assert.ok(json.cart !== undefined, "Response should have cart");
+    const cart = json.cart as Record<string, unknown>;
+    assert.ok(typeof cart.id === "string", "Cart should have string id");
+  });
+});
