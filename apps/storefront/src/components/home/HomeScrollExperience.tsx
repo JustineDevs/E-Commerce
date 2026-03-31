@@ -47,8 +47,8 @@ function TileMedia({
 }
 
 /**
- * Maharlika home with Infiner-style motion: hero stagger + scroll reveals,
- * driven by GSAP ScrollTrigger. Copy and images come from admin CMS (Supabase).
+ * Home layout with hero stagger and scroll reveals (GSAP ScrollTrigger).
+ * Copy and images come from admin CMS (Supabase).
  */
 export function HomeScrollExperience({ products, home }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -362,8 +362,16 @@ export function HomeScrollExperience({ products, home }: Props) {
             </Link>
           </div>
           {products.length === 0 ? (
-            <div className="py-12 text-center text-on-surface-variant sm:py-16">
-              <p>No products yet.</p>
+            <div className="mx-auto max-w-2xl space-y-4 py-12 text-center sm:py-16">
+              <p className="font-medium text-on-surface">No products on the home grid yet.</p>
+              <p className="text-sm leading-relaxed text-on-surface-variant">
+                Products will show here when they are live in the{" "}
+                <Link href="/shop" className="font-medium text-primary underline-offset-4 hover:underline">
+                  shop catalog
+                </Link>
+                . If you are the shop team and expect products here, check that items are
+                published and available for your storefront region in admin.
+              </p>
             </div>
           ) : (
             <div
