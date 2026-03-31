@@ -39,6 +39,7 @@ function imageRemotePatterns() {
 const nextConfig = {
   poweredByHeader: false,
   outputFileTracingRoot: path.join(__dirname, "../.."),
+  serverExternalPackages: ["@aws-sdk/client-kms"],
   experimental: {
     externalDir: true,
     optimizePackageImports: [
@@ -61,6 +62,7 @@ const nextConfig = {
     "@apparel-commerce/ui",
     "@apparel-commerce/database",
     "@apparel-commerce/platform-data",
+    "@apparel-commerce/payment-connection-crypto",
   ],
 };
 
