@@ -1,6 +1,5 @@
 /** @type {import('next').NextConfig} */
 const path = require("path");
-const { withSentryConfig } = require("@sentry/nextjs");
 // Load root .env so NEXTAUTH_* and GOOGLE_* are available (storefront has no local .env)
 require("dotenv").config({ path: path.join(__dirname, "../../.env") });
 
@@ -17,6 +16,11 @@ function imageRemotePatterns() {
     }));
   return [
     ...fromEnv,
+    {
+      protocol: "https",
+      hostname: "cdn.simpleicons.org",
+      pathname: "/**",
+    },
     {
       protocol: "https",
       hostname: "lh3.googleusercontent.com",
@@ -70,9 +74,4 @@ const nextConfig = {
   },
 };
 
-module.exports = withSentryConfig(nextConfig, {
-  org: process.env.SENTRY_ORG,
-  project: process.env.SENTRY_PROJECT,
-  silent: !process.env.CI,
-  hideSourceMaps: true,
-});
+module.exports = nextConfig;
