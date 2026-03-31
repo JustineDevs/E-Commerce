@@ -18,8 +18,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Maharlika Apparel Custom | Admin",
-  description: "Staff console for orders, inventory, and POS",
+  title: "Staff admin",
+  description: "Internal console for orders, inventory, POS, and settings",
   icons: {
     icon: [
       { url: "/icons/favicon-16x16.png", sizes: "16x16", type: "image/png" },
@@ -49,7 +49,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="bg-surface text-on-surface antialiased">
+      <body className="bg-surface font-body text-on-surface antialiased">
         <NextAuthSessionProvider>
           <LenisProvider>{children}</LenisProvider>
         </NextAuthSessionProvider>
