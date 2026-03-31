@@ -10,18 +10,26 @@ import {
   Label,
   Textarea,
 } from "@apparel-commerce/ui";
-import { getSupportEmail, getSupportPhoneDisplay } from "@/lib/public-site";
 
-export function ContactSupportForm() {
-  const email = getSupportEmail();
-  const phone = getSupportPhoneDisplay();
+export function ContactSupportForm({
+  supportEmail,
+  supportPhone,
+}: {
+  supportEmail?: string;
+  supportPhone?: string;
+}) {
+  const email =
+    supportEmail?.trim() && supportEmail.includes("@") ? supportEmail.trim() : undefined;
+  const phone = supportPhone?.trim() || undefined;
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [status, setStatus] = useState<string | null>(null);
 
   const submitMailto = useCallback(() => {
     if (!email) {
-      setStatus("Set NEXT_PUBLIC_SUPPORT_EMAIL to enable email.");
+      setStatus(
+        "Add a support email under Admin Settings Storefront contact and social, or set NEXT_PUBLIC_SUPPORT_EMAIL.",
+      );
       return;
     }
     const encSub = encodeURIComponent(
@@ -47,11 +55,12 @@ export function ContactSupportForm() {
         <Alert variant="destructive">
           <AlertTitle>Email not configured</AlertTitle>
           <AlertDescription className="text-sm">
-            Add{" "}
+            Set support email in Admin under Settings, Storefront home, Contact and social section,
+            or add{" "}
             <code className="rounded bg-surface-container-high px-1">
               NEXT_PUBLIC_SUPPORT_EMAIL
             </code>{" "}
-            in your environment.
+            in the storefront environment.
           </AlertDescription>
         </Alert>
       )}
