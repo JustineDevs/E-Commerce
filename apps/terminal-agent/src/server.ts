@@ -2,8 +2,10 @@ import http from "node:http";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
+  encodeEscPosProductLabel,
   encodeEscPosReceipt,
   drawerOpenPulse,
+  type ProductLabelPayload,
   type ReceiptPayload,
 } from "@apparel-commerce/printer-core";
 import {
@@ -62,12 +64,11 @@ function mutatingPostAllowed(req: http.IncomingMessage): boolean {
   return req.headers["x-terminal-agent-secret"] === secret;
 }
 
-async function printWithAdapter(
-  payload: ReceiptPayload,
+async function sendEscPosToAdapter(
+  bytes: Uint8Array,
   adapter: string,
   override?: { host: string; port: number },
 ): Promise<void> {
-  const bytes = encodeEscPosReceipt(payload);
   const device = cachedDevice;
 
   if (adapter === "mock") {
@@ -137,6 +138,30 @@ async function printWithAdapter(
   throw new Error(`Adapter "${adapter}" is not implemented in this agent build`);
 }
 
+async function printWithAdapter(
+  payload: ReceiptPayload,
+  adapter: string,
+  override?: { host: string; port: number },
+): Promise<void> {
+  await sendEscPosToAdapter(
+    encodeEscPosReceipt(payload),
+    adapter,
+    override,
+  );
+}
+
+async function printLabelWithAdapter(
+  payload: ProductLabelPayload,
+  adapter: string,
+  override?: { host: string; port: number },
+): Promise<void> {
+  await sendEscPosToAdapter(
+    encodeEscPosProductLabel(payload),
+    adapter,
+    override,
+  );
+}
+
 async function openDrawerWithAdapter(
   adapter: string,
   override?: { host: string; port: number },
@@ -204,8 +229,59 @@ function json(res: http.ServerResponse, code: number, body: unknown) {
   res.end(JSON.stringify(body));
 }
 
-function parseBody<T>(raw: string): T {
-  return JSON.parse(raw) as T;
+function readMaxBodyBytes(): number {
+  const raw = process.env.TERMINAL_AGENT_MAX_BODY_BYTES?.trim();
+  const n = raw ? Number.parseInt(raw, 10) : NaN;
+  if (Number.isFinite(n) && n > 0 && n <= 10_000_000) return n;
+  return 262_144;
+}
+
+function readJsonBody(req: http.IncomingMessage): Promise<
+  | { ok: true; value: unknown }
+  | { ok: false; status: number; error: string }
+> {
+  const maxBytes = readMaxBodyBytes();
+  return new Promise((resolve) => {
+    const chunks: Buffer[] = [];
+    let total = 0;
+    let settled = false;
+
+    const finish = (
+      result:
+        | { ok: true; value: unknown }
+        | { ok: false; status: number; error: string },
+    ) => {
+      if (settled) return;
+      settled = true;
+      resolve(result);
+    };
+
+    req.on("data", (chunk: Buffer) => {
+      if (settled) return;
+      total += chunk.length;
+      if (total > maxBytes) {
+        finish({ ok: false, status: 413, error: "Payload too large" });
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+
+    req.on("end", () => {
+      if (settled) return;
+      const raw = Buffer.concat(chunks).toString("utf8");
+      try {
+        const value = raw.length === 0 ? {} : JSON.parse(raw);
+        finish({ ok: true, value });
+      } catch {
+        finish({ ok: false, status: 400, error: "Invalid JSON" });
+      }
+    });
+
+    req.on("error", () => {
+      finish({ ok: false, status: 400, error: "Request read error" });
+    });
+  });
 }
 
 const corsHeaders = {
@@ -297,18 +373,18 @@ const server = http.createServer((req, res) => {
       json(res, 401, { error: "Unauthorized" });
       return;
     }
-    let raw = "";
-    req.on("data", (c) => {
-      raw += c;
-    });
-    req.on("end", async () => {
+    void readJsonBody(req).then(async (parsed) => {
+      if (!parsed.ok) {
+        json(res, parsed.status, { error: parsed.error });
+        return;
+      }
       try {
-        const body = parseBody<{
-          receipt: ReceiptPayload;
+        const body = parsed.value as {
+          receipt?: ReceiptPayload;
           adapter?: string;
           printer?: { host: string; port: number };
-        }>(raw || "{}");
-        if (!body.receipt?.title) {
+        };
+        if (!body?.receipt?.title) {
           json(res, 400, { error: "receipt required" });
           return;
         }
@@ -327,21 +403,67 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (req.method === "POST" && url.pathname === "/print-label") {
+    if (!mutatingPostAllowed(req)) {
+      json(res, 401, { error: "Unauthorized" });
+      return;
+    }
+    void readJsonBody(req).then(async (parsed) => {
+      if (!parsed.ok) {
+        json(res, parsed.status, { error: parsed.error });
+        return;
+      }
+      try {
+        const body = parsed.value as {
+          label?: ProductLabelPayload;
+          adapter?: string;
+          printer?: { host: string; port: number };
+        };
+        const label = body?.label;
+        const nameOk =
+          typeof label?.productName === "string" &&
+          label.productName.trim().length > 0;
+        const skuOk = typeof label?.sku === "string";
+        const priceOk =
+          typeof label?.priceDisplay === "string" &&
+          label.priceDisplay.trim().length > 0;
+        if (!label || !nameOk || !skuOk || !priceOk) {
+          json(res, 400, {
+            error:
+              "label with productName, sku, and priceDisplay strings required",
+          });
+          return;
+        }
+        const adapter =
+          body.adapter ?? resolvedDefaultAdapter(cachedDevice);
+        await printLabelWithAdapter(label, adapter, body.printer);
+        state.lastError = null;
+        state.lastPrintAt = new Date().toISOString();
+        json(res, 200, { ok: true });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        state.lastError = msg;
+        json(res, 502, { error: msg });
+      }
+    });
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/open-drawer") {
     if (!mutatingPostAllowed(req)) {
       json(res, 401, { error: "Unauthorized" });
       return;
     }
-    let raw = "";
-    req.on("data", (c) => {
-      raw += c;
-    });
-    req.on("end", async () => {
+    void readJsonBody(req).then(async (parsed) => {
+      if (!parsed.ok) {
+        json(res, parsed.status, { error: parsed.error });
+        return;
+      }
       try {
-        const body = parseBody<{
+        const body = parsed.value as {
           printer?: { host: string; port: number };
           adapter?: string;
-        }>(raw || "{}");
+        };
         const adapter =
           body.adapter ?? resolvedDefaultAdapter(cachedDevice);
         await openDrawerWithAdapter(adapter, body.printer);
