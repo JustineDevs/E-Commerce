@@ -3,18 +3,17 @@ import type { Metadata } from "next";
 import { StorefrontCommerceAlert } from "@/components/StorefrontCommerceAlert";
 import { fetchCategorySummaries } from "@/lib/catalog-fetch";
 import { shopHref } from "@/lib/shop-url";
-import { canonicalUrl } from "@/lib/seo";
+import { canonicalUrl, SITE_DESCRIPTION, SITE_NAME } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Collections",
-  description:
-    "Shop by category: Shorts, Shirts, Jackets. Maharlika Apparel Custom — curated collections of custom apparel for the Philippines.",
+  description: `Browse by category (shorts, shirts, jackets). ${SITE_DESCRIPTION}`,
   alternates: { canonical: canonicalUrl("/collections") },
 };
 
-/** Curated category entry points; counts when available from the shop. */
+/** Category entry points; counts when available from the shop. */
 const FEATURED_LABELS = ["Shorts", "Shirt", "Jacket"] as const;
 
 export default async function CollectionsPage() {
@@ -35,14 +34,14 @@ export default async function CollectionsPage() {
     <main className="storefront-page-shell max-w-[1200px]">
       <header className="mb-10 sm:mb-12 md:mb-16">
         <p className="mb-3 font-label text-xs uppercase tracking-[0.25em] text-secondary sm:mb-4">
-          Maharlika Apparel Custom
+          {SITE_NAME}
         </p>
         <h1 className="mb-4 font-headline text-4xl font-bold tracking-tighter text-primary sm:mb-6 sm:text-5xl md:text-6xl">
           Collections
         </h1>
         <p className="font-body text-on-surface-variant max-w-2xl leading-relaxed">
-          Shop by category: shorts, shirts, and jackets from Maharlika Apparel
-          Custom. Each link opens the shop with that category selected.
+          Open the shop with a category filter applied (shorts, shirts, jackets).
+          Product counts update from the catalog.
         </p>
       </header>
       <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
