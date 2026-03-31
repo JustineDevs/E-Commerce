@@ -1,8 +1,10 @@
 "use client";
 
+import type { CmsBlock } from "@apparel-commerce/platform-data";
 import { useSession } from "next-auth/react";
 import { staffHasPermission } from "@apparel-commerce/platform-data";
 import { useCallback, useEffect, useState } from "react";
+import { CmsPageBlocksEditor } from "./CmsPageBlocksEditor";
 
 type Row = {
   id: string;
@@ -10,16 +12,23 @@ type Row = {
   locale: string;
   intro_html: string;
   banner_url: string | null;
-  blocks: unknown;
+  blocks: CmsBlock[];
 };
+
+type CatOpt = { id: string; name: string; handle: string };
 
 export function CmsCategoryEditor() {
   const { data: session, status } = useSession();
   const canWrite = staffHasPermission(session?.user?.permissions ?? [], "content:write");
   const [rows, setRows] = useState<Row[]>([]);
   const [editing, setEditing] = useState<Row | null>(null);
-  const [blocksJson, setBlocksJson] = useState("[]");
   const [error, setError] = useState<string | null>(null);
+  const [categories, setCategories] = useState<CatOpt[]>([]);
+  const [gaps, setGaps] = useState<CatOpt[]>([]);
+  const [gapLocale, setGapLocale] = useState("en");
+
+  const siteBase =
+    (typeof process !== "undefined" && process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "")) || "";
 
   const load = useCallback(() => {
     fetch("/api/admin/cms/category-content")
@@ -28,28 +37,48 @@ export function CmsCategoryEditor() {
         if (!r.ok) throw new Error(j.error ?? r.statusText);
         return j.data ?? [];
       })
-      .then(setRows)
+      .then((list) =>
+        setRows(
+          list.map((r) => ({
+            ...r,
+            blocks: Array.isArray(r.blocks) ? (r.blocks as CmsBlock[]) : [],
+          })),
+        ),
+      )
       .catch((e: unknown) => setError(e instanceof Error ? e.message : "Unable to load content"));
   }, []);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  const loadCategories = useCallback(() => {
+    void fetch("/api/admin/cms/category-content/medusa-categories")
+      .then(async (r) => {
+        const j = (await r.json()) as { categories?: CatOpt[] };
+        if (!r.ok) return;
+        setCategories(j.categories ?? []);
+      })
+      .catch(() => setCategories([]));
+  }, []);
+
+  const loadGaps = useCallback(() => {
+    void fetch(`/api/admin/cms/category-content/catalog-gaps?locale=${encodeURIComponent(gapLocale)}`)
+      .then(async (r) => {
+        const j = (await r.json()) as { data?: { missing?: CatOpt[] } };
+        if (!r.ok) return;
+        setGaps(j.data?.missing ?? []);
+      })
+      .catch(() => setGaps([]));
+  }, [gapLocale]);
 
   useEffect(() => {
-    if (!editing) return;
-    setBlocksJson(JSON.stringify(editing.blocks ?? [], null, 2));
-  }, [editing]);
+    load();
+    loadCategories();
+  }, [load, loadCategories]);
+
+  useEffect(() => {
+    loadGaps();
+  }, [loadGaps]);
 
   const save = async () => {
     if (!editing || !canWrite) return;
-    let blocks: unknown = [];
-    try {
-      blocks = JSON.parse(blocksJson) as unknown;
-    } catch {
-      setError("Blocks JSON invalid");
-      return;
-    }
     setError(null);
     const r = await fetch("/api/admin/cms/category-content", {
       method: "POST",
@@ -60,7 +89,7 @@ export function CmsCategoryEditor() {
         locale: editing.locale,
         intro_html: editing.intro_html,
         banner_url: editing.banner_url,
-        blocks,
+        blocks: editing.blocks,
       }),
     });
     const j = (await r.json()) as { error?: string };
@@ -70,15 +99,51 @@ export function CmsCategoryEditor() {
     }
     setEditing(null);
     load();
+    loadGaps();
   };
 
   if (status === "loading") return <p className="text-sm text-slate-600">Loading…</p>;
+
+  const previewCollection =
+    siteBase && editing
+      ? `${siteBase}/collections/${encodeURIComponent(editing.collection_handle)}?locale=${encodeURIComponent(editing.locale)}`
+      : "";
+  const previewShopFallback =
+    siteBase && editing
+      ? `${siteBase}/shop?category=${encodeURIComponent(editing.collection_handle)}&locale=${encodeURIComponent(editing.locale)}`
+      : "";
 
   return (
     <div className="grid gap-8 lg:grid-cols-2">
       <div>
         <h3 className="font-headline text-lg font-bold text-primary mb-3">Rows</h3>
-        <p className="text-xs text-slate-600 mb-2">Handle must match shop category filter (e.g. Shorts, Shirt, Jacket).</p>
+        {error ? <p className="text-sm text-red-700 mb-2">{error}</p> : null}
+
+        <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50/80 p-4 text-sm">
+          <p className="font-semibold text-amber-950">Missing CMS rows (catalog has category, no CMS row)</p>
+          <label className="mt-2 block text-xs text-amber-900">
+            Locale
+            <select
+              className="ml-2 rounded border border-amber-300 px-2 py-1 text-sm"
+              value={gapLocale}
+              onChange={(e) => setGapLocale(e.target.value)}
+            >
+              <option value="en">en</option>
+            </select>
+          </label>
+          <ul className="mt-2 max-h-32 list-inside list-disc text-xs text-amber-950">
+            {gaps.length === 0 ? (
+              <li>None detected for this locale.</li>
+            ) : (
+              gaps.map((c) => (
+                <li key={c.id}>
+                  {c.name} (<code>{c.handle}</code>)
+                </li>
+              ))
+            )}
+          </ul>
+        </div>
+
         <ul className="space-y-2">
           {rows.map((r) => (
             <li key={r.id}>
@@ -94,7 +159,7 @@ export function CmsCategoryEditor() {
           onClick={() =>
             setEditing({
               id: "",
-              collection_handle: "Shorts",
+              collection_handle: categories[0]?.handle ?? "shorts",
               locale: "en",
               intro_html: "",
               banner_url: null,
@@ -108,11 +173,62 @@ export function CmsCategoryEditor() {
       {editing ? (
         <div className="rounded-xl border border-slate-200 bg-white p-6 space-y-3">
           <label className="block text-xs font-medium text-slate-600">
-            Collection handle
-            <input
+            Collection (Medusa product category)
+            <select
               className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-sm"
               value={editing.collection_handle}
-              onChange={(e) => setEditing({ ...editing, collection_handle: e.target.value })}
+              onChange={(e) => {
+                const h = e.target.value;
+                setEditing({ ...editing, collection_handle: h });
+              }}
+            >
+              {categories.map((c) => (
+                <option key={c.id} value={c.handle}>
+                  {c.name} ({c.handle})
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="text-xs text-slate-600">
+            Handle must match the Medusa product category. Preview:{" "}
+            {previewCollection ? (
+              <>
+                <a
+                  href={previewCollection}
+                  className="text-primary underline"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  /collections/{editing.collection_handle}
+                </a>
+                {" · "}
+                <a
+                  href={previewShopFallback}
+                  className="text-primary underline"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  shop filter
+                </a>
+              </>
+            ) : (
+              "set NEXT_PUBLIC_SITE_URL"
+            )}
+            . Index:{" "}
+            {siteBase ? (
+              <a href={`${siteBase}/collections`} className="text-primary underline" target="_blank" rel="noreferrer">
+                /collections
+              </a>
+            ) : (
+              "/collections"
+            )}
+          </p>
+          <label className="block text-xs font-medium text-slate-600">
+            Locale
+            <input
+              className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-sm"
+              value={editing.locale}
+              onChange={(e) => setEditing({ ...editing, locale: e.target.value })}
             />
           </label>
           <label className="block text-xs font-medium text-slate-600">
@@ -131,15 +247,14 @@ export function CmsCategoryEditor() {
               onChange={(e) => setEditing({ ...editing, banner_url: e.target.value || null })}
             />
           </label>
-          <label className="block text-xs font-medium text-slate-600">
-            Blocks JSON
-            <textarea
-              className="mt-1 w-full min-h-[120px] rounded border border-slate-200 px-3 py-2 text-sm font-mono"
-              value={blocksJson}
-              onChange={(e) => setBlocksJson(e.target.value)}
+          <div>
+            <p className="text-xs font-medium text-slate-600 mb-1">Blocks</p>
+            <CmsPageBlocksEditor
+              value={editing.blocks}
+              onChange={(blocks) => setEditing({ ...editing, blocks })}
+              disabled={!canWrite}
             />
-          </label>
-          {error ? <p className="text-sm text-red-700">{error}</p> : null}
+          </div>
           <button
             type="button"
             disabled={!canWrite}
