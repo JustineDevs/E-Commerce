@@ -1,7 +1,14 @@
 import { NextRequest } from "next/server";
 import { getServerSession } from "next-auth/next";
-import { staffHasPermission } from "@apparel-commerce/database";
-import { getCmsNavigationPayload, upsertCmsNavigationPayload } from "@apparel-commerce/platform-data";
+import { staffSessionAllows } from "@apparel-commerce/database";
+import {
+  getCmsNavigationDraftPayload,
+  getCmsNavigationPayloadAdmin,
+  mergeNavigationDraftOverLive,
+  normalizeNavigationPayloadInput,
+  upsertCmsNavigationDraftPayload,
+  upsertCmsNavigationPayload,
+} from "@apparel-commerce/platform-data";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { authOptions } from "@/lib/auth";
 import { getCorrelationId } from "@/lib/request-correlation";
@@ -13,13 +20,18 @@ export async function GET(req: NextRequest) {
   if (!session?.user) {
     return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
   }
-  if (!staffHasPermission(session.user.permissions ?? [], "content:read")) {
+  if (!staffSessionAllows(session, "content:read")) {
     return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
   }
   const sup = adminSupabaseOr503(cid);
   if ("response" in sup) return sup.response;
-  const data = await getCmsNavigationPayload(sup.client);
-  return correlatedJson(cid, { data });
+  const live = await getCmsNavigationPayloadAdmin(sup.client);
+  const draft = await getCmsNavigationDraftPayload(sup.client);
+  const merged = mergeNavigationDraftOverLive(live, draft);
+  return correlatedJson(cid, {
+    data: merged,
+    meta: { hasDraft: draft != null },
+  });
 }
 
 export async function PUT(req: NextRequest) {
@@ -28,7 +40,7 @@ export async function PUT(req: NextRequest) {
   if (!session?.user) {
     return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
   }
-  if (!staffHasPermission(session.user.permissions ?? [], "content:write")) {
+  if (!staffSessionAllows(session, "content:write")) {
     return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
   }
   let body: unknown;
@@ -39,8 +51,16 @@ export async function PUT(req: NextRequest) {
   }
   const sup = adminSupabaseOr503(cid);
   if ("response" in sup) return sup.response;
+  const rec = body as Record<string, unknown>;
   try {
-    await upsertCmsNavigationPayload(sup.client, body as Parameters<typeof upsertCmsNavigationPayload>[1]);
+    if (rec.mode === "draft") {
+      const payload = normalizeNavigationPayloadInput(rec.payload ?? rec);
+      await upsertCmsNavigationDraftPayload(sup.client, payload);
+    } else {
+      const payload = normalizeNavigationPayloadInput(body);
+      await upsertCmsNavigationPayload(sup.client, payload);
+      await upsertCmsNavigationDraftPayload(sup.client, {});
+    }
   } catch (e) {
     return correlatedJson(
       cid,
@@ -48,6 +68,11 @@ export async function PUT(req: NextRequest) {
       { status: 500 },
     );
   }
-  const data = await getCmsNavigationPayload(sup.client);
-  return correlatedJson(cid, { data });
+  const live = await getCmsNavigationPayloadAdmin(sup.client);
+  const draft = await getCmsNavigationDraftPayload(sup.client);
+  const merged = mergeNavigationDraftOverLive(live, draft);
+  return correlatedJson(cid, {
+    data: merged,
+    meta: { hasDraft: draft != null },
+  });
 }
