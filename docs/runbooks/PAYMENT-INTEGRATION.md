@@ -1,56 +1,49 @@
 # Payment Integration Guide
 
-This document describes the payment providers integrated into the Maharlika Apparel e-commerce platform.
+This document describes the payment providers integrated into the Maharlika Apparel e-commerce platform (Medusa v2).
 
 ## Overview
 
 | Provider | Methods | Use Case |
 |----------|---------|----------|
-| **Lemon Squeezy** | Card, Stripe, PayPal | International; Merchant of Record |
+| **Stripe** | Cards, wallets, regional methods (per Stripe Dashboard) | International and configurable per region |
+| **PayPal** | PayPal balance, cards | International |
 | **Paymongo** | GCash, cards, BillEase, e-wallets | Philippines |
 | **PayMaya (Maya)** | GCash, Maya wallet, cards, QRPH | Philippines |
+| **Cash on delivery** | COD | In-person or configured regions |
+
+Use `medusa-config.ts`, environment variables, and BYOK rows in `payment_connections` (Supabase) to enable providers per deployment.
 
 ---
 
-## 1. Lemon Squeezy (Stripe & PayPal)
+## 1. Stripe
 
-Lemon Squeezy acts as a **Merchant of Record** and can accept:
-- Credit/debit cards (via Stripe)
-- PayPal
-- Direct card payments
+1. Create or open a [Stripe](https://stripe.com) account.
+2. Obtain **Secret key** and **Webhook signing secret** from the Stripe Dashboard.
+3. Register Medusa webhook URL: `https://your-medusa-backend.example.com/hooks/payment/stripe` (exact path follows your Medusa route setup).
 
-### Setup
+### Environment (Medusa / BYOK)
 
-1. Create a [Lemon Squeezy](https://lemonsqueezy.com) account.
-2. In **Settings → Store**, enable Stripe and PayPal as payment methods.
-3. Get credentials from **Settings → API**:
-   - API Key
-   - Store ID
-   - Checkout Variant ID (for one-time purchases)
-   - Webhook Signing Secret
-
-### Environment (Medusa)
-
-```env
-LEMONSQUEEZY_API_KEY=
-LEMONSQUEEZY_STORE_ID=
-LEMONSQUEEZY_CHECKOUT_VARIANT_ID=
-LEMONSQUEEZY_WEBHOOK_SECRET=
-```
-
-### Storefront
-
-Default payment method. Customers select **"Lemon Squeezy (Card, Stripe, PayPal)"** on the checkout page.
-
-### Webhooks
-
-Register webhook URL in Lemon Squeezy: `https://your-medusa-backend.onrender.com/hooks/payment/lemonsqueezy`
+Map via admin payment connections or env (see `apps/medusa/.env.template`): `STRIPE_API_KEY`, `STRIPE_WEBHOOK_SECRET`, and related keys as documented in the Medusa Stripe module.
 
 ---
 
-## 2. Paymongo (GCash)
+## 2. PayPal
+
+1. Create REST app credentials in the [PayPal Developer](https://developer.paypal.com) portal.
+2. Configure sandbox vs live via `PAYPAL_ENVIRONMENT`.
+3. Register PayPal webhooks to your Medusa PayPal hook URL.
+
+### Environment (Medusa / BYOK)
+
+`PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_WEBHOOK_ID`, etc. (see template and `payment-provider-secret-env-map` in Medusa).
+
+---
+
+## 3. Paymongo (GCash)
 
 Paymongo supports Philippine payment methods:
+
 - GCash
 - Maya
 - GrabPay
@@ -74,7 +67,7 @@ PAYMONGO_WEBHOOK_SECRET=whsk_...
 
 ### Storefront
 
-Customers select **"GCash / PayMongo"** on checkout. They are redirected to Paymongo’s hosted payment page.
+Customers select **"GCash / PayMongo"** on checkout when that provider is enabled. They are redirected to Paymongo’s hosted payment page.
 
 ### Webhooks
 
@@ -82,9 +75,10 @@ Register: `https://your-medusa-backend.onrender.com/hooks/payment/paymongo`
 
 ---
 
-## 3. PayMaya (Maya)
+## 4. PayMaya (Maya)
 
 Maya provides:
+
 - Maya Checkout (hosted page)
 - Invoice API (payment links)
 - GCash, Maya wallet, cards, QRPH
@@ -106,13 +100,14 @@ MAYA_SANDBOX=true      # Set to false for production
 
 ### Storefront
 
-Customers select **"Maya (GCash, cards, e-wallets)"** on checkout. They are redirected to Maya’s hosted invoice page.
+Customers select **"Maya (GCash, cards, e-wallets)"** on checkout when enabled. They are redirected to Maya’s hosted invoice page.
 
 ### Webhooks
 
 Register: `https://your-medusa-backend.onrender.com/hooks/payment/maya`
 
 Maya recommends **IP whitelisting** for webhook security:
+
 - Sandbox: `13.229.160.234`, `3.1.199.75`
 - Production: `18.138.50.235`, `3.1.207.200`
 
@@ -121,22 +116,24 @@ Maya recommends **IP whitelisting** for webhook security:
 ## Checkout Flow
 
 1. Customer adds items to bag and goes to `/checkout`.
-2. Customer selects a payment method (Lemon Squeezy, Paymongo, or Maya).
+2. Customer selects an available payment method.
 3. Customer clicks **Continue to secure payment**.
 4. Medusa creates a cart, initiates a payment session for the chosen provider.
-5. Customer is redirected to the provider’s hosted checkout page.
-6. After payment, provider sends a webhook to Medusa.
+5. Customer completes payment on the provider’s hosted page (or COD flow) as applicable.
+6. After payment, the provider sends a webhook to Medusa where configured.
 7. Medusa completes the order and updates the cart/order status.
 
 ---
 
 ## Provider IDs (Medusa)
 
-| Provider | ID |
-|----------|-----|
-| Lemon Squeezy | `pp_lemonsqueezy_lemonsqueezy` |
+| Provider | Example ID |
+|----------|------------|
+| Stripe | `pp_stripe_stripe` (and region-specific Stripe method IDs as registered) |
+| PayPal | `pp_paypal_paypal` |
 | Paymongo | `pp_paymongo_paymongo` |
 | Maya | `pp_maya_maya` |
+| COD | `pp_cod_cod` |
 
 These IDs are used when configuring `NEXT_PUBLIC_MEDUSA_PAYMENT_PROVIDER_ID` for a default provider, or when selecting a provider on the checkout page.
 
@@ -151,8 +148,9 @@ When working on payment features in Cursor:
    - **PayPal** – Create/capture orders, refunds, disputes; list transactions, invoices.
 
 2. **Skills** (from `skills-lock.json`; source: wshobson/agents):
-   - **stripe-integration** – Use for Stripe and Lemon Squeezy card flows.
-   - **paypal-integration** – Use for PayPal and Lemon Squeezy PayPal flows.
+
+   - **stripe-integration** – Stripe setup and webhooks.
+   - **paypal-integration** – PayPal setup and webhooks.
 
 3. **Configuration**:
    - Root: `.env.example` → `NEXT_PUBLIC_MEDUSA_*`, `MEDUSA_*` (client config).
@@ -162,6 +160,7 @@ When working on payment features in Cursor:
 
 ## References
 
-- [Lemon Squeezy Docs](https://docs.lemonsqueezy.com)
+- [Stripe Docs](https://stripe.com/docs)
+- [PayPal REST APIs](https://developer.paypal.com/docs/api/overview/)
 - [PayMongo Docs](https://developers.paymongo.com)
 - [Maya Developer Hub](https://developers.maya.ph)
