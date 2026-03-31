@@ -38,7 +38,7 @@ const cards: { title: string; description: string; href: string }[] = [
   },
   {
     title: "Accessibility",
-    description: "Our commitment to inclusive browsing.",
+    description: "Inclusive browsing and known limitations.",
     href: "/accessibility",
   },
   {
@@ -60,8 +60,7 @@ export default function HelpPage() {
         Help center
       </h1>
       <p className="mt-3 max-w-prose text-sm leading-relaxed text-on-surface-variant">
-        Quick links for Maharlika storefront support-orders, policies, and
-        account help.
+        Links to orders, policies, and account help for this storefront.
       </p>
       <ul className="mt-10 grid list-none grid-cols-1 gap-4 sm:grid-cols-2">
         {cards.map((c) => (
