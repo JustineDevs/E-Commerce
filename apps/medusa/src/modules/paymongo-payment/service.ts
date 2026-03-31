@@ -33,18 +33,16 @@ import {
 } from "@medusajs/framework/utils";
 import crypto from "node:crypto";
 import { buildPaymongoWebhookDedupId, claimPaymongoWebhookDedup } from "../../lib/paymongo-webhook-dedup";
-
-const PAYMONGO_API = "https://api.paymongo.com/v1";
+import {
+  createPaymongoLink,
+  getPaymongoLink,
+  type PaymongoClientOptions,
+} from "../../lib/paymongo-sdk-client";
 
 export type PaymongoPaymentOptions = {
   secretKey: string;
-  /** Used to verify webhooks (starts with whsk_) */
   webhookSecret: string;
 };
-
-function basicAuth(secretKey: string): string {
-  return `Basic ${Buffer.from(`${secretKey}:`).toString("base64")}`;
-}
 
 function parseSessionFromDescription(description: string): string | undefined {
   const prefix = "medusa_ps:";
@@ -116,6 +114,10 @@ export default class PaymongoPaymentProviderService extends AbstractPaymentProvi
     }
   }
 
+  private get clientOptions(): PaymongoClientOptions {
+    return { secretKey: this.options_.secretKey };
+  }
+
   async initiatePayment(
     input: InitiatePaymentInput,
   ): Promise<InitiatePaymentOutput> {
@@ -139,53 +141,31 @@ export default class PaymongoPaymentProviderService extends AbstractPaymentProvi
         "php",
     ).toLowerCase();
 
-    const res = await fetch(`${PAYMONGO_API}/links`, {
-      method: "POST",
-      headers: {
-        Authorization: basicAuth(this.options_.secretKey),
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        data: {
-          attributes: {
-            amount: Math.round(amountMinor),
-            currency,
-            description: `medusa_ps:${sessionId}`,
-          },
+    try {
+      const { linkId, checkoutUrl } = await createPaymongoLink(
+        this.clientOptions,
+        {
+          amountMinor,
+          currency,
+          description: `medusa_ps:${sessionId}`,
         },
-      }),
-    });
-    const text = await res.text();
-    if (!res.ok) {
-      throw new MedusaError(
-        MedusaError.Types.INVALID_DATA,
-        `Paymongo create link failed: ${res.status} ${text}`,
       );
-    }
-    const json = JSON.parse(text) as {
-      data?: {
-        id?: string;
-        attributes?: { checkout_url?: string };
-      };
-    };
-    const linkId = json.data?.id;
-    const checkoutUrl = json.data?.attributes?.checkout_url;
-    if (!linkId || !checkoutUrl) {
-      throw new MedusaError(
-        MedusaError.Types.INVALID_DATA,
-        "Paymongo create link response missing id or checkout_url.",
-      );
-    }
 
-    return {
-      id: linkId,
-      status: PaymentSessionStatus.REQUIRES_MORE,
-      data: {
-        session_id: sessionId,
-        paymongo_link_id: linkId,
-        checkout_url: checkoutUrl,
-      },
-    };
+      return {
+        id: linkId,
+        status: PaymentSessionStatus.REQUIRES_MORE,
+        data: {
+          session_id: sessionId,
+          paymongo_link_id: linkId,
+          checkout_url: checkoutUrl,
+        },
+      };
+    } catch (err) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        `Paymongo create link failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   async authorizePayment(
@@ -199,46 +179,35 @@ export default class PaymongoPaymentProviderService extends AbstractPaymentProvi
       );
     }
 
-    const res = await fetch(`${PAYMONGO_API}/links/${encodeURIComponent(linkId)}`, {
-      method: "GET",
-      headers: {
-        Authorization: basicAuth(this.options_.secretKey),
-      },
-    });
-    const text = await res.text();
-    if (!res.ok) {
-      throw new MedusaError(
-        MedusaError.Types.NOT_ALLOWED,
-        `Paymongo retrieve link failed: ${res.status} ${text}`,
+    try {
+      const { status, amountMinor } = await getPaymongoLink(
+        this.clientOptions,
+        linkId,
       );
-    }
-    const json = JSON.parse(text) as {
-      data?: {
-        attributes?: {
-          status?: string;
-          amount?: number;
-        };
-      };
-    };
-    const status = (json.data?.attributes?.status ?? "").toLowerCase();
-    if (status !== "paid") {
-      throw new MedusaError(
-        MedusaError.Types.NOT_ALLOWED,
-        `Paymongo link is not paid yet (status=${status || "unknown"}).`,
-      );
-    }
+      if (status !== "paid") {
+        throw new MedusaError(
+          MedusaError.Types.NOT_ALLOWED,
+          `Paymongo link is not paid yet (status=${status || "unknown"}).`,
+        );
+      }
 
-    const amountMinor = json.data?.attributes?.amount;
-    return {
-      status: PaymentSessionStatus.AUTHORIZED,
-      data: {
-        ...((input.data as Record<string, unknown>) ?? {}),
-        paymongo_link_id: linkId,
-        ...(typeof amountMinor === "number" && Number.isFinite(amountMinor)
-          ? { captured_amount_minor: amountMinor }
-          : {}),
-      },
-    };
+      return {
+        status: PaymentSessionStatus.AUTHORIZED,
+        data: {
+          ...((input.data as Record<string, unknown>) ?? {}),
+          paymongo_link_id: linkId,
+          ...(typeof amountMinor === "number" && Number.isFinite(amountMinor)
+            ? { captured_amount_minor: amountMinor }
+            : {}),
+        },
+      };
+    } catch (err) {
+      if (err instanceof MedusaError) throw err;
+      throw new MedusaError(
+        MedusaError.Types.NOT_ALLOWED,
+        `Paymongo retrieve link failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   async capturePayment(input: CapturePaymentInput): Promise<CapturePaymentOutput> {
@@ -309,6 +278,9 @@ export default class PaymongoPaymentProviderService extends AbstractPaymentProvi
       (payload.headers["Paymongo-Signature"] as string | undefined);
 
     if (!verifyPaymongoSignature(raw, signature, this.options_.webhookSecret)) {
+      console.error(
+        "[payment-webhook] verification_failed provider=paymongo reason=invalid_signature",
+      );
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
         "Invalid Paymongo webhook signature.",
