@@ -1,8 +1,11 @@
 import { DEFAULT_PUBLIC_SITE_ORIGIN } from "@apparel-commerce/sdk";
 
-const SITE_NAME = "Maharlika Apparel Custom";
-const SITE_DESC =
-  "Custom apparel and everyday craft. Shorts, shirts, and jackets built for precision. Shop Maharlika Apparel Custom in the Philippines.";
+/** Legal / brand label for titles, footer, and structured data. */
+export const SITE_NAME = "Maharlika Apparel Custom";
+
+/** Factual summary for meta tags and JSON-LD (no promotional claims). */
+export const SITE_DESCRIPTION =
+  "Apparel including shorts, shirts, and jackets. Shipping in the Philippines. Browse by category, size, and color.";
 
 export function getBaseUrl(): string {
   const url =
@@ -28,8 +31,8 @@ export function buildJsonLdOrganization() {
     "@type": "Organization",
     name: SITE_NAME,
     url,
-    logo: `${url}/brand/maharlika-logo-horizontal.png`,
-    description: SITE_DESC,
+    logo: `${url}/brand/maharlika-logo-design.svg`,
+    description: SITE_DESCRIPTION,
     sameAs: [],
   };
 }
@@ -41,7 +44,7 @@ export function buildJsonLdWebSite() {
     "@type": "WebSite",
     name: SITE_NAME,
     url,
-    description: SITE_DESC,
+    description: SITE_DESCRIPTION,
     potentialAction: {
       "@type": "SearchAction",
       target: { "@type": "EntryPoint", urlTemplate: `${url}/search?q={search_term_string}` },
@@ -101,5 +104,5 @@ export function buildJsonLdBreadcrumb(
 
 export const seoDefaults = {
   siteName: SITE_NAME,
-  siteDescription: SITE_DESC,
+  siteDescription: SITE_DESCRIPTION,
 };
