@@ -1,4 +1,8 @@
 export { cn } from "./lib/utils";
+export {
+  AuthSplitShell,
+  type AuthSplitShellProps,
+} from "./components/auth-split-shell";
 export { Button, buttonVariants, type ButtonProps } from "./components/ui/button";
 
 export {
