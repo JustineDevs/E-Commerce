@@ -34,7 +34,7 @@ In-scope for security reporting:
 
 Out-of-scope:
 
-- Issues in third-party services (Lemon Squeezy, AfterShip, Supabase, NextAuth) – report to those providers
+- Issues in third-party services (payment processors, AfterShip, Supabase, NextAuth) – report to those providers
 - Social engineering or physical access
 - Denial of service that requires significant resources
 
@@ -44,7 +44,7 @@ The Apparel Commerce Platform follows these security practices:
 
 ### Payment and Webhooks
 
-- **Lemon Squeezy webhooks** are verified using signature validation before any order or payment state change.
+- **Payment webhooks** are verified using provider signature validation before any order or payment state change.
 - Orders are never marked as paid solely from client-side redirect state.
 - Webhook events are logged for idempotency and replay safety.
 
