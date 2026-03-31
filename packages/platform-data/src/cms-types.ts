@@ -1,7 +1,27 @@
 export type CmsPageType = "static" | "landing" | "legal";
 export type CmsPublishStatus = "draft" | "published" | "scheduled";
 
-export type CmsNavLink = { href: string; label: string };
+/** Optional promo tile shown next to a mega-menu column. */
+export type CmsNavFeatured = {
+  href: string;
+  label: string;
+  imageUrl?: string;
+};
+
+/**
+ * Header/footer link. Optional `children` powers desktop mega menus.
+ * `startsAt` / `endsAt` are ISO timestamps; omitted links are filtered at read time on the storefront.
+ */
+export type CmsNavLink = {
+  href: string;
+  label: string;
+  badge?: string;
+  iconKey?: string;
+  children?: CmsNavLink[];
+  featured?: CmsNavFeatured;
+  startsAt?: string;
+  endsAt?: string;
+};
 
 export type CmsFooterColumn = {
   title: string;
@@ -12,7 +32,11 @@ export type CmsSocialLink = { href: string; label: string; network?: string };
 
 export type CmsNavigationPayload = {
   headerLinks: CmsNavLink[];
+  /** When non-empty, used for the compact / mobile nav instead of top-level header links. */
+  headerLinksMobile: CmsNavLink[];
   footerColumns: CmsFooterColumn[];
+  /** Thin bar below main footer columns (legal, region, etc.). */
+  footerBottomLinks: CmsNavLink[];
   socialLinks: CmsSocialLink[];
 };
 
@@ -42,6 +66,17 @@ export type CmsPageRow = {
   version: number;
   created_at: string;
   updated_at: string;
+  /** Optional parent CMS page slug for breadcrumbs. */
+  parent_slug: string | null;
+  /** Optional shorter crumb label (defaults to title). */
+  breadcrumb_label: string | null;
+};
+
+export type CmsPageBlockPresetRow = {
+  id: string;
+  name: string;
+  blocks: CmsBlock[];
+  created_at: string;
 };
 
 export type CmsBlogPostRow = {
@@ -60,6 +95,9 @@ export type CmsBlogPostRow = {
   preview_token: string | null;
   meta_title: string | null;
   meta_description: string | null;
+  canonical_url: string | null;
+  og_image_url: string | null;
+  rss_include: boolean;
   json_ld: unknown | null;
   created_at: string;
   updated_at: string;
