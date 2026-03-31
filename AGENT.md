@@ -13,9 +13,12 @@ You are working on the **Apparel Commerce Platform**, a composable commerce syst
 
 Read these first when answering questions about scope, flow, or requirements:
 
+- **internal/docs/REMAINING-IMPLEMENTATION.md** – Shipped vs backlog for commerce hardening; validation commands; next-session checklist.
 - **internal/docs/spec.md** – System scope, tech stack, functional requirements, OMS flow.
 - **internal/docs/blueprint.md** – Sprint plan, data model, OMS flow, SOPs.
 - **internal/docs/privacy-terms.md** – PRD, service agreement, GDPR/PDPA compliance.
+
+If some of the above files are absent in your branch, use git history or restore from main before relying on them.
 
 For doc context commands, use **internal/docs** and **.cursor/llm** as canonical roots (see `.cursor/commands/docs.md`).
 
@@ -27,12 +30,12 @@ For doc context commands, use **internal/docs** and **.cursor/llm** as canonical
 | API | Node.js + Express |
 | Database | PostgreSQL via Supabase |
 | Auth | NextAuth/Auth.js with Google provider |
-| Payments | Lemon Squeezy, Stripe, PayPal, Paymongo (GCash), Maya |
+| Payments | Stripe, PayPal, Paymongo (GCash), Maya, cash on delivery (Medusa) |
 | Shipping | AfterShip + J&T Express Philippines |
 
 ## Critical Rules
 
-1. **Payment truth**: Orders MUST NOT be marked as paid from client-side redirect alone. Use verified Lemon Squeezy webhooks.
+1. **Payment truth**: Orders MUST NOT be marked as paid from client-side redirect alone. Rely on verified payment-provider webhooks and Medusa payment completion.
 2. **Webhook verification**: Always verify webhook signatures before mutating order, payment, or inventory state.
 3. **Inventory**: Use immutable inventory movements. No manual stock overwrites as the only source of truth.
 4. **Secrets**: Store OAuth, payment, and API keys in environment variables. Never expose them in client bundles.
@@ -69,8 +72,8 @@ packages/
 
 ## MCP (Model Context Protocol)
 
-- **Stripe** – Payments, subscriptions, refunds, docs search. Use for Stripe/Lemon Squeezy card flows.
-- **PayPal** – Orders, refunds, disputes, subscriptions. Use for PayPal/Lemon Squeezy flows.
+- **Stripe** – Payments, subscriptions, refunds, docs search. Use for Stripe card and related flows.
+- **PayPal** – Orders, refunds, disputes, subscriptions. Use for PayPal flows.
 - **Supabase** – Database, migrations, Edge Functions. See `mcp_supabase_*` tools.
 
 Ensure Stripe and PayPal MCP servers are enabled in Cursor when working on payment integrations.
@@ -94,5 +97,5 @@ Full rules, workflows, and anti-patterns: **`internal/docs/MCP-UI-STACK.md`**.
 - **building-admin-dashboard-customizations** – Admin UI, widgets, forms, tables.
 - **authentication-setup** – Login, JWT, OAuth, session, RBAC.
 - **design-with-taste** – Simplicity, fluidity, delight in UI.
-- **stripe-integration** (skills-lock) – Stripe setup, webhooks, Lemon Squeezy integration.
-- **paypal-integration** (skills-lock) – PayPal setup, webhooks, Lemon Squeezy integration.
+- **stripe-integration** (skills-lock) – Stripe setup and webhooks.
+- **paypal-integration** (skills-lock) – PayPal setup and webhooks.
