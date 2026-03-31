@@ -1,5 +1,7 @@
 import { test, expect } from "@playwright/test";
 
+import { gotoFirstCatalogPdp } from "../helpers/storefront";
+
 test.describe("storefront smoke", () => {
   test("home renders primary brand and navigation", async ({ page }) => {
     await page.goto("/");
@@ -24,13 +26,16 @@ test.describe("storefront smoke", () => {
     await expect(page.getByTestId("checkout-submit-pay")).toBeDisabled();
   });
 
-  test("product PDP loads for classic-shorts", async ({ page }) => {
-    const res = await page.goto("/shop/classic-shorts");
-    if (!res || res.status() >= 400) {
-      test.skip(true, "classic-shorts not seeded in Medusa");
+  test("product PDP loads from catalog (first listed product)", async ({ page }) => {
+    const slug = await gotoFirstCatalogPdp(page);
+    if (!slug) {
+      test.skip(
+        true,
+        "No products in Medusa for this region. Run: pnpm --filter medusa seed && pnpm --filter medusa seed:ph (ensure NEXT_PUBLIC_MEDUSA_REGION_ID matches the PH region).",
+      );
     }
     const addBtn = page.getByTestId("pdp-add-to-bag");
-    await expect(addBtn).toBeVisible();
+    await expect(addBtn).toBeVisible({ timeout: 30_000 });
     await expect(addBtn).toBeEnabled();
   });
 });
