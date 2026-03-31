@@ -53,7 +53,7 @@ export default async function AdminDashboardPage({
     return (
       <AdminPageShell
         title="Overview"
-        subtitle="Sales and stock at a glance."
+        subtitle="Recent sales and stock summary."
         bannerSlot={bannerSlot}
       >
         <p className="text-sm text-on-surface-variant">
@@ -113,7 +113,7 @@ export default async function AdminDashboardPage({
   return (
     <AdminPageShell
       title="Overview"
-      subtitle="Sales and stock at a glance. The same online store feeds the shop, inventory, orders, and POS."
+      subtitle="Recent sales and stock summary. One commerce system powers the storefront catalog, inventory, orders, and POS."
       bannerSlot={bannerSlot}
       inspector={<AuditTimeline title="Recent activity" />}
     >
