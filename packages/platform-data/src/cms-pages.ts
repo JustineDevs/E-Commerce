@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isCmsPubliclyVisible } from "./cms-public-visibility";
 import { isMissingTableOrSchemaError } from "./supabase-errors";
 import type { CmsBlock, CmsPageRow, CmsPageType, CmsPublishStatus } from "./cms-types";
 
@@ -44,6 +45,8 @@ function rowToPage(r: Record<string, unknown>): CmsPageRow {
     version: typeof r.version === "number" ? r.version : Number(r.version) || 1,
     created_at: String(r.created_at ?? ""),
     updated_at: String(r.updated_at ?? ""),
+    parent_slug: r.parent_slug != null ? String(r.parent_slug) : null,
+    breadcrumb_label: r.breadcrumb_label != null ? String(r.breadcrumb_label) : null,
   };
 }
 
@@ -93,23 +96,39 @@ export async function getCmsPageBySlugLocalePublic(
     return null;
   }
   if (!data) return null;
-  return rowToPage(data as Record<string, unknown>);
+  const page = rowToPage(data as Record<string, unknown>);
+  if (!isCmsPubliclyVisible(page.status, page.scheduled_publish_at)) {
+    return null;
+  }
+  return page;
 }
 
 export async function listCmsPagesForSitemapPublic(
   supabase: SupabaseClient,
 ): Promise<{ slug: string; locale: string; updated_at: string }[]> {
-  const { data, error } = await supabase.from("cms_pages").select("slug, locale, updated_at");
+  const { data, error } = await supabase
+    .from("cms_pages")
+    .select("slug, locale, updated_at, status, scheduled_publish_at");
   if (error) {
     if (isMissingTableOrSchemaError(error)) return [];
     console.error("[cms-pages] listCmsPagesForSitemapPublic", error.message);
     return [];
   }
-  return (data ?? []).map((r) => ({
-    slug: String((r as Record<string, unknown>).slug ?? ""),
-    locale: String((r as Record<string, unknown>).locale ?? "en"),
-    updated_at: String((r as Record<string, unknown>).updated_at ?? ""),
-  }));
+  const now = Date.now();
+  return (data ?? [])
+    .map((r) => {
+      const x = r as Record<string, unknown>;
+      return {
+        slug: String(x.slug ?? ""),
+        locale: String(x.locale ?? "en"),
+        updated_at: String(x.updated_at ?? ""),
+        status: (x.status as CmsPageRow["status"]) ?? "draft",
+        scheduled_publish_at:
+          x.scheduled_publish_at != null ? String(x.scheduled_publish_at) : null,
+      };
+    })
+    .filter((r) => isCmsPubliclyVisible(r.status, r.scheduled_publish_at, now))
+    .map(({ slug, locale, updated_at }) => ({ slug, locale, updated_at }));
 }
 
 export async function getCmsPageBySlugAdmin(
@@ -149,6 +168,8 @@ export type UpsertCmsPageInput = {
   canonical_url?: string | null;
   og_image_url?: string | null;
   json_ld?: unknown | null;
+  parent_slug?: string | null;
+  breadcrumb_label?: string | null;
 };
 
 export async function upsertCmsPage(
@@ -193,6 +214,14 @@ export async function upsertCmsPage(
       input.canonical_url !== undefined ? input.canonical_url : existing?.canonical_url ?? null,
     og_image_url: input.og_image_url !== undefined ? input.og_image_url : existing?.og_image_url ?? null,
     json_ld: input.json_ld !== undefined ? input.json_ld : existing?.json_ld ?? null,
+    parent_slug:
+      input.parent_slug !== undefined
+        ? input.parent_slug
+        : existing?.parent_slug ?? null,
+    breadcrumb_label:
+      input.breadcrumb_label !== undefined
+        ? input.breadcrumb_label
+        : existing?.breadcrumb_label ?? null,
     version: nextVersion,
     updated_at: new Date().toISOString(),
   };
@@ -270,4 +299,61 @@ export async function getCmsPageBySlugPreview(
   }
   if (!data) return null;
   return rowToPage(data as Record<string, unknown>);
+}
+
+/**
+ * Breadcrumb trail for published ancestors only, starting from a parent slug (excludes the leaf page).
+ * Use with a preview or draft leaf row to build full crumbs: `[...ancestors, leafCrumb]`.
+ */
+export async function getCmsPageAncestorTrail(
+  supabase: SupabaseClient,
+  startParentSlug: string | null | undefined,
+  locale: string,
+  maxDepth = 8,
+): Promise<{ label: string; href: string }[]> {
+  const crumbs: { label: string; href: string }[] = [];
+  let currentSlug: string | null =
+    typeof startParentSlug === "string" && startParentSlug.trim()
+      ? startParentSlug.trim()
+      : null;
+  let guard = 0;
+  const visited = new Set<string>();
+  while (currentSlug && guard++ < maxDepth) {
+    if (visited.has(currentSlug)) break;
+    visited.add(currentSlug);
+    const row = await getCmsPageBySlugLocalePublic(supabase, currentSlug, locale);
+    if (!row) break;
+    const label = row.breadcrumb_label?.trim() || row.title?.trim() || row.slug;
+    crumbs.unshift({ label, href: `/p/${row.slug}` });
+    const parent = row.parent_slug?.trim();
+    currentSlug = parent && parent.length > 0 ? parent : null;
+  }
+  return crumbs;
+}
+
+/**
+ * Walks `parent_slug` up to `maxDepth` for storefront breadcrumbs (includes current page last).
+ */
+export async function getCmsPageBreadcrumbTrail(
+  supabase: SupabaseClient,
+  slug: string,
+  locale: string,
+  maxDepth = 8,
+): Promise<{ label: string; href: string }[]> {
+  const crumbs: { label: string; href: string }[] = [];
+  let currentSlug: string | null = slug;
+  let guard = 0;
+  const visited = new Set<string>();
+  while (currentSlug && guard++ < maxDepth) {
+    if (visited.has(currentSlug)) break;
+    visited.add(currentSlug);
+    const row = await getCmsPageBySlugLocalePublic(supabase, currentSlug, locale);
+    if (!row) break;
+    const label =
+      row.breadcrumb_label?.trim() || row.title?.trim() || row.slug;
+    crumbs.unshift({ label, href: `/p/${row.slug}` });
+    const parent = row.parent_slug?.trim();
+    currentSlug = parent && parent.length > 0 ? parent : null;
+  }
+  return crumbs;
 }
