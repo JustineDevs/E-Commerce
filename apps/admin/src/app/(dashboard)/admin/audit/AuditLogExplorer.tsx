@@ -4,6 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { staffHasPermission } from "@apparel-commerce/platform-data";
 import type { AuditEntry } from "@/components/admin-console/AuditTimeline";
+import { formatAuditActorLabel } from "@/lib/audit-actor-format";
+import {
+  formatAuditActionLabel,
+  formatAuditResourceLabel,
+} from "@/lib/audit-display-format";
 import {
   AdminEmptyState,
   AdminErrorState,
@@ -161,6 +166,7 @@ export function AuditLogExplorer() {
             <thead>
               <tr className="border-b border-outline-variant/20 text-xs uppercase tracking-widest text-on-surface-variant">
                 <th className="py-3 px-4">Time</th>
+                <th className="py-3 px-4">By</th>
                 <th className="py-3 px-4">Action</th>
                 <th className="py-3 px-4">Resource</th>
               </tr>
@@ -171,8 +177,21 @@ export function AuditLogExplorer() {
                   <td className="py-3 px-4 whitespace-nowrap text-on-surface-variant">
                     {new Date(e.created_at).toLocaleString()}
                   </td>
-                  <td className="py-3 px-4 font-medium text-primary">{e.action}</td>
-                  <td className="py-3 px-4 text-on-surface-variant">{e.resource ?? "—"}</td>
+                  <td className="py-3 px-4 max-w-[220px] break-words text-on-surface-variant">
+                    {formatAuditActorLabel(e)}
+                  </td>
+                  <td
+                    className="py-3 px-4 font-medium text-primary"
+                    title={e.action || undefined}
+                  >
+                    {formatAuditActionLabel(e.action ?? "")}
+                  </td>
+                  <td
+                    className="py-3 px-4 text-on-surface-variant"
+                    title={e.resource || undefined}
+                  >
+                    {formatAuditResourceLabel(e.resource ?? null) || "—"}
+                  </td>
                 </tr>
               ))}
             </tbody>
