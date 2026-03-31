@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "dotenv": "^16.4.0",
+    "@apparel-commerce/platform-data": "workspace:*",
+    "@apparel-commerce/validation": "workspace:*",
     "@apparel-commerce/database": "workspace:*",
     "@apparel-commerce/rate-limits": "workspace:*",
     "@apparel-commerce/sdk": "workspace:*",
