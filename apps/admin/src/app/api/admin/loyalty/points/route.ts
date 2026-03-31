@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { getServerSession } from "next-auth/next";
-import { staffHasPermission } from "@apparel-commerce/database";
+import { staffSessionAllows } from "@apparel-commerce/database";
 import {
   addPoints,
   redeemPoints,
@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   const cid = getCorrelationId(req);
   const session = await getServerSession(authOptions);
   if (!session?.user) return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
-  if (!staffHasPermission(session.user.permissions ?? [], "loyalty:write")) {
+  if (!staffSessionAllows(session, "loyalty:write")) {
     return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
   }
   const { account_id, points, reason, order_id, action } = await req.json();
