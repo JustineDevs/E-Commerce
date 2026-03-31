@@ -7,6 +7,7 @@ export type CmsRedirectRow = {
   to_path: string;
   status_code: 301 | 302 | 307 | 308;
   active: boolean;
+  preserve_query: boolean;
   created_at: string;
 };
 
@@ -28,6 +29,7 @@ export async function listCmsRedirects(supabase: SupabaseClient): Promise<CmsRed
         ? (code as 301 | 302 | 307 | 308)
         : 301,
       active: Boolean(x.active),
+      preserve_query: Boolean(x.preserve_query),
       created_at: String(x.created_at ?? ""),
     };
   });
@@ -41,6 +43,7 @@ export async function upsertCmsRedirect(
     to_path: string;
     status_code?: 301 | 302 | 307 | 308;
     active?: boolean;
+    preserve_query?: boolean;
   },
 ): Promise<CmsRedirectRow | null> {
   const row = {
@@ -48,6 +51,7 @@ export async function upsertCmsRedirect(
     to_path: input.to_path,
     status_code: input.status_code ?? 301,
     active: input.active ?? true,
+    preserve_query: input.preserve_query ?? false,
   };
   if (input.id) {
     const { data, error } = await supabase
@@ -67,6 +71,7 @@ export async function upsertCmsRedirect(
       to_path: String(x.to_path ?? ""),
       status_code: Number(x.status_code) as 301 | 302 | 307 | 308,
       active: Boolean(x.active),
+      preserve_query: Boolean(x.preserve_query),
       created_at: String(x.created_at ?? ""),
     };
   }
@@ -82,6 +87,7 @@ export async function upsertCmsRedirect(
     to_path: String(x.to_path ?? ""),
     status_code: Number(x.status_code) as 301 | 302 | 307 | 308,
     active: Boolean(x.active),
+    preserve_query: Boolean(x.preserve_query),
     created_at: String(x.created_at ?? ""),
   };
 }
@@ -119,6 +125,7 @@ export async function getCmsRedirectForPath(
     to_path: String(x.to_path ?? ""),
     status_code: Number(x.status_code) as 301 | 302 | 307 | 308,
     active: Boolean(x.active),
+    preserve_query: Boolean(x.preserve_query),
     created_at: String(x.created_at ?? ""),
   };
 }
