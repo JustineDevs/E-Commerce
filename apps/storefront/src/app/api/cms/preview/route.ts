@@ -5,7 +5,20 @@ import {
   getCmsPageBySlugPreview,
 } from "@apparel-commerce/platform-data";
 
+import {
+  getRequestIp,
+  rateLimitFixedWindow,
+} from "@/lib/storefront-api-rate-limit";
+
 export async function GET(req: NextRequest) {
+  const ip = getRequestIp(req);
+  const rl = await rateLimitFixedWindow(`cms-preview:${ip}`, 60, 60_000);
+  if (!rl.ok) {
+    return Response.json(
+      { error: "Too many requests", retryAfter: rl.retryAfterSec },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } },
+    );
+  }
   const slug = req.nextUrl.searchParams.get("slug");
   const locale = req.nextUrl.searchParams.get("locale") ?? "en";
   const token = req.nextUrl.searchParams.get("token");
