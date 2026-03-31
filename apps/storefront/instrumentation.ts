@@ -1,12 +1,4 @@
-import * as Sentry from "@sentry/nextjs";
-
 export async function register() {
-  if (process.env.NEXT_RUNTIME === "nodejs") {
-    await import("./sentry.server.config");
-  } else if (process.env.NEXT_RUNTIME === "edge") {
-    await import("./sentry.edge.config");
-  }
-
   if (process.env.NEXT_RUNTIME !== "nodejs") {
     return;
   }
@@ -20,9 +12,9 @@ export async function register() {
       throw new Error("NEXTAUTH_SECRET is required in production");
     }
     if (!process.env.GOOGLE_CLIENT_ID?.trim() || !process.env.GOOGLE_CLIENT_SECRET?.trim()) {
-      console.warn("[storefront] GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET not set — OAuth sign-in will not work");
+      console.warn(
+        "[storefront] GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET not set — OAuth sign-in will not work",
+      );
     }
   }
 }
-
-export const onRequestError = Sentry.captureRequestError;
