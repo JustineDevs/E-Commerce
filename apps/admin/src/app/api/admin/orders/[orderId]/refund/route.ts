@@ -1,4 +1,4 @@
-import { staffHasPermission } from "@apparel-commerce/database";
+import { staffSessionAllows } from "@apparel-commerce/database";
 import { getServerSession } from "next-auth/next";
 import { logAdminApiEvent } from "@/lib/admin-api-log";
 import { authOptions } from "@/lib/auth";
@@ -20,7 +20,7 @@ export async function POST(
   if (!session?.user) {
     return correlatedJson(correlationId, { error: "Unauthorized" }, { status: 401 });
   }
-  if (!staffHasPermission(session.user.permissions ?? [], "orders:write")) {
+  if (!staffSessionAllows(session, "orders:write")) {
     return correlatedJson(correlationId, { error: "Forbidden" }, { status: 403 });
   }
 
