@@ -1,4 +1,5 @@
 import type { NextAuthOptions } from "next-auth";
+import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import {
   tryCreateSupabaseClient,
@@ -6,16 +7,17 @@ import {
   isStaffRole,
   resolveStaffPermissionsForUserId,
 } from "@apparel-commerce/database";
+import { loadGoogleCredentials, normalizeEmail } from "@apparel-commerce/sdk";
+import {
+  isAdminE2eCredentialsConfigured,
+  parseAdminAllowedEmailList,
+} from "@/lib/admin-allowed-emails";
 
 const PERMISSIONS_CACHE_TTL_MS = 60_000;
 const staffSnapshotCache = new Map<
   string,
   { permissions: string[]; role: string | undefined; expiresAt: number }
 >();
-
-function normalizeEmailKey(email: string): string {
-  return email.trim().toLowerCase();
-}
 
 /**
  * Loads RBAC from Supabase (source of truth). Uses lowercase email for cache and lookup
@@ -25,7 +27,7 @@ async function getCachedStaffSnapshot(email: string): Promise<{
   permissions: string[];
   role: string | undefined;
 }> {
-  const key = normalizeEmailKey(email);
+  const key = normalizeEmail(email);
   const cached = staffSnapshotCache.get(key);
   if (cached && Date.now() < cached.expiresAt) {
     return { permissions: cached.permissions, role: cached.role };
@@ -56,35 +58,85 @@ async function getCachedStaffSnapshot(email: string): Promise<{
   return { permissions, role };
 }
 
-const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim() ?? "";
-const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim() ?? "";
+const google = loadGoogleCredentials("admin");
 
-if (process.env.NODE_ENV === "development" && (!googleClientId || !googleClientSecret)) {
-  console.warn(
-    "[admin auth] GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET is empty. Google sign-in will not work. Check root .env.",
-  );
-}
+const e2eCredentialsEnabled = isAdminE2eCredentialsConfigured();
 
 export const authOptions: NextAuthOptions = {
   debug: process.env.NODE_ENV === "development",
+  pages: {
+    signIn: "/sign-in",
+  },
   providers: [
     GoogleProvider({
-      clientId: googleClientId,
-      clientSecret: googleClientSecret,
+      clientId: google.clientId,
+      clientSecret: google.clientSecret,
     }),
+    ...(e2eCredentialsEnabled
+      ? [
+          CredentialsProvider({
+            id: "e2e-credentials",
+            name: "E2E (credentials)",
+            credentials: {
+              email: { label: "Email", type: "email" },
+              password: { label: "Password", type: "password" },
+            },
+            async authorize(credentials) {
+              if (!credentials?.email || !credentials?.password) return null;
+              const emailRaw =
+                typeof credentials.email === "string" ? credentials.email : "";
+              const pwd =
+                typeof credentials.password === "string" ? credentials.password : "";
+              const emailNorm = normalizeEmail(emailRaw);
+              const allowed = parseAdminAllowedEmailList();
+              if (!allowed.includes(emailNorm)) return null;
+              if (pwd !== process.env.NEXTAUTH_SECRET?.trim()) return null;
+              const supabase = tryCreateSupabaseClient();
+              if (!supabase) return null;
+              const { data } = await supabase
+                .from("users")
+                .select("id")
+                .eq("email", emailNorm)
+                .maybeSingle();
+              if (!data?.id) return null;
+              const { data: roleRow } = await supabase
+                .from("user_roles")
+                .select("role")
+                .eq("user_id", data.id)
+                .maybeSingle();
+              const role = roleRow?.role as string | undefined;
+              if (!isStaffRole(role ?? "")) return null;
+              return {
+                id: data.id as string,
+                email: emailNorm,
+                name: "E2E Staff",
+                role,
+              };
+            },
+          }),
+        ]
+      : []),
   ],
   secret: process.env.NEXTAUTH_SECRET?.trim(),
   session: { strategy: "jwt", maxAge: 60 * 60 * 8 },
   callbacks: {
     async signIn({ user, account }) {
+      if (account?.provider === "e2e-credentials") {
+        if (!e2eCredentialsEnabled) return false;
+        if (!user?.email) return false;
+        const role = (user as { role?: string }).role;
+        if (!isStaffRole(role ?? "")) return false;
+        staffSnapshotCache.delete(normalizeEmail(user.email));
+        return true;
+      }
       if (!user?.email || account?.provider !== "google" || !account.providerAccountId) {
         return false;
       }
-      const emailNorm = normalizeEmailKey(user.email);
+      const emailNorm = normalizeEmail(user.email);
       user.email = emailNorm;
       const promote =
         process.env.ADMIN_ALLOWED_EMAILS?.split(",")
-          .map((s) => normalizeEmailKey(s))
+          .map((s) => normalizeEmail(s))
           .filter(Boolean) ?? [];
       try {
         const supabase = tryCreateSupabaseClient();
@@ -113,17 +165,26 @@ export const authOptions: NextAuthOptions = {
         return false;
       }
     },
-    async jwt({ token, user }) {
-      if (user?.role) {
-        token.role = user.role;
+    async jwt({ token, user, trigger, session }) {
+      if (user) {
+        if (user.email) token.email = user.email;
+        if (user.role) token.role = user.role;
+        if (user.name !== undefined) token.name = user.name;
+        if (user.image !== undefined) token.picture = user.image;
+      }
+      if (trigger === "update" && session && typeof session === "object") {
+        const s = session as { name?: string | null };
+        if (s.name !== undefined) token.name = s.name;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user?.email) {
-        session.user.email = normalizeEmailKey(session.user.email);
+        session.user.email = normalizeEmail(session.user.email);
       }
       if (session.user) {
+        if (token.name !== undefined) session.user.name = token.name as string | null;
+        if (token.picture !== undefined) session.user.image = token.picture as string | null;
         try {
           if (session.user.email) {
             const snapshot = await getCachedStaffSnapshot(session.user.email);
