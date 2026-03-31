@@ -1,10 +1,17 @@
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http";
-import { MedusaError } from "@medusajs/framework/utils";
+import {
+  ContainerRegistrationKeys,
+  MedusaError,
+} from "@medusajs/framework/utils";
 import { addToCartWorkflow } from "@medusajs/medusa/core-flows";
+import {
+  emailFromCartRow,
+  emailFromCustomerRow,
+  needsCustomerEmailLookup,
+} from "../../../../../lib/loyalty-resolve-email";
 
 type Body = {
   points?: number;
-  email?: string;
 };
 
 /** 1 loyalty point = 1.00 currency unit off; amounts use smallest currency unit (e.g. centavos). */
@@ -22,13 +29,41 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
 
   const body = (req.body ?? {}) as Body;
   const points = Math.floor(Number(body.points ?? 0));
-  const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
 
   if (points <= 0) {
     return res.status(200).json({ cart_id: cartId, skipped: true as const });
   }
-  if (!email) {
-    throw new MedusaError(MedusaError.Types.INVALID_DATA, "email is required to redeem points");
+
+  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY);
+  const { data: cartRows } = await query.graph({
+    entity: "cart",
+    fields: ["id", "email", "customer_id", "customer.email"],
+    filters: { id: cartId },
+  });
+  const row = cartRows?.[0] as
+    | {
+        email?: string | null;
+        customer_id?: string | null;
+        customer?: { email?: string | null };
+      }
+    | undefined;
+  let email = emailFromCartRow(row);
+  const { lookupCustomerId } = needsCustomerEmailLookup(row);
+  if (!email.includes("@") && lookupCustomerId) {
+    const { data: custRows } = await query.graph({
+      entity: "customer",
+      fields: ["email"],
+      filters: { id: lookupCustomerId },
+    });
+    email = emailFromCustomerRow(
+      custRows?.[0] as { email?: string | null } | undefined,
+    );
+  }
+  if (!email.includes("@")) {
+    throw new MedusaError(
+      MedusaError.Types.INVALID_DATA,
+      "Set cart email or sign in before redeeming loyalty points",
+    );
   }
 
   const variantId = process.env.MEDUSA_LOYALTY_DISCOUNT_VARIANT_ID?.trim();
