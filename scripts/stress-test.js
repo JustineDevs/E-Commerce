@@ -12,6 +12,8 @@
  *  5. E2E (Playwright smoke, flows)
  *  6. Dogfood (visual screenshots)
  *
+ * DB prep (optional, before E2E): pnpm e2e:prep — Medusa seed is skipped when the store API already has products; staff ensure is a no-op when the user is already staff/admin.
+ *
  * Usage: node scripts/stress-test.js [options]
  *   --no-lint       Skip lint
  *   --no-security   Skip security check
