@@ -13,7 +13,7 @@ export default function CookiesPage() {
       </h1>
       <div className="mt-8 space-y-6 font-body text-sm leading-relaxed text-on-surface-variant">
         <p>
-          We use cookies and similar storage to run the Maharlika storefront
+          We use cookies and similar storage to operate this storefront
           securely, remember your session when you sign in, and keep your cart
           usable across pages.
         </p>
@@ -32,9 +32,9 @@ export default function CookiesPage() {
             Functional
           </h2>
           <p>
-            Preferences such as wishlist data may be stored locally in your
-            browser (<code>localStorage</code>) so the UI can show saved items
-            without an account sync.
+            Preferences such as saved-item lists may be stored locally in your
+            browser (<code>localStorage</code>) so the UI can show favorites
+            without cloud sync until you sign in.
           </p>
         </section>
         <section>
