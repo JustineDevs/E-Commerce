@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it, beforeEach, afterEach } from "node:test";
-import { isStaffRbacStrictEnv, staffHasPermission } from "./permissions";
+import {
+  isStaffRbacStrictEnv,
+  staffHasPermission,
+  staffSessionAllows,
+} from "./permissions";
 
 describe("staffHasPermission", () => {
   beforeEach(() => {
@@ -36,5 +40,27 @@ describe("staffHasPermission", () => {
   it("requires explicit key when list is non-empty without wildcard", () => {
     assert.equal(staffHasPermission(["pos:use"], "pos:use"), true);
     assert.equal(staffHasPermission(["pos:use"], "crm:read"), false);
+  });
+});
+
+describe("staffSessionAllows", () => {
+  it("uses admin wildcard when permissions array is empty", () => {
+    assert.equal(
+      staffSessionAllows(
+        { user: { role: "admin", permissions: [] } },
+        "catalog:write",
+      ),
+      true,
+    );
+  });
+
+  it("denies staff with empty grants", () => {
+    assert.equal(
+      staffSessionAllows(
+        { user: { role: "staff", permissions: [] } },
+        "catalog:write",
+      ),
+      false,
+    );
   });
 });
