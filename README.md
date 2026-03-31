@@ -15,7 +15,7 @@ The platform uses a shared monorepo and a single transactional database so that 
 - **Storefront**: Product discovery, cart, checkout, order tracking, and customer account
 - **Admin Dashboard**: Analytics, inventory management, order fulfillment hub, POS terminal
 - **Unified OMS**: One source of truth for products, variants, inventory, orders, payments, and shipments
-- **Payments**: Lemon Squeezy hosted checkout and payment links (webhook-verified)
+- **Payments**: Medusa payment providers (Stripe, PayPal, PayMongo, Maya, cash on delivery) with webhook-verified capture where applicable
 - **Shipping**: AfterShip integration with J&T Express Philippines for tracking
 
 ### Tech Stack
@@ -27,7 +27,7 @@ The platform uses a shared monorepo and a single transactional database so that 
 | Database | PostgreSQL via Supabase |
 | Monorepo | Turborepo + pnpm workspaces |
 | Auth | NextAuth/Auth.js with Google provider |
-| Payments | Lemon Squeezy |
+| Payments | Stripe, PayPal, PayMongo, Maya, COD (Medusa) |
 | Shipping | AfterShip + J&T Express Philippines |
 
 ## Live preview
@@ -62,7 +62,7 @@ internal/docs/     # Spec, blueprint, privacy-terms
 - Node.js >= 20
 - pnpm 9.x
 - Supabase project
-- Lemon Squeezy and AfterShip API credentials
+- Payment provider and AfterShip API credentials as needed
 - Google OAuth client (for NextAuth)
 
 ### Local development ports
@@ -91,7 +91,7 @@ Copy `.env.example` to `.env` and configure:
 - `DATABASE_URL` – Supabase Postgres connection string
 - `NEXTAUTH_SECRET`, `NEXTAUTH_URL` – NextAuth configuration
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` – Google OAuth
-- See `apps/medusa/.env.template` for Lemon Squeezy, Stripe, PayPal, Paymongo, Maya credentials
+- See `apps/medusa/.env.template` for Stripe, PayPal, Paymongo, Maya, and related credentials
 - AfterShip API key
 
 ### Database
@@ -117,7 +117,7 @@ pnpm build
 
 ## Documentation
 
-- [Payment Integration](docs/runbooks/PAYMENT-INTEGRATION.md) – Lemon Squeezy, Stripe, PayPal, Paymongo (GCash), Maya setup
+- [Payment Integration](docs/runbooks/PAYMENT-INTEGRATION.md) – Stripe, PayPal, Paymongo (GCash), Maya setup
 - [Specification](docs/spec.md) – System scope, tech stack, functional requirements
 - [Blueprint](docs/blueprint.md) – Sprint plan, data model, OMS flow
 - [Privacy & Terms](docs/privacy-terms.md) – PRD, service agreement, GDPR/PDPA
