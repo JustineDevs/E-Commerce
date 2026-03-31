@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
 import {
   getWishlist,
   type WishlistEntry,
@@ -13,6 +14,7 @@ import {
 } from "@/lib/wishlist";
 
 export function WishlistPageClient() {
+  const { status } = useSession();
   const [items, setItems] = useState<WishlistEntry[]>([]);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
 
@@ -26,8 +28,14 @@ export function WishlistPageClient() {
     return unsub;
   }, [refresh]);
 
-  function remove(slug: string, name: string) {
-    toggleWishlist({ slug, name });
+  function remove(slug: string, name: string, medusaProductId?: string) {
+    toggleWishlist({
+      slug,
+      name,
+      ...(medusaProductId?.trim()
+        ? { medusaProductId: medusaProductId.trim() }
+        : {}),
+    });
     refresh();
   }
 
@@ -37,15 +45,15 @@ export function WishlistPageClient() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "maharlika-wishlist.json";
+    a.download = "saved-items-backup.json";
     a.click();
     URL.revokeObjectURL(url);
   }
 
-  function handleImport() {
+  function handleRestoreFromBackup() {
     const input = document.createElement("input");
     input.type = "file";
-    input.accept = ".json";
+    input.accept = ".json,application/json";
     input.onchange = () => {
       const file = input.files?.[0];
       if (!file) return;
@@ -54,11 +62,15 @@ export function WishlistPageClient() {
         try {
           const count = importWishlistJSON(reader.result as string);
           refresh();
-          setStatusMsg(`Imported ${count} new item${count !== 1 ? "s" : ""}.`);
-          setTimeout(() => setStatusMsg(null), 3000);
+          setStatusMsg(
+            `Restored ${count} new item${count !== 1 ? "s" : ""} to your saved list.`,
+          );
+          setTimeout(() => setStatusMsg(null), 4000);
         } catch {
-          setStatusMsg("Import failed. Check file format.");
-          setTimeout(() => setStatusMsg(null), 3000);
+          setStatusMsg(
+            "That file could not be read. Use a backup you exported from this shop.",
+          );
+          setTimeout(() => setStatusMsg(null), 4000);
         }
       };
       reader.readAsText(file);
@@ -71,6 +83,26 @@ export function WishlistPageClient() {
     refresh();
   }
 
+  if (status === "loading") {
+    return <p className="text-sm text-on-surface-variant">Loading…</p>;
+  }
+
+  if (status !== "authenticated") {
+    return (
+      <div className="space-y-4">
+        <p className="text-on-surface-variant">
+          Sign in to save favorites and keep them with your account on this device.
+        </p>
+        <Link
+          href={`/sign-in?callbackUrl=${encodeURIComponent("/wishlist")}`}
+          className="inline-flex rounded-lg bg-primary px-6 py-3 text-sm font-bold text-on-primary hover:opacity-90"
+        >
+          Sign in to view saved items
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       {statusMsg && (
@@ -81,18 +113,21 @@ export function WishlistPageClient() {
       {items.length === 0 ? (
         <div className="space-y-4">
           <p className="text-on-surface-variant">
-            Your wishlist is empty.{" "}
+            You have not saved anything yet.{" "}
             <Link href="/shop" className="font-medium text-primary underline">
               Browse the shop
-            </Link>
-            .
+            </Link>{" "}
+            and tap the heart on a product to add it here.
+          </p>
+          <p className="text-xs text-on-surface-variant">
+            Already have a backup from this shop? You can merge those items into this list.
           </p>
           <button
             type="button"
-            onClick={handleImport}
+            onClick={handleRestoreFromBackup}
             className="rounded border border-primary px-4 py-2 text-xs font-bold uppercase tracking-wider text-primary hover:bg-primary hover:text-on-primary"
           >
-            Import wishlist
+            Restore from backup file
           </button>
         </div>
       ) : (
@@ -100,7 +135,7 @@ export function WishlistPageClient() {
           <ul className="divide-y divide-outline-variant/20 rounded-lg border border-outline-variant/20">
             {items.map((item) => (
               <li
-                key={item.slug}
+                key={`${item.slug}:${item.medusaProductId ?? ""}`}
                 className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="min-w-0">
@@ -123,7 +158,9 @@ export function WishlistPageClient() {
                   </Link>
                   <button
                     type="button"
-                    onClick={() => remove(item.slug, item.name)}
+                    onClick={() =>
+                      remove(item.slug, item.name, item.medusaProductId)
+                    }
                     className="rounded border border-outline-variant px-4 py-2 text-xs font-bold uppercase tracking-wider text-on-surface-variant hover:border-error hover:text-error"
                   >
                     Remove
@@ -132,20 +169,20 @@ export function WishlistPageClient() {
               </li>
             ))}
           </ul>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <button
               type="button"
               onClick={handleExport}
               className="rounded border border-primary px-4 py-2 text-xs font-bold uppercase tracking-wider text-primary hover:bg-primary hover:text-on-primary"
             >
-              Export
+              Download backup
             </button>
             <button
               type="button"
-              onClick={handleImport}
+              onClick={handleRestoreFromBackup}
               className="rounded border border-primary px-4 py-2 text-xs font-bold uppercase tracking-wider text-primary hover:bg-primary hover:text-on-primary"
             >
-              Import
+              Restore from backup
             </button>
             <button
               type="button"
