@@ -1,5 +1,5 @@
 import { getServerSession } from "next-auth/next";
-import { staffHasPermission } from "@apparel-commerce/database";
+import { staffSessionAllows } from "@apparel-commerce/database";
 import { authOptions } from "@/lib/auth";
 import { listEntityWorkflows } from "@/lib/admin-workflow";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
@@ -18,7 +18,7 @@ export async function GET(req: Request) {
   if (!session?.user) {
     return correlatedJson(correlationId, { error: "Unauthorized" }, { status: 401 });
   }
-  if (!staffHasPermission(session.user.permissions ?? [], "dashboard:read")) {
+  if (!staffSessionAllows(session, "dashboard:read")) {
     return correlatedJson(correlationId, { error: "Forbidden" }, { status: 403 });
   }
 
