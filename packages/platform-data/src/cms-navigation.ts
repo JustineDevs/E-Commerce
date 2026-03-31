@@ -1,22 +1,84 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isMissingTableOrSchemaError } from "./supabase-errors";
-import type { CmsNavigationPayload, CmsNavLink, CmsFooterColumn, CmsSocialLink } from "./cms-types";
+import type {
+  CmsFooterColumn,
+  CmsNavFeatured,
+  CmsNavLink,
+  CmsNavigationPayload,
+  CmsSocialLink,
+} from "./cms-types";
 
 const DEFAULT_ID = "default";
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === "object" && !Array.isArray(v);
+}
+
+function parseFeatured(v: unknown): CmsNavFeatured | undefined {
+  if (!isRecord(v)) return undefined;
+  const href = typeof v.href === "string" ? v.href : "";
+  const label = typeof v.label === "string" ? v.label : "";
+  if (!href || !label) return undefined;
+  return {
+    href,
+    label,
+    imageUrl: typeof v.imageUrl === "string" ? v.imageUrl : undefined,
+  };
+}
+
+export function parseNavLink(v: unknown): CmsNavLink | null {
+  if (!isRecord(v)) return null;
+  const href = typeof v.href === "string" ? v.href : "";
+  const label = typeof v.label === "string" ? v.label : "";
+  if (!href || !label) return null;
+  const childrenRaw = Array.isArray(v.children) ? v.children : [];
+  const children = childrenRaw
+    .map(parseNavLink)
+    .filter((x): x is CmsNavLink => x != null);
+  const featured = parseFeatured(v.featured);
+  return {
+    href,
+    label,
+    badge: typeof v.badge === "string" ? v.badge : undefined,
+    iconKey: typeof v.iconKey === "string" ? v.iconKey : undefined,
+    children: children.length ? children : undefined,
+    featured,
+    startsAt: typeof v.startsAt === "string" ? v.startsAt : undefined,
+    endsAt: typeof v.endsAt === "string" ? v.endsAt : undefined,
+  };
+}
 
 function parseLinks(v: unknown): CmsNavLink[] {
   if (!Array.isArray(v)) return [];
   const out: CmsNavLink[] = [];
   for (const x of v) {
-    if (x && typeof x === "object" && "href" in x && "label" in x) {
-      const r = x as Record<string, unknown>;
-      out.push({
-        href: String(r.href ?? ""),
-        label: String(r.label ?? ""),
-      });
-    }
+    const l = parseNavLink(x);
+    if (l) out.push(l);
   }
   return out;
+}
+
+function linkVisibleAt(link: CmsNavLink, now: number): boolean {
+  if (link.startsAt) {
+    const t = Date.parse(link.startsAt);
+    if (!Number.isNaN(t) && t > now) return false;
+  }
+  if (link.endsAt) {
+    const t = Date.parse(link.endsAt);
+    if (!Number.isNaN(t) && t < now) return false;
+  }
+  return true;
+}
+
+function filterNavLinksBySchedule(links: CmsNavLink[], now: number): CmsNavLink[] {
+  return links
+    .filter((l) => linkVisibleAt(l, now))
+    .map((l) => ({
+      ...l,
+      children: l.children?.length
+        ? filterNavLinksBySchedule(l.children, now)
+        : undefined,
+    }));
 }
 
 function parseFooter(v: unknown): CmsFooterColumn[] {
@@ -50,26 +112,171 @@ function parseSocial(v: unknown): CmsSocialLink[] {
   return out;
 }
 
-export async function getCmsNavigationPayload(supabase: SupabaseClient): Promise<CmsNavigationPayload> {
+function emptyPayload(): CmsNavigationPayload {
+  return {
+    headerLinks: [],
+    headerLinksMobile: [],
+    footerColumns: [],
+    footerBottomLinks: [],
+    socialLinks: [],
+  };
+}
+
+function rowToPayload(
+  row: Record<string, unknown>,
+  opts?: { filterSchedule?: boolean },
+): CmsNavigationPayload {
+  const base: CmsNavigationPayload = {
+    headerLinks: parseLinks(row.header_links),
+    headerLinksMobile: parseLinks(row.header_links_mobile),
+    footerColumns: parseFooter(row.footer_columns),
+    footerBottomLinks: parseLinks(row.footer_bottom_links),
+    socialLinks: parseSocial(row.social_links),
+  };
+  if (opts?.filterSchedule) {
+    const now = Date.now();
+    return {
+      ...base,
+      headerLinks: filterNavLinksBySchedule(base.headerLinks, now),
+      headerLinksMobile: filterNavLinksBySchedule(base.headerLinksMobile, now),
+      footerBottomLinks: filterNavLinksBySchedule(base.footerBottomLinks, now),
+    };
+  }
+  return base;
+}
+
+/** Public storefront: schedule windows applied. */
+export async function getCmsNavigationPayload(
+  supabase: SupabaseClient,
+): Promise<CmsNavigationPayload> {
   const { data, error } = await supabase
     .from("cms_navigation")
-    .select("header_links, footer_columns, social_links")
+    .select("header_links, header_links_mobile, footer_columns, footer_bottom_links, social_links")
     .eq("id", DEFAULT_ID)
     .maybeSingle();
   if (error) {
     if (isMissingTableOrSchemaError(error)) {
-      return { headerLinks: [], footerColumns: [], socialLinks: [] };
+      return emptyPayload();
     }
     console.error("[cms-navigation] getCmsNavigationPayload", error.message);
-    return { headerLinks: [], footerColumns: [], socialLinks: [] };
+    return emptyPayload();
   }
-  if (!data) return { headerLinks: [], footerColumns: [], socialLinks: [] };
-  const row = data as Record<string, unknown>;
+  if (!data) return emptyPayload();
+  return rowToPayload(data as Record<string, unknown>, { filterSchedule: true });
+}
+
+/** Admin + publish: raw links without schedule filtering. */
+export async function getCmsNavigationPayloadAdmin(
+  supabase: SupabaseClient,
+): Promise<CmsNavigationPayload> {
+  const { data, error } = await supabase
+    .from("cms_navigation")
+    .select("header_links, header_links_mobile, footer_columns, footer_bottom_links, social_links")
+    .eq("id", DEFAULT_ID)
+    .maybeSingle();
+  if (error) {
+    if (isMissingTableOrSchemaError(error)) {
+      return emptyPayload();
+    }
+    console.error("[cms-navigation] getCmsNavigationPayloadAdmin", error.message);
+    return emptyPayload();
+  }
+  if (!data) return emptyPayload();
+  return rowToPayload(data as Record<string, unknown>, { filterSchedule: false });
+}
+
+export type CmsNavigationDraftPayload = Partial<CmsNavigationPayload> & {
+  headerLinks?: CmsNavLink[];
+  footerColumns?: CmsFooterColumn[];
+  socialLinks?: CmsSocialLink[];
+  headerLinksMobile?: CmsNavLink[];
+  footerBottomLinks?: CmsNavLink[];
+};
+
+export async function getCmsNavigationDraftPayload(
+  supabase: SupabaseClient,
+): Promise<CmsNavigationDraftPayload | null> {
+  const { data, error } = await supabase
+    .from("cms_navigation_draft")
+    .select("payload")
+    .eq("id", DEFAULT_ID)
+    .maybeSingle();
+  if (error) {
+    if (isMissingTableOrSchemaError(error)) return null;
+    console.error("[cms-navigation] getCmsNavigationDraftPayload", error.message);
+    return null;
+  }
+  if (!data) return null;
+  const raw = (data as Record<string, unknown>).payload;
+  if (!isRecord(raw)) return null;
+  const keys = Object.keys(raw).filter((k) => {
+    const v = raw[k];
+    if (Array.isArray(v)) return v.length > 0;
+    return v != null && v !== "";
+  });
+  if (keys.length === 0) return null;
+  return raw as CmsNavigationDraftPayload;
+}
+
+/** Merge draft partial over live for the editor initial state. */
+export function mergeNavigationDraftOverLive(
+  live: CmsNavigationPayload,
+  draft: CmsNavigationDraftPayload | null,
+): CmsNavigationPayload {
+  if (!draft) return live;
   return {
-    headerLinks: parseLinks(row.header_links),
-    footerColumns: parseFooter(row.footer_columns),
-    socialLinks: parseSocial(row.social_links),
+    headerLinks: draft.headerLinks ?? live.headerLinks,
+    headerLinksMobile: draft.headerLinksMobile ?? live.headerLinksMobile,
+    footerColumns: draft.footerColumns ?? live.footerColumns,
+    footerBottomLinks: draft.footerBottomLinks ?? live.footerBottomLinks,
+    socialLinks: draft.socialLinks ?? live.socialLinks,
   };
+}
+
+export async function upsertCmsNavigationDraftPayload(
+  supabase: SupabaseClient,
+  payload: CmsNavigationDraftPayload,
+): Promise<void> {
+  const { error } = await supabase.from("cms_navigation_draft").upsert(
+    {
+      id: DEFAULT_ID,
+      payload: payload as unknown as Record<string, unknown>,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "id" },
+  );
+  if (error) throw new Error(error.message);
+}
+
+export async function publishCmsNavigationDraft(supabase: SupabaseClient): Promise<CmsNavigationPayload> {
+  const draft = await getCmsNavigationDraftPayload(supabase);
+  if (!draft || Object.keys(draft).length === 0) {
+    return getCmsNavigationPayloadAdmin(supabase);
+  }
+  const live = await getCmsNavigationPayloadAdmin(supabase);
+  const merged = mergeNavigationDraftOverLive(live, draft);
+  await upsertCmsNavigationPayload(supabase, merged);
+  await supabase
+    .from("cms_navigation_draft")
+    .upsert(
+      { id: DEFAULT_ID, payload: {}, updated_at: new Date().toISOString() },
+      { onConflict: "id" },
+    );
+  return merged;
+}
+
+function serializeNavLink(l: CmsNavLink): Record<string, unknown> {
+  const o: Record<string, unknown> = {
+    href: l.href,
+    label: l.label,
+  };
+  if (l.badge) o.badge = l.badge;
+  if (l.iconKey) o.iconKey = l.iconKey;
+  if (l.startsAt) o.startsAt = l.startsAt;
+  if (l.endsAt) o.endsAt = l.endsAt;
+  if (l.featured) o.featured = l.featured;
+  if (l.children?.length) o.children = l.children.map(serializeNavLink);
+  return o;
 }
 
 export async function upsertCmsNavigationPayload(
@@ -79,12 +286,43 @@ export async function upsertCmsNavigationPayload(
   const { error } = await supabase.from("cms_navigation").upsert(
     {
       id: DEFAULT_ID,
-      header_links: payload.headerLinks as unknown as Record<string, unknown>[],
-      footer_columns: payload.footerColumns as unknown as Record<string, unknown>[],
+      header_links: payload.headerLinks.map(serializeNavLink) as unknown as Record<
+        string,
+        unknown
+      >[],
+      header_links_mobile: payload.headerLinksMobile.map(serializeNavLink) as unknown as Record<
+        string,
+        unknown
+      >[],
+      footer_columns: payload.footerColumns.map((c) => ({
+        title: c.title,
+        links: c.links.map(serializeNavLink),
+      })) as unknown as Record<string, unknown>[],
+      footer_bottom_links: payload.footerBottomLinks.map(serializeNavLink) as unknown as Record<
+        string,
+        unknown
+      >[],
       social_links: payload.socialLinks as unknown as Record<string, unknown>[],
       updated_at: new Date().toISOString(),
     },
     { onConflict: "id" },
   );
   if (error) throw new Error(error.message);
+}
+
+/** Backward compat: accept partial payloads from older clients. */
+export function normalizeNavigationPayloadInput(raw: unknown): CmsNavigationPayload {
+  if (!isRecord(raw)) return emptyPayload();
+  const headerLinks = parseLinks(raw.headerLinks);
+  const headerLinksMobile = parseLinks(raw.headerLinksMobile);
+  const footerColumns = parseFooter(raw.footerColumns);
+  const footerBottomLinks = parseLinks(raw.footerBottomLinks);
+  const socialLinks = parseSocial(raw.socialLinks);
+  return {
+    headerLinks,
+    headerLinksMobile,
+    footerColumns,
+    footerBottomLinks,
+    socialLinks,
+  };
 }
