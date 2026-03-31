@@ -1,34 +1,59 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { toggleWishlist, wishlistContains } from "@/lib/wishlist";
 
 type Props = {
   slug: string;
   name: string;
+  /** Medusa product id from catalog; optional for legacy call sites. */
+  medusaProductId?: string;
   className?: string;
 };
 
-export function WishlistToggle({ slug, name, className = "" }: Props) {
+export function WishlistToggle({
+  slug,
+  name,
+  medusaProductId,
+  className = "",
+}: Props) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const { status } = useSession();
   const [on, setOn] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    setOn(wishlistContains(slug));
-  }, [slug]);
+    setOn(wishlistContains(slug, medusaProductId));
+  }, [slug, medusaProductId]);
 
   const handleClick = useCallback(() => {
-    const next = toggleWishlist({ slug, name });
+    if (status !== "authenticated") {
+      const next = pathname || `/shop/${slug}`;
+      router.push(`/sign-in?callbackUrl=${encodeURIComponent(next)}`);
+      return;
+    }
+    const next = toggleWishlist({
+      slug,
+      name,
+      ...(medusaProductId?.trim()
+        ? { medusaProductId: medusaProductId.trim() }
+        : {}),
+    });
     setOn(next);
-  }, [slug, name]);
+  }, [slug, name, medusaProductId, status, router, pathname]);
 
   return (
     <button
       type="button"
       onClick={handleClick}
       aria-pressed={on}
-      aria-label={on ? "Remove from wishlist" : "Add to wishlist"}
+      aria-label={
+        on ? "Remove from saved items" : "Save item to your list"
+      }
       className={`inline-flex items-center justify-center rounded border border-outline-variant/40 p-3 transition-colors hover:border-primary ${className}`}
     >
       <span
@@ -37,7 +62,7 @@ export function WishlistToggle({ slug, name, className = "" }: Props) {
       >
         favorite
       </span>
-      {!mounted ? <span className="sr-only">Wishlist</span> : null}
+      {!mounted ? <span className="sr-only">Save</span> : null}
     </button>
   );
 }
