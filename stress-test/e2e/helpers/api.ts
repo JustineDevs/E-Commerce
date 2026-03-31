@@ -8,8 +8,10 @@ export async function skipUnlessApiHealthy(
   request: APIRequestContext,
 ): Promise<void> {
   const base = apiBaseUrl();
-  const res = await request.get(`${base}/health`).catch(() => null);
-  if (!res?.ok()) {
+  const res = await request
+    .get(`${base}/health`, { failOnStatusCode: false })
+    .catch(() => null);
+  if (!res) {
     test.skip(true, `API not reachable at ${base}: start API for this test`);
   }
 }
