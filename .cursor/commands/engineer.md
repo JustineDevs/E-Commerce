@@ -255,7 +255,7 @@ Focus on real regressions:
 - ownership checks
 - critical API boundaries (admin BFF, Medusa Store/Admin)
 - storefront checkout and cart (session storage vs Medusa cart)
-- Lemon and AfterShip webhook safety (HMAC, dedup, single owner per env)
+- Payment-provider and AfterShip webhook safety (HMAC, dedup, single owner per env)
 - POS draft order and convert-to-order
 - payments and order-paid transitions
 - catalog misconfiguration vs empty-grid vs error states
