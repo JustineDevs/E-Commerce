@@ -1,0 +1,45 @@
+---
+description: Neutral UX copy rules for Admin and Storefront. Keep UI wording non-technical for non-engineers.
+globs: "{apps/admin,apps/storefront,packages/ui}/**/*.{ts,tsx,js,jsx,md,mdx}"
+alwaysApply: false
+---
+
+# Neutral UX copy (Admin + Storefront)
+
+## Goal
+
+UI text must read clearly for non-technical staff and customers. Keep the interface neutral and task-focused. Keep technical detail behind the UI in logs, error codes, and internal docs.
+
+## Rules
+
+- Use plain language. Prefer short sentences.
+- Avoid internal system names in UI: Medusa, Supabase, SDK, API key, region id, sales channel id, ISR, cache, webhook.
+- Avoid implementation terms: request, payload, status code, retry, timeout, socket, 503, database.
+- Prefer action and outcome wording: what happened, what the user should do next.
+- If you need a reference for support, include a short neutral label plus a correlation id. Example: "Reference: ABC123".
+
+## Error and empty-state pattern
+
+- UI message: neutral, non-technical.
+- Secondary line: next step the user controls.
+- Logging: technical cause, stack, upstream service, correlation id.
+
+## Examples
+
+**Avoid**
+- "Medusa publishable key missing. Configure NEXT_PUBLIC_MEDUSA_REGION_ID."
+- "500 from Store API. Retry the request."
+- "Sales channel mismatch. Product not visible."
+
+**Prefer**
+- "Store connection is not set up."
+- "This product is not available in the shop yet."
+- "We could not load products. Refresh the page or try again in a moment."
+- "We could not save your changes. Check required fields and try again."
+
+## Where technical detail belongs
+
+- Server logs and structured error objects returned to the Admin BFF.
+- Internal docs (`admin.md`, architecture docs, runbooks).
+- Dev-only diagnostics pages, guarded by staff permissions.
+
