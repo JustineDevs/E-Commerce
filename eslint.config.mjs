@@ -1,6 +1,13 @@
 import tsParser from "@typescript-eslint/parser";
 import globals from "globals";
 
+let nextPlugin;
+try {
+  nextPlugin = (await import("@next/eslint-plugin-next")).default;
+} catch {
+  nextPlugin = null;
+}
+
 /** @type {import("eslint").Linter.Config[]} */
 export default [
   {
@@ -38,4 +45,21 @@ export default [
       "no-undef": "error",
     },
   },
+  ...(nextPlugin
+    ? [
+        {
+          files: [
+            "apps/storefront/**/*.ts",
+            "apps/storefront/**/*.tsx",
+            "apps/admin/**/*.ts",
+            "apps/admin/**/*.tsx",
+          ],
+          plugins: { "@next/next": nextPlugin },
+          rules: {
+            ...nextPlugin.configs.recommended.rules,
+            ...nextPlugin.configs["core-web-vitals"].rules,
+          },
+        },
+      ]
+    : []),
 ];
