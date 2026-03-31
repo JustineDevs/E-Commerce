@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { getServerSession } from "next-auth/next";
-import { staffHasPermission } from "@apparel-commerce/database";
+import { staffSessionAllows } from "@apparel-commerce/database";
 import {
   getReceiptByOrder,
   saveReceipt,
@@ -10,13 +10,14 @@ import {
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { authOptions } from "@/lib/auth";
 import { getCorrelationId } from "@/lib/request-correlation";
+import { sendResendTransactionalEmail } from "@apparel-commerce/resend-mail";
 import { correlatedJson } from "@/lib/staff-api-response";
 
 export async function GET(req: NextRequest) {
   const cid = getCorrelationId(req);
   const session = await getServerSession(authOptions);
   if (!session?.user) return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
-  if (!staffHasPermission(session.user.permissions ?? [], "receipts:read")) {
+  if (!staffSessionAllows(session, "receipts:read")) {
     return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
   }
   const orderId = req.nextUrl.searchParams.get("order_id");
@@ -35,7 +36,7 @@ export async function POST(req: NextRequest) {
   const cid = getCorrelationId(req);
   const session = await getServerSession(authOptions);
   if (!session?.user) return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
-  if (!staffHasPermission(session.user.permissions ?? [], "receipts:send")) {
+  if (!staffSessionAllows(session, "receipts:send")) {
     return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
   }
   const body = await req.json();
@@ -61,21 +62,28 @@ export async function POST(req: NextRequest) {
   });
 
   if (body.customer_email && body.send) {
-    const resendKey = process.env.RESEND_API_KEY;
+    const resendKey = process.env.RESEND_API_KEY?.trim();
+    const fromAddr =
+      process.env.RESEND_FROM_EMAIL?.trim() ||
+      process.env.RESEND_FROM?.trim() ||
+      "noreply@apparel-commerce.com";
     if (resendKey) {
-      try {
-        const { Resend } = await import("resend");
-        const resend = new Resend(resendKey);
-        await resend.emails.send({
-          from: process.env.RESEND_FROM ?? "noreply@apparel-commerce.com",
-          to: body.customer_email,
-          subject: `Your receipt for Order #${body.display_id ?? body.order_id}`,
-          html,
-        });
-        await markReceiptSent(sb, receipt.id);
-      } catch {
-        // email send failure is non-blocking
+      const sent = await sendResendTransactionalEmail({
+        apiKey: resendKey,
+        from: fromAddr,
+        to: String(body.customer_email),
+        subject: `Your receipt for Order #${body.display_id ?? body.order_id}`,
+        html,
+        tags: [{ name: "type", value: "staff_receipt" }],
+      });
+      if (!sent.ok) {
+        return correlatedJson(
+          cid,
+          { error: "Failed to send receipt email", detail: sent.message },
+          { status: 502 },
+        );
       }
+      await markReceiptSent(sb, receipt.id);
     }
   }
 
