@@ -10,17 +10,21 @@
     "build": "node ../../scripts/clean-next-dir.cjs apps/storefront && next build",
     "start": "next start",
     "lint": "next lint",
+    "test": "tsx --test src/lib/storefront-api-rate-limit.test.ts src/lib/medusa-money.test.ts src/lib/medusa-profile-address.test.ts src/lib/medusa-review-verification.test.ts src/lib/medusa-catalog-stock.test.ts",
     "generate:icons": "python scripts/generate-favicons.py"
   },
   "dependencies": {
     "@apparel-commerce/platform-data": "workspace:*",
+    "@apparel-commerce/resend-mail": "workspace:*",
     "@apparel-commerce/sdk": "workspace:*",
     "@apparel-commerce/types": "workspace:*",
     "@apparel-commerce/ui": "workspace:*",
     "@apparel-commerce/user-preferences": "workspace:*",
     "@apparel-commerce/validation": "workspace:*",
     "@medusajs/js-sdk": "2.13.1",
-    "@sentry/nextjs": "^10.46.0",
+    "@paypal/react-paypal-js": "^8.0.0",
+    "@stripe/react-stripe-js": "^3.0.0",
+    "@stripe/stripe-js": "^5.0.0",
     "@supabase/supabase-js": "^2.45.0",
     "dotenv": "^16.4.0",
     "gsap": "^3.14.2",
@@ -41,6 +45,7 @@
     "eslint": "^9.0.0",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.15",
+    "tsx": "^4.19.0",
     "typescript": "^5.6.0"
   }
 }
