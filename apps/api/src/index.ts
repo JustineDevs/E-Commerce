@@ -36,7 +36,18 @@ app.use(requestIdMiddleware);
 
 app.use(
   helmet({
-    contentSecurityPolicy: false,
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:"],
+        connectSrc: ["'self'"],
+        fontSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+      },
+    },
     crossOriginEmbedderPolicy: false,
   }),
 );
@@ -48,16 +59,13 @@ app.use(
         process.env.CORS_ORIGIN?.split(",")
           .map((s) => s.trim())
           .filter(Boolean) ?? [];
+      const isProd = process.env.NODE_ENV === "production";
       if (!origin) {
-        callback(null, true);
+        callback(null, !isProd);
         return;
       }
       if (allowed.length === 0) {
-        if (process.env.NODE_ENV !== "production") {
-          callback(null, true);
-          return;
-        }
-        callback(null, false);
+        callback(null, !isProd);
         return;
       }
       if (allowed.includes(origin)) {
