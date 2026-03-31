@@ -38,7 +38,7 @@ Use these as primary references:
 3. internal/docs/privacy-terms.md for PRD, compliance (GDPR, PDPA), and service agreement.
 4. .cursor/llm/llm.txt for the high-level project overview and links to component docs.
 5. Per tech docs in .cursor/llm/* for concrete expectations:
-   - Lemon Squeezy (payments, webhooks)
+   - Payment providers (Medusa modules, webhooks)
    - AfterShip (tracking, J&T Express Philippines)
    - NextAuth/Auth.js (Google OAuth)
    - Supabase (Postgres, auth)
@@ -113,7 +113,7 @@ Propose:
 2. Verify:
    - JWT/session verification matches NextAuth and Supabase rules.
    - Authorization (admin, staff, customer) is enforced on admin and POS routes.
-   - Secrets (OAuth, Lemon Squeezy, AfterShip, Supabase) are in environment variables and never in client bundles.
+   - Secrets (OAuth, payment providers, AfterShip, Supabase) are in environment variables and never in client bundles.
 3. Identify:
    - Any routes that should be authenticated but are not.
    - Any mixing of session types that can lead to privilege bugs.
@@ -145,7 +145,7 @@ Suggest:
 
 For each major external SDK:
 
-- Lemon Squeezy
+- Payment providers (Stripe, PayPal, PayMongo, Maya, etc.)
 - AfterShip
 - NextAuth
 - Supabase
@@ -156,7 +156,7 @@ Do this:
 1. Identify where in the repo each SDK is used. Point to apps and packages.
 2. Check for:
    - Direct usage spread across many files instead of going through packages/sdk or shared modules.
-   - Duplicate implementations of the same behavior (e.g. multiple Lemon Squeezy clients).
+   - Duplicate implementations of the same behavior (e.g. multiple ad-hoc PSP HTTP clients).
    - Incorrect or partial usage relative to their docs (missing signature verification, missing status checks).
 3. For each SDK, propose:
 
@@ -178,7 +178,7 @@ Do this:
 
 - Duplicated networking or auth logic in multiple hooks or components.
 - Stubbed or truncated flows that hit missing endpoints.
-- Any direct Lemon Squeezy, AfterShip, or Supabase usage from the browser that should be server-side.
+- Any direct payment-provider, AfterShip, or Supabase usage from the browser that should be server-side.
 
 Recommend:
 
@@ -235,7 +235,7 @@ Give direct suggestions for consolidation and deletion.
 
 1. Describe the ideal user happy path in 12 to 18 months:
 
-- Customer browses storefront, adds to cart, checks out via Lemon Squeezy, tracks order via AfterShip.
+- Customer browses storefront, adds to cart, checks out via configured PSP, tracks order via AfterShip.
 - Staff manages inventory, fulfills orders, creates shipments with J&T Express.
 - Admin views analytics and low-stock alerts.
 - All data lives in one Postgres source of truth with clear audit trails.
