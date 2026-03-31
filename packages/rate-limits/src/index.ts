@@ -1,6 +1,6 @@
 /**
  * Centralized env-driven limits for optional Express or proxy gateways.
- * Medusa store limits are configured in `apps/medusa/src/api/middlewares.ts`.
+ * Medusa duplicates checkout POST env reads in `apps/medusa/src/api/middlewares.ts` (CJS build; keep in sync).
  */
 
 export function readPositiveIntEnv(name: string, fallback: number): number {
@@ -130,6 +130,18 @@ export function expressPublicTrackRateLimitOptions(): {
     standardHeaders: true,
     legacyHeaders: false,
   };
+}
+
+/**
+ * Medusa store: stricter cap for POST /store/carts* and /store/payment-collections* (checkout velocity).
+ * Duplicated in Medusa middlewares (same env names and defaults).
+ */
+export function readStoreCheckoutPostMaxPerWindow(): number {
+  return readPositiveIntEnv("RATE_LIMIT_STORE_CHECKOUT_POST_MAX", 60);
+}
+
+export function readStoreCheckoutPostWindowMs(): number {
+  return readPositiveIntEnv("RATE_LIMIT_STORE_CHECKOUT_POST_WINDOW_MS", 60_000);
 }
 
 /** Express API `/compliance` routes (internal API key + sensitive data). */
