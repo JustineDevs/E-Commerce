@@ -1,30 +1,30 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { getServerSession } from "next-auth/next";
 
-import { MEDUSA_CART_COOKIE } from "@/lib/cart-cookie";
+import { authOptions } from "@/lib/auth";
 import { medusaAdminFetch } from "@/lib/medusa-admin-fetch";
+import {
+  applyRateLimit,
+  applyUserRateLimit,
+  readCartIdFromCookie,
+} from "@/lib/cart-api-helpers";
+import { extractSessionEmail } from "@apparel-commerce/sdk";
 
-/**
- * Links the HttpOnly Medusa cart cookie to a Medusa customer by email (NextAuth).
- * Enables cart ownership to follow the signed-in user for server-side fulfillment.
- */
 export async function POST(req: Request) {
-  let body: { email?: string };
-  try {
-    body = (await req.json()) as { email?: string };
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const rl = await applyRateLimit(req, "cart-attach", 25, 60_000);
+  if (!rl.ok) return rl.response;
+
+  const session = await getServerSession(authOptions);
+  const email = extractSessionEmail(session);
+  if (!email) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const email =
-    typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
-  if (!email.includes("@")) {
-    return NextResponse.json({ ok: false, skipped: true });
-  }
+  const userRl = await applyUserRateLimit(email, "cart-attach", 15, 60_000);
+  if (!userRl.ok) return userRl.response;
 
-  const jar = await cookies();
-  const cartId = jar.get(MEDUSA_CART_COOKIE)?.value?.trim();
-  if (!cartId?.startsWith("cart_")) {
+  const cartId = await readCartIdFromCookie();
+  if (!cartId) {
     return NextResponse.json({ ok: false, skipped: true });
   }
 
@@ -80,8 +80,9 @@ export async function POST(req: Request) {
 
     if (!patchRes.ok) {
       const text = await patchRes.text().catch(() => "");
+      console.error("[cart/attach-customer] cart update failed:", text.slice(0, 300));
       return NextResponse.json(
-        { ok: false, error: "cart_update_failed", detail: text.slice(0, 200) },
+        { ok: false, error: "cart_update_failed" },
         { status: patchRes.status >= 500 ? 502 : 400 },
       );
     }
@@ -92,6 +93,7 @@ export async function POST(req: Request) {
     if (msg.includes("MEDUSA_SECRET_API_KEY")) {
       return NextResponse.json({ ok: false, skipped: true });
     }
-    return NextResponse.json({ ok: false, error: msg.slice(0, 200) }, { status: 500 });
+    console.error("[cart/attach-customer] unhandled:", msg.slice(0, 300));
+    return NextResponse.json({ ok: false, error: "internal_error" }, { status: 500 });
   }
 }
