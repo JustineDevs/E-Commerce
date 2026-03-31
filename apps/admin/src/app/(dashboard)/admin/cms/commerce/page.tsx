@@ -1,10 +1,10 @@
 import { CmsPageFrame } from "@/components/admin-console";
 import { AdminTechnicalDetails } from "@/components/AdminTechnicalDetails";
 import { CmsCommerceSearch } from "@/components/cms/CmsCommerceSearch";
-import { requirePagePermission } from "@/lib/require-page-permission";
+import { requireAnyPagePermission } from "@/lib/require-page-permission";
 
 export default async function CmsCommercePage() {
-  await requirePagePermission("content:read");
+  await requireAnyPagePermission(["content:read", "catalog:read"]);
   return (
     <CmsPageFrame
       title="Product lookup"
