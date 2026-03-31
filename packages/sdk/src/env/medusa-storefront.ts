@@ -1,6 +1,7 @@
 import {
   getMedusaPublishableKey,
   getMedusaRegionId,
+  getMedusaSalesChannelId,
   getMedusaStoreBaseUrl,
 } from "../medusa-env";
 
@@ -19,6 +20,11 @@ export function listMissingMedusaStorefrontEnv(): string[] {
     if (base.includes("localhost") || base.includes("127.0.0.1")) {
       missing.push(
         "NEXT_PUBLIC_MEDUSA_URL / MEDUSA_BACKEND_URL must be a public HTTPS origin in production (not localhost)",
+      );
+    }
+    if (!getMedusaSalesChannelId()) {
+      missing.push(
+        "NEXT_PUBLIC_MEDUSA_SALES_CHANNEL_ID (or MEDUSA_SALES_CHANNEL_ID) so listings, carts, and Medusa seed use the same channel",
       );
     }
   }
