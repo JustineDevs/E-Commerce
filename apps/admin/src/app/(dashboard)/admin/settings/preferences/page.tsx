@@ -9,14 +9,14 @@ export default async function AdminPreferencesPage() {
 
   return (
     <AdminPageShell
-      title="Your preferences"
-      subtitle="These choices apply to this browser only. They change layout density and default table sizes."
+      title="Workspace UI"
+      subtitle="Layout density and default table sizes for this browser. Account name and email are under the profile menu (Preferences) in the sidebar."
       breadcrumbs={
         <AdminBreadcrumbs
           items={[
             { label: "Dashboard", href: "/admin" },
             { label: "Settings", href: "/admin/settings/preferences" },
-            { label: "Preferences" },
+            { label: "Workspace UI" },
           ]}
         />
       }
