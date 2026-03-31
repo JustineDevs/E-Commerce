@@ -1,42 +1,33 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 
-import { MEDUSA_CART_COOKIE } from "@/lib/cart-cookie";
+import { createStorefrontMedusaSdk } from "@/lib/medusa-sdk";
 import {
-  getRequestIp,
-  rateLimitFixedWindow,
-} from "@/lib/storefront-api-rate-limit";
+  applyRateLimit,
+  parseJsonBody,
+  isValidCartId,
+  writeCartCookie,
+} from "@/lib/cart-api-helpers";
 
 export async function POST(req: Request) {
-  const ip = getRequestIp(req);
-  const rl = rateLimitFixedWindow(`cart-bind:${ip}`, 40, 60_000);
-  if (!rl.ok) {
-    return NextResponse.json(
-      { error: "Too many requests", retryAfter: rl.retryAfterSec },
-      { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } },
-    );
-  }
+  const rl = await applyRateLimit(req, "cart-bind", 40, 60_000);
+  if (!rl.ok) return rl.response;
 
-  let body: { cartId?: string };
-  try {
-    body = (await req.json()) as { cartId?: string };
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
+  const parsed = await parseJsonBody<{ cartId?: string }>(req);
+  if (!parsed.ok) return parsed.response;
 
-  const cartId = typeof body.cartId === "string" ? body.cartId.trim() : "";
-  if (!cartId.startsWith("cart_")) {
+  const cartId = typeof parsed.data.cartId === "string" ? parsed.data.cartId.trim() : "";
+  if (!isValidCartId(cartId)) {
     return NextResponse.json({ error: "cartId required" }, { status: 400 });
   }
 
-  const jar = await cookies();
-  jar.set(MEDUSA_CART_COOKIE, cartId, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 7,
-  });
+  try {
+    const sdk = createStorefrontMedusaSdk();
+    await sdk.store.cart.retrieve(cartId, { fields: "id" } as never);
+  } catch {
+    return NextResponse.json({ error: "Invalid cart" }, { status: 400 });
+  }
+
+  await writeCartCookie(cartId);
 
   return NextResponse.json({ ok: true });
 }
