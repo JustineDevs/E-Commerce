@@ -1,5 +1,13 @@
 /**
  * Single source for sidebar and command palette (Cmd+K) navigation.
+ *
+ * Sidebar groups (labels and order) match the staff back office IA:
+ * - Commerce: Dashboard, Products, Inventory, Orders, POS, Offline queue, CRM
+ * - Operations: Employees, Devices, Channels, Chat orders
+ * - Marketing: Analytics, Loyalty, Campaigns, Storefront home, Content, Reviews
+ * - Settings: Admin guide, Workspace UI, Payments, Receipts, Workflow, Audit log
+ *
+ * CMS deep links live in ADMIN_COMMAND_CMS_GROUPS (Cmd+K), not every item in the narrow sidebar.
  */
 export type AdminNavItem = {
   href: string;
@@ -58,6 +66,12 @@ export const ADMIN_NAV_GROUPS: { label: string; items: readonly AdminNavItem[] }
         icon: "article",
         permission: "content:read",
       },
+      {
+        href: "/admin/reviews",
+        label: "Reviews",
+        icon: "rate_review",
+        permission: "content:read",
+      },
     ],
   },
   {
@@ -66,7 +80,7 @@ export const ADMIN_NAV_GROUPS: { label: string; items: readonly AdminNavItem[] }
       { href: "/admin/docs", label: "Admin guide", icon: "menu_book", permission: "dashboard:read" },
       {
         href: "/admin/settings/preferences",
-        label: "Preferences",
+        label: "Workspace UI",
         icon: "tune",
         permission: "settings:read",
       },
@@ -104,6 +118,12 @@ export const ADMIN_COMMAND_CMS_GROUPS: { label: string; items: readonly AdminNav
     label: "Content (website)",
     items: [
       { href: "/admin/cms/pages", label: "Pages", icon: "article", permission: "content:read" },
+      {
+        href: "/admin/cms/site-map",
+        label: "Content site map",
+        icon: "account_tree",
+        permission: "content:read",
+      },
       {
         href: "/admin/cms/navigation",
         label: "Navigation and footer",
