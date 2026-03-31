@@ -56,11 +56,6 @@
       "sourceType": "github",
       "computedHash": "645b891da1edbae76ab79c7b088d4e73397464f8396edaf773c0e01971ce75d6"
     },
-    "lemonsqueezy-ui-skills": {
-      "source": "ihlamury/design-skills",
-      "sourceType": "github",
-      "computedHash": "fec10108a56b5e4a5a998d99e453e0142c92d58f73955b566c2cf7bf8da1fcdc"
-    },
     "nextjs-performance": {
       "source": "giuseppe-trisciuoglio/developer-kit",
       "sourceType": "github",
@@ -80,6 +75,11 @@
       "source": "coreyhaines31/marketingskills",
       "sourceType": "github",
       "computedHash": "c6384f24bb0203f8aa98b23b55d35b9e6721b94532a0e7965215c340ae96f1e0"
+    },
+    "resend": {
+      "source": "resend/resend-skills",
+      "sourceType": "github",
+      "computedHash": "e4939d78ff00adc577d54a0f4a669b02fde63ae4cea7e20b7ed7284cd74e9360"
     },
     "responsive-design": {
       "source": "supercent-io/skills-template",
