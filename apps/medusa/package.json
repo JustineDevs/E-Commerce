@@ -22,17 +22,22 @@
     "import:legacy-inventory": "medusa exec ./src/scripts/import-legacy-inventory-jsonl.ts",
     "start": "medusa start",
     "dev": "medusa develop",
-    "test:integration:http": "TEST_TYPE=integration:http NODE_OPTIONS=--experimental-vm-modules jest --silent=false --runInBand --forceExit",
-    "test:integration:modules": "TEST_TYPE=integration:modules NODE_OPTIONS=--experimental-vm-modules jest --silent=false --runInBand --forceExit",
-    "test:unit": "TEST_TYPE=unit NODE_OPTIONS=--experimental-vm-modules jest --silent --runInBand --forceExit",
-    "test:stress": "node --import tsx/esm --test src/lib/aftership-webhook-dedup.stress.test.ts src/lib/lemon-webhook-dedup.stress.test.ts src/lib/lemon-webhook-dedup-failclosed.stress.test.ts src/lib/paymongo-webhook-dedup.stress.test.ts src/loaders/validate-process-env.stress.test.ts"
+    "test:integration:http": "node scripts/run-jest.cjs integration:http -- --silent=false --runInBand --forceExit",
+    "test:integration:modules": "node scripts/run-jest.cjs integration:modules -- --silent=false --runInBand --forceExit",
+    "test:unit": "node scripts/run-jest.cjs unit -- --silent --runInBand --forceExit",
+    "test:stress": "node --import tsx/esm --test src/lib/aftership-webhook-dedup.stress.test.mts src/lib/paymongo-webhook-dedup.stress.test.mts src/loaders/validate-process-env.stress.test.mts"
   },
   "dependencies": {
+    "@aftership/tracking-sdk": "^15.0.1",
+    "@apparel-commerce/payment-connection-crypto": "workspace:*",
+    "@apparel-commerce/resend-mail": "workspace:*",
+    "@apparel-commerce/types": "workspace:*",
+    "@paypal/paypal-server-sdk": "^2.0.0",
     "@supabase/supabase-js": "^2.45.0",
+    "tsx": "^4.19.0",
     "zod": "^3.23.8",
     "@medusajs/payment-stripe": "2.13.1",
     "pg": "^8.13.1",
-    "resend": "^4.0.0",
     "@medusajs/admin-sdk": "2.13.1",
     "@medusajs/admin-shared": "2.13.1",
     "@medusajs/cli": "2.13.1",
@@ -42,6 +47,7 @@
     "@medusajs/medusa": "2.13.1"
   },
   "devDependencies": {
+    "@medusajs/utils": "2.13.1",
     "@opentelemetry/exporter-zipkin": "^2.0.0",
     "@types/pg": "^8.11.10",
     "@medusajs/test-utils": "2.13.1",
@@ -56,7 +62,6 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "ts-node": "^10.9.2",
-    "tsx": "^4.19.0",
     "typescript": "^5.6.2",
     "vite": "^5.4.14",
     "yalc": "^1.0.0-pre.53"
