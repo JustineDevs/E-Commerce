@@ -790,6 +790,7 @@ export default async function seedDemoData({ container }: ExecArgs) {
           ],
         },
         {
+          // PHP variant prices: Philippines storefront uses `region_id` from seed:ph; without them the store API omits this handle for that region (PDP 404).
           title: "Medusa Shorts",
           category_ids: [
             categoryResult.find((cat) => cat.name === "Merch")!.id,
@@ -830,6 +831,10 @@ export default async function seedDemoData({ container }: ExecArgs) {
                   amount: 15,
                   currency_code: "usd",
                 },
+                {
+                  amount: 85000,
+                  currency_code: "php",
+                },
               ],
             },
             {
@@ -846,6 +851,10 @@ export default async function seedDemoData({ container }: ExecArgs) {
                 {
                   amount: 15,
                   currency_code: "usd",
+                },
+                {
+                  amount: 85000,
+                  currency_code: "php",
                 },
               ],
             },
@@ -864,6 +873,10 @@ export default async function seedDemoData({ container }: ExecArgs) {
                   amount: 15,
                   currency_code: "usd",
                 },
+                {
+                  amount: 85000,
+                  currency_code: "php",
+                },
               ],
             },
             {
@@ -880,6 +893,10 @@ export default async function seedDemoData({ container }: ExecArgs) {
                 {
                   amount: 15,
                   currency_code: "usd",
+                },
+                {
+                  amount: 85000,
+                  currency_code: "php",
                 },
               ],
             },
