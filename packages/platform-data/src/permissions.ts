@@ -26,6 +26,7 @@ export const STAFF_PERMISSION_KEYS = [
   "settings:write",
   "content:read",
   "content:write",
+  "content:publish",
   "employees:read",
   "employees:write",
   "loyalty:read",
@@ -90,6 +91,18 @@ export function staffHasPermission(
     return true;
   }
   return permissions.includes(key);
+}
+
+/**
+ * Permission check for API routes and RSC: uses {@link staffPermissionListForSession}
+ * so admin role resolves to `*` when the JWT snapshot is empty.
+ * Prefer this over `staffHasPermission(session.user.permissions ?? [], key)`.
+ */
+export function staffSessionAllows(
+  session: StaffSessionLike,
+  key: string,
+): boolean {
+  return staffHasPermission(staffPermissionListForSession(session), key);
 }
 
 /**
