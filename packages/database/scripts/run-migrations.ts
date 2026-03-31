@@ -1,5 +1,8 @@
 /**
- * Applies `supabase/migrations/*.sql` in order using Postgres (no Supabase CLI).
+ * Applies listed `supabase/migrations/*.sql` in order using Postgres (no Supabase CLI).
+ * Filenames are explicit in MIGRATION_FILES so order stays stable.
+ * When you add `supabase/migrations/0xx_*.sql`, append the filename here in numeric order
+ * (the script does not auto-discover files).
  * Uses LEGACY_DATABASE_URL (Supabase pooler URI) from repo root `.env`.
  *
  * For `supabase db push` instead, install the Supabase CLI globally and run:
@@ -24,6 +27,19 @@ const MIGRATION_FILES = [
   "008_storefront_reviews_cart.sql",
   "009_medusa_reference_columns.sql",
   "010_pos_offline_commit_idempotency.sql",
+  "011_storefront_public_metadata.sql",
+  "012_product_reviews_moderation.sql",
+  "013_payment_connections.sql",
+  "014_payment_connections_envelope_crypto.sql",
+  "015_drop_accidental_medusa_core_tables_from_legacy.sql",
+  "016_rls_payment_connections_staff.sql",
+  "017_payment_connections_aftership.sql",
+  "018_outbox_events.sql",
+  "019_background_jobs.sql",
+  "020_storefront_profiles_product_qa.sql",
+  "021_cms_content_navigation_expansion.sql",
+  "022_cms_sprint_extensions.sql",
+  "023_remove_lemonsqueezy_payment_connections.sql",
   "enable_rls.sql",
   "rls_deny_anon_sensitive.sql",
 ] as const;
