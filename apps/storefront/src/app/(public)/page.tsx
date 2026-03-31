@@ -7,6 +7,7 @@ import {
   buildJsonLdOrganization,
   buildJsonLdWebSite,
   canonicalUrl,
+  SITE_NAME,
 } from "@/lib/seo";
 
 const HomeScrollExperience = nextDynamic(
@@ -42,11 +43,11 @@ export default async function HomePage() {
         <div className="mx-auto max-w-2xl space-y-6 pt-8">
           <div>
             <h1 className="font-headline text-3xl font-extrabold text-primary">
-              Maharlika Apparel Custom
+              {SITE_NAME}
             </h1>
             <p className="mt-2 text-on-surface-variant">
-              Online store for custom apparel. Browse, order, and track
-              shipments.{" "}
+              The storefront is not loading products right now. When the catalog
+              is available, you can browse, order, and track shipments.{" "}
               <Link
                 href="/privacy"
                 className="font-medium text-primary underline underline-offset-4"
