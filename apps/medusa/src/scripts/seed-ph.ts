@@ -30,14 +30,6 @@ const LEGACY_LOC_META_KEY = "legacy_inventory_location_code";
 /** Aligns with `medusa-config.ts` provider registration (pp_{id}_{id}). */
 function buildPaymentProviderIdsForSeed(): string[] {
   const ids: string[] = ["pp_system_default", "pp_cod_cod"];
-  if (
-    process.env.LEMONSQUEEZY_API_KEY?.trim() &&
-    process.env.LEMONSQUEEZY_STORE_ID?.trim() &&
-    process.env.LEMONSQUEEZY_CHECKOUT_VARIANT_ID?.trim() &&
-    process.env.LEMONSQUEEZY_WEBHOOK_SECRET?.trim()
-  ) {
-    ids.push("pp_lemonsqueezy_lemonsqueezy");
-  }
   if (process.env.STRIPE_API_KEY?.trim()) {
     ids.push("pp_stripe_stripe");
   }
