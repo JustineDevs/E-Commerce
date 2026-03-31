@@ -24,27 +24,6 @@ Step-by-step guide for non-technical users. Each section explains where to go, w
 
 ---
 
-## Lemon Squeezy (International Payments)
-
-**URL:** https://app.lemonsqueezy.com
-
-**What you get:** API Key, Store ID, Checkout Variant ID, Webhook Signing Secret. Used for card payments, Stripe, and PayPal via Lemon Squeezy.
-
-**Payment required?** No signup fee. Lemon Squeezy takes a percentage per transaction.
-
-**Steps:**
-
-1. Go to https://app.lemonsqueezy.com and sign up or log in.
-2. Create or select your **Store**.
-3. Go to **Settings** (gear icon) → **Store** → enable **Stripe** and **PayPal** as payment methods.
-4. Go to **Settings** → **API**.
-5. Click **Create API key**. Copy the key (you will not see it again).
-6. On the same page, note your **Store ID**.
-7. Go to **Products** → create or select a product → copy the **Checkout Variant ID**.
-8. Go to **Settings** → **Webhooks** → **Add endpoint**. Enter your webhook URL (a developer will provide this). Copy the **Signing Secret**.
-
----
-
 ## Stripe (Card Payments)
 
 **URL:** https://dashboard.stripe.com
@@ -146,7 +125,6 @@ Step-by-step guide for non-technical users. Each section explains where to go, w
 | Service      | Signup fee | To get API keys      | For live transactions  |
 |-------------|------------|----------------------|------------------------|
 | Render      | No         | Free tier OK         | Paid plans for always-on |
-| Lemon Squeezy | No       | Free                 | % per transaction      |
 | Stripe      | No         | Free                 | % per transaction      |
 | PayPal      | No         | Free                 | % per transaction      |
 | PayMongo    | No         | KYC required         | % per transaction      |
