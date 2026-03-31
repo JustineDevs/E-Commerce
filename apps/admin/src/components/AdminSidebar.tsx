@@ -2,12 +2,12 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import maharlikaLogo from "../../../../public/Maharlika Logo Design.png";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { staffHasPermission, staffPermissionListForSession } from "@apparel-commerce/platform-data";
 import { Button } from "@apparel-commerce/ui";
 import { ADMIN_NAV_GROUPS } from "@/config/admin-nav";
+import { AdminProfilePreferencesDialog } from "@/components/AdminProfilePreferencesDialog";
 
 function cn(...parts: Array<string | false | undefined>) {
   return parts.filter(Boolean).join(" ");
@@ -46,12 +46,13 @@ export function AdminSidebar({
           className="block overflow-x-auto rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
         >
           <Image
-            src={maharlikaLogo}
-            width={maharlikaLogo.width}
-            height={maharlikaLogo.height}
-            alt="Maharlika Clothing Custom"
+            src="/brand/maharlika-logo-design.svg"
+            width={1536}
+            height={1024}
+            alt="Maharlika Apparel Custom, admin home"
             priority
-            className="block h-28 w-auto max-w-none object-contain object-left"
+            unoptimized
+            className="block h-28 w-auto max-w-[min(100%,260px)] object-contain object-left"
           />
         </Link>
         <p className="mt-1 text-[10px] font-medium uppercase tracking-widest text-slate-400">
@@ -78,6 +79,7 @@ export function AdminSidebar({
                     key={item.href}
                     href={item.href}
                     onClick={() => onNavigate?.()}
+                    aria-current={isActive ? "page" : undefined}
                     className={
                       isActive
                         ? "flex items-center gap-3 rounded-lg bg-white px-4 py-3 text-primary shadow-sm transition-all"
@@ -110,16 +112,8 @@ export function AdminSidebar({
         </button>
       ) : null}
       <div className="mt-auto flex flex-col gap-1 border-t border-slate-200 pt-4">
-        <div className="mb-2 flex items-center gap-3 px-4 py-3">
-          <div className="h-8 w-8 overflow-hidden rounded-full bg-surface-container-high" />
-          <div className="flex min-w-0 flex-col overflow-hidden">
-            <span className="truncate text-xs font-bold text-primary">
-              {session?.user?.email ?? "Staff"}
-            </span>
-            <span className="truncate text-[10px] capitalize text-slate-500">
-              {session?.user?.role ?? "staff"}
-            </span>
-          </div>
+        <div className="px-2">
+          <AdminProfilePreferencesDialog />
         </div>
         <Button
           type="button"
