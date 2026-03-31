@@ -1,23 +1,11 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
 import { tryCreateSupabaseClient } from "@apparel-commerce/database";
 import { logAdminApiEvent } from "@/lib/admin-api-log";
 import { gateChannelWebhookSecretConfigured } from "@/lib/channel-webhook-policy";
+import { verifyChannelWebhookSignature } from "@/lib/channel-webhook-signature";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson } from "@/lib/staff-api-response";
 
 export const dynamic = "force-dynamic";
-
-function verifySignature(rawBody: string, secret: string, headerSig: string): boolean {
-  const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
-  try {
-    const a = Buffer.from(headerSig.trim(), "utf8");
-    const b = Buffer.from(expected, "utf8");
-    if (a.length !== b.length) return false;
-    return timingSafeEqual(a, b);
-  } catch {
-    return false;
-  }
-}
 
 export async function POST(req: Request) {
   const correlationId = getCorrelationId(req);
@@ -39,7 +27,7 @@ export async function POST(req: Request) {
   }
   if (secret) {
     const sig = req.headers.get("x-channel-signature") ?? "";
-    if (!verifySignature(raw, secret, sig)) {
+    if (!verifyChannelWebhookSignature(raw, secret, sig)) {
       logAdminApiEvent({
         route: "POST /api/integrations/channels/webhook",
         correlationId,
