@@ -14,7 +14,7 @@ const MAX_PER_WINDOW = 60;
 
 export async function POST(req: Request) {
   const ip = getRequestIp(req);
-  const rl = rateLimitFixedWindow(`tracking-link:${ip}`, MAX_PER_WINDOW, WINDOW_MS);
+  const rl = await rateLimitFixedWindow(`tracking-link:${ip}`, MAX_PER_WINDOW, WINDOW_MS);
   if (!rl.ok) {
     return NextResponse.json(
       { error: "Too many requests", retryAfter: rl.retryAfterSec },
