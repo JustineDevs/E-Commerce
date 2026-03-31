@@ -104,7 +104,7 @@ This document specifies the Product Requirements for an apparel commerce platfor
 
 #### A5. Checkout Page
 - Billing and shipping address capture
-- Lemon Squeezy hosted payment form
+- Hosted payment flow via configured Medusa payment providers (e.g. Stripe, PayPal, PayMongo, Maya)
 - Order review before payment
 - Payment success confirmation
 
@@ -238,7 +238,7 @@ This document specifies the Product Requirements for an apparel commerce platfor
 **Why**: Historical accuracy; catalog changes don't mutate order history
 
 #### D3. Payment Records
-- Payment provider: Lemon Squeezy
+- Payment provider: per enabled Medusa integration (e.g. Stripe, PayPal, PayMongo, Maya)
 - Payment status: Pending, Paid, Failed, Refunded
 - External payment ID
 - Payment timestamp
@@ -259,7 +259,7 @@ This document specifies the Product Requirements for an apparel commerce platfor
 
 ***
 
-### E. Payments (Lemon Squeezy Integration)
+### E. Payments (Medusa payment providers)
 
 #### E1. Hosted Checkout
 - Payment link generated per order
@@ -359,7 +359,7 @@ This document specifies the Product Requirements for an apparel commerce platfor
 
 ### Security
 - HTTPS everywhere
-- Payment data via Lemon Squeezy (PCI compliance delegated)
+- Payment data handled by configured PSPs and hosted checkouts (PCI scope reduced)
 - OAuth for authentication (no password storage)
 - Environment variables for secrets
 - SQL injection / XSS prevention
@@ -381,7 +381,7 @@ This document specifies the Product Requirements for an apparel commerce platfor
 - **Monorepo**: Turborepo + pnpm
 - **Styling**: Tailwind CSS + shadcn/ui
 - **Auth**: NextAuth/Auth.js with Google provider
-- **Payments**: Lemon Squeezy API + SDK
+- **Payments**: Medusa payment modules and official PSP SDKs or typed clients where applicable
 - **Shipping**: AfterShip SDK + J&T Express Philippines
 
 ### Deployment
@@ -402,7 +402,7 @@ This document specifies the Product Requirements for an apparel commerce platfor
 | Inventory accuracy | 98%+ | Prevents overselling |
 | Order-to-ship time | < 24 hours | Competitive advantage |
 | Customer support tickets (shipping) | < 5% of orders | AfterShip tracking reduces inquiries |
-| Payment success rate | > 98% | Lemon Squeezy reliability |
+| Payment success rate | > 98% | PSP uptime and checkout quality |
 | Uptime | 99.5% | SLA commitment |
 
 ***
@@ -433,7 +433,7 @@ This document specifies the Product Requirements for an apparel commerce platfor
 ### Constraints
 - Philippines-first focus (localised for PH tax, carriers, currency)
 - No legacy system data migration in scope
-- Payment provider limited to Lemon Squeezy for Phase 1
+- Phase 1 uses a defined set of Medusa-configured payment providers (see technical docs)
 - Shipping limited to J&T Express initially
 
 ***
@@ -444,7 +444,7 @@ This document specifies the Product Requirements for an apparel commerce platfor
 |---|---|---|
 | **Phase 1: Foundation** | Weeks 1–2 | Monorepo setup, database schema, auth scaffold, API skeleton |
 | **Phase 2: Catalog** | Weeks 2–3 | Product catalog, variant management, inventory APIs, admin UI |
-| **Phase 3: Checkout** | Weeks 3–4 | Storefront, cart, Lemon Squeezy integration, payment webhooks |
+| **Phase 3: Checkout** | Weeks 3–4 | Storefront, cart, payment provider integration, payment webhooks |
 | **Phase 4: Fulfillment** | Weeks 4–5 | POS, orders hub, AfterShip integration, tracking page |
 | **Phase 5: QA & Launch** | Weeks 5–6 | Testing, staging deploy, production launch, SOP handoff |
 
@@ -469,7 +469,7 @@ This document specifies the Product Requirements for an apparel commerce platfor
 - **POS**: Point-of-Sale terminal for in-store transactions
 - **OMS**: Order Management System
 - **AfterShip**: Third-party shipping tracking and label provider
-- **Lemon Squeezy**: Third-party payment processor and merchant of record
+- **Payment processor**: Third-party PSP (e.g. Stripe, PayPal) as configured per deployment
 - **Webhook**: HTTP callback from external service (payment confirmed, shipment updated)
 
 ***
@@ -512,7 +512,7 @@ The Project includes:
 - Admin dashboard and POS terminal
 - Order management system
 - Inventory management system
-- Integration with Lemon Squeezy for payments
+- Integration with configured payment providers for checkout and webhooks
 - Integration with AfterShip and J&T Express for shipping
 
 ***
@@ -528,7 +528,7 @@ Provider will deliver the following components:
 3. **Fully functional storefront** with product browsing, cart, and checkout
 4. **Admin dashboard** with inventory, orders, and analytics
 5. **POS terminal** for in-store sales
-6. **Lemon Squeezy payment integration** with webhook processing
+6. **Payment provider integration** with webhook processing
 7. **AfterShip and J&T Express integration** for shipment tracking
 8. **Deployment configuration** for production environments (CI/CD, Docker if applicable)
 9. **Documentation** including setup guides, API docs, and operational SOPs
@@ -674,7 +674,7 @@ Provider does NOT warrant:
 
 - Uninterrupted uptime or zero defects
 - Specific performance benchmarks beyond those in the PRD
-- Third-party services (Lemon Squeezy, AfterShip, Supabase) availability
+- Third-party services (payment processors, AfterShip, Supabase) availability
 - Fitness for purposes not described in this Agreement
 
 ### 8.3 Limitation of Liability
@@ -692,7 +692,7 @@ In no event shall Provider be liable for:
 Client agrees to:
 
 - Provide timely feedback and approval on deliverables
-- Provide third-party API keys (Lemon Squeezy, AfterShip, Google OAuth)
+- Provide third-party API keys (payment processors, AfterShip, Google OAuth)
 - Arrange and pay for hosting services (Vercel, Supabase, Render, etc.)
 - Test the application thoroughly before production launch
 - Maintain regular backups
@@ -790,7 +790,7 @@ Client will pay for and maintain:
 - Vercel hosting (storefront/admin)
 - Supabase Postgres database
 - Render or similar (API server)
-- Third-party API services (Lemon Squeezy, AfterShip, Google Cloud)
+- Third-party API services (payment processors, AfterShip, Google Cloud)
 - Email/domain services
 
 Estimated monthly infrastructure cost: **[Amount] PHP**, variable based on usage.
@@ -943,8 +943,7 @@ Company (if applicable): ________________________
 
 **Client will provide by [Date]:**
 
-- Lemon Squeezy API Key (Live and Test)
-- Lemon Squeezy Webhook Secret
+- Payment provider API keys and webhook secrets as required for enabled integrations (live and test)
 - AfterShip API Key
 - Google Cloud OAuth Client ID and Secret
 - Supabase project URL and API key (if Client creates account)
