@@ -96,14 +96,14 @@ Source: `packages/database/supabase/migrations/*.sql` (and `seed.sql` where note
 | `product_reviews` | Commerce-adjacent | Must key by Medusa `product` identity (slug or id); not a second catalog. |
 | `cart_abandonment_events` | Derived / analytics | No authoritative cart; event stream only. |
 
-**Medusa tables** (not listed here): live in the Medusa Postgres database (`DATABASE_URL` for `apps/medusa`); catalog, cart, order, payment, inventory, customer (commerce) live there.
+**Medusa tables** (not listed here): live in the Medusa Postgres database (`DATABASE_URL` for `apps/medusa`); catalog, cart, order, payment, inventory, customer (commerce) live there. Schema reference: `internal/docs/exclusive/medusadb/schema.sql`. If the Supabase project (`LEGACY_DATABASE_URL`) ever held mistaken copies of those `public` table names, migration `015_drop_accidental_medusa_core_tables_from_legacy.sql` removes them (apply only to legacy, never to Medusa `DATABASE_URL`).
 
 ---
 
 ## Appendix B: PR and ADR gate
 
 - Every PR that adds tables, migrations, or cross-system writes: complete the checklist in `.github/pull_request_template.md`.
-- Architecture decision: **`docs/adr/0001-data-ownership.md`**.
+- Architecture decision: **`docs/archived/adr/0001-data-ownership.md`**.
 
 ---
 
@@ -122,13 +122,14 @@ Mappings below are **legacy Supabase columns → meaning**. Medusa entity defini
 | `loyalty_transactions.medusa_order_id` | Explicit Medusa order reference (migration **009**); new inserts set both. |
 | `loyalty_rewards.*` | Reward catalog metadata only; discount **amounts** at checkout remain Medusa promotions/pricing. |
 
-### Reviews (`008` + **009**)
+### Reviews (`008` + **009** + **012**)
 
 | Legacy column | Role |
 |---------------|------|
 | `product_reviews.medusa_product_id` | **Required** on new inserts; Medusa `product.id`. |
 | `product_reviews.product_slug` | Denormalized handle for URLs and legacy rows before backfill. |
 | `product_reviews.rating`, `body`, `author_name` | UGC only; no product catalog fields. |
+| `product_reviews.status`, moderation + verification columns | **012**: `pending` / `approved` / `rejected` / `hidden`; purchase proof references Medusa orders only (not Supabase as commerce authority). |
 
 ### Campaigns (`004_retail_operations.sql`)
 
