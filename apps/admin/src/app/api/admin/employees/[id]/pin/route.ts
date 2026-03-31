@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { getServerSession } from "next-auth/next";
-import { staffHasPermission } from "@apparel-commerce/database";
+import { staffSessionAllows } from "@apparel-commerce/database";
 import {
   setEmployeePin,
   verifyEmployeePin,
@@ -16,7 +16,7 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
   const cid = getCorrelationId(req);
   const session = await getServerSession(authOptions);
   if (!session?.user) return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
-  if (!staffHasPermission(session.user.permissions ?? [], "employees:write")) {
+  if (!staffSessionAllows(session, "employees:write")) {
     return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
   }
   const { id } = await ctx.params;
