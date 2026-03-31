@@ -27,7 +27,7 @@ Current repository structure and reference. Use this to orient agents and contri
 - **.cursor/** – Agent rules, commands, skills, LLM context
   - `commands/` – Cursor commands (audit, docs, hardening, QA, repo-map, trace, etc.).
   - `rules/` – Project rules and standards.
-  - `llm/` – LLM context and indexed docs (Lemon Squeezy, AfterShip, etc.).
+  - `llm/` – LLM context and indexed docs (payments, AfterShip, etc.).
 
 - **.github/** – Workflows, issue/PR templates (if present)
 
