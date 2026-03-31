@@ -3,8 +3,17 @@
  *
  * Re-exports platform data from @apparel-commerce/platform-data.
  * Supabase = identity, RBAC, compliance, audit only. Medusa owns commerce.
- * See ADR-0002 and internal/docs/SOP-DATABASE-OWNERSHIP.md
+ * See `data-boundaries.ts`, ADR-0002, and docs/data-ownership.md.
  */
+export {
+  LEGACY_TABLE_BINDINGS,
+  MEDUSA_COMMERCE_DOMAINS,
+  MEDUSA_EXCLUSIVE_TABLE_NAMES,
+  isMedusaExclusiveTableName,
+  type AppSurface,
+  type LegacyTableBinding,
+  type LegacyTableKind,
+} from "./data-boundaries";
 export {
   createSupabaseClient,
   tryCreateSupabaseClient,
@@ -19,6 +28,7 @@ export {
   isStaffRbacStrictEnv,
   staffHasPermission,
   staffPermissionListForSession,
+  staffSessionAllows,
   resolveStaffPermissionsForUserId,
   type StaffPermissionKey,
   type StaffSessionLike,
