@@ -10,7 +10,6 @@ const EXACT: Record<string, string> = {
   pp_stripe_stripe: "Stripe",
   pp_maya_maya: "Maya",
   pp_paymongo_paymongo: "PayMongo",
-  pp_lemonsqueezy_lemonsqueezy: "Lemon Squeezy",
 };
 
 const STRIPE_SUFFIX = /^pp_stripe-(.+)_stripe$/;
