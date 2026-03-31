@@ -24,3 +24,6 @@ build
 !.yarn/versions
 
 .medusa
+
+# Jest (explicit cache dir in jest.config.cjs)
+.jest-cache/
