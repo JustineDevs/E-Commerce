@@ -11,7 +11,7 @@
   },
   "scripts": {
     "lint": "eslint src --ext .ts",
-    "test": "node --import tsx/esm --test src/shop-catalog.contract.test.ts src/validation.stress.test.ts"
+    "test": "node --import tsx/esm --test src/shop-catalog.contract.test.ts src/validation.stress.test.ts src/http-schemas.test.ts"
   },
   "dependencies": {
     "zod": "^3.23.0"
