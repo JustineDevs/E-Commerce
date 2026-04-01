@@ -482,7 +482,7 @@ Short guide to **what appears to the right of the sidebar** for every staff dest
 ## 7. Authentication (`lib/auth.ts`)
 
 - **Provider:** Google OAuth (`GoogleProvider`).
-- **Env:** `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL` (admin often uses `apps/admin/.env.local` for port `3001`).
+- **Env:** Root `.env`: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL` (storefront), and `ADMIN_NEXTAUTH_URL` (e.g. `http://localhost:3001` for staff OAuth on the admin origin).
 - **Sign-in flow:** `signIn` callback uses Supabase `tryCreateSupabaseClient`, `upsertOAuthUser`, `isStaffRole`; optional allowlist `ADMIN_ALLOWED_EMAILS` (comma-separated).
 - **JWT/session:** Permissions loaded via `resolveStaffPermissionsForUserId` with **in-memory cache** (`PERMISSIONS_CACHE_TTL_MS` = 60s) keyed by email.
 - **Session object:** Includes `user.permissions` (string array) for RBAC in UI and API routes.
