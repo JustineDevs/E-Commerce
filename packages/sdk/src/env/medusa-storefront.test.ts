@@ -27,6 +27,8 @@ const ENV_KEYS = [
   "MEDUSA_PUBLISHABLE_API_KEY",
   "NEXT_PUBLIC_MEDUSA_REGION_ID",
   "MEDUSA_REGION_ID",
+  "NEXT_PUBLIC_MEDUSA_SALES_CHANNEL_ID",
+  "MEDUSA_SALES_CHANNEL_ID",
   "NEXT_PUBLIC_MEDUSA_URL",
   "MEDUSA_BACKEND_URL",
 ];
@@ -70,6 +72,19 @@ describe("medusa-storefront env", () => {
     );
   });
 
+  it("assertMedusaStorefrontEnvProduction: throws when production and sales channel ID missing", () => {
+    process.env.NODE_ENV = "production";
+    process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY = "pk_123";
+    process.env.NEXT_PUBLIC_MEDUSA_REGION_ID = "reg_123";
+    delete process.env.NEXT_PUBLIC_MEDUSA_SALES_CHANNEL_ID;
+    delete process.env.MEDUSA_SALES_CHANNEL_ID;
+    process.env.NEXT_PUBLIC_MEDUSA_URL = "https://api.example.com";
+    assert.throws(
+      () => assertMedusaStorefrontEnvProduction(),
+      /NEXT_PUBLIC_MEDUSA_SALES_CHANNEL_ID/,
+    );
+  });
+
   it("assertMedusaStorefrontEnvProduction: throws when production and URL is localhost", () => {
     process.env.NODE_ENV = "production";
     process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY = "pk_123";
@@ -89,6 +104,7 @@ describe("medusa-storefront env", () => {
     process.env.NODE_ENV = "production";
     process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY = "pk_123";
     process.env.NEXT_PUBLIC_MEDUSA_REGION_ID = "reg_123";
+    process.env.NEXT_PUBLIC_MEDUSA_SALES_CHANNEL_ID = "sc_123";
     process.env.NEXT_PUBLIC_MEDUSA_URL = "https://api.example.com";
     assert.doesNotThrow(() => assertMedusaStorefrontEnvProduction());
   });
@@ -103,6 +119,7 @@ describe("medusa-storefront env", () => {
     process.env.NODE_ENV = "production";
     process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY = "pk_123";
     process.env.NEXT_PUBLIC_MEDUSA_REGION_ID = "reg_123";
+    process.env.NEXT_PUBLIC_MEDUSA_SALES_CHANNEL_ID = "sc_123";
     process.env.MEDUSA_BACKEND_URL = "http://localhost:9000";
     process.env.NEXT_PUBLIC_MEDUSA_URL = "https://api.example.com";
     assert.doesNotThrow(() => assertMedusaStorefrontEnvProduction());
