@@ -59,19 +59,8 @@ export const PAYMENT_PROVIDER_LABELS: Record<PaymentProviderKey, string> = {
   COD: "Cash on delivery (COD)",
 };
 
-/** Providers where payment is completed inline (embedded) on the storefront. */
-export const EMBEDDED_PROVIDERS: ReadonlySet<PaymentProviderKey> = new Set([
-  "STRIPE",
-  "PAYPAL",
-]);
-
 function isCodProviderId(providerId: string): boolean {
   return providerId === PAYMENT_PROVIDER_IDS.COD || providerId.includes("cod_cod");
-}
-
-/** Returns true if the provider key uses embedded checkout instead of redirect. */
-export function isEmbeddedProvider(key: PaymentProviderKey): boolean {
-  return EMBEDDED_PROVIDERS.has(key);
 }
 
 export async function startMedusaCheckout(input: {
