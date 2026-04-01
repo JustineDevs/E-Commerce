@@ -173,7 +173,6 @@ test.describe("Medusa HTTP matrix", () => {
     }
     expect(res.ok()).toBeTruthy();
     const body = (await res.json()) as {
-      credentialSource?: string;
       configuredCount?: number;
       providers?: Record<string, unknown>;
     };
