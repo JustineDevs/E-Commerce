@@ -67,6 +67,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
+      testIgnore: "**/storefront-api-security-rate-limit.spec.ts",
       use: { ...devices["Desktop Chrome"] },
     },
     {
