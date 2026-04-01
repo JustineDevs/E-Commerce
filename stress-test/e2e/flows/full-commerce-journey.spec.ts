@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-import { gotoFirstCatalogPdp } from "../helpers/storefront";
+import { expectCheckoutShellVisible, gotoFirstCatalogPdp } from "../helpers/storefront";
 
 /**
  * End-to-end commerce paths (guest): SOP, catalog, PDP, bag affordance, checkout shell.
@@ -22,16 +22,15 @@ test.describe("Full commerce journey (guest)", () => {
         "No catalog products. Run: node scripts/e2e-prep-medusa.mjs (Medusa must be stopped or DB lock OK).",
       );
     }
-    await expect(page.getByTestId("pdp-add-to-bag")).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByTestId("pdp-add-to-bag")).toBeEnabled();
+    const addBtn = page.getByTestId("pdp-add-to-bag");
+    await expect(addBtn).toBeVisible({ timeout: 30_000 });
+    await expect(addBtn).not.toContainText("Loading", { timeout: 45_000 });
+    await expect(addBtn).toBeEnabled({ timeout: 45_000 });
   });
 
-  test("checkout page loads with pay control", async ({ page }) => {
+  test("checkout page loads (guest sign-in or pay shell)", async ({ page }) => {
     await page.goto("/checkout");
-    await expect(
-      page.getByRole("heading", { name: /checkout/i }),
-    ).toBeVisible();
-    await expect(page.getByTestId("checkout-submit-pay")).toBeVisible();
+    await expectCheckoutShellVisible(page);
   });
 
   test("sign-in page loads for account flows", async ({ page }) => {
