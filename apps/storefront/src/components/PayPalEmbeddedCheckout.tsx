@@ -25,8 +25,8 @@ export function PayPalEmbeddedCheckout({
     intent: "capture",
   };
 
-  const handleCreateOrder = useCallback((): string => {
-    return paypalOrderId;
+  const handleCreateOrder = useCallback((): Promise<string> => {
+    return Promise.resolve(paypalOrderId);
   }, [paypalOrderId]);
 
   const handleApprove = useCallback(
