@@ -3,6 +3,9 @@ import { test, expect } from "@playwright/test";
 const base =
   process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
 
+/** RFC 5737 documentation range; stable IP key for IP-scoped rate limits (avoids clashing with parallel suites). */
+const RL_TEST_FORWARDED_FOR = "203.0.113.79";
+
 test.describe.configure({ mode: "serial" });
 
 test.describe("attach-customer IP burst returns 429", () => {
@@ -14,6 +17,9 @@ test.describe("attach-customer IP burst returns 429", () => {
       const res = await request.post(`${base}/api/cart/attach-customer`, {
         data: {},
         failOnStatusCode: false,
+        headers: {
+          "X-Forwarded-For": RL_TEST_FORWARDED_FOR,
+        },
       });
       lastStatus = res.status();
       if (i < 25) {
