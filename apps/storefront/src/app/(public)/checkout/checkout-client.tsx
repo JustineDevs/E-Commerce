@@ -16,7 +16,6 @@ import {
   startMedusaCheckout,
   PAYMENT_PROVIDER_IDS,
   PAYMENT_PROVIDER_LABELS,
-  isEmbeddedProvider,
   type CodCartPayload,
   type PaymentProviderKey,
 } from "@/lib/medusa-checkout";
@@ -46,8 +45,11 @@ const SITE_ORIGIN = (
 
 export function CheckoutClient({
   initialResumeCartId,
+  initialStripeCheckoutCancel,
 }: {
   initialResumeCartId?: string;
+  /** Set when Stripe Checkout cancel_url lands on /checkout?stripe_cancel=1 */
+  initialStripeCheckoutCancel?: boolean;
 }) {
   const { data: session, status: authStatus } = useSession();
   const payInFlightRef = useRef(false);
@@ -144,6 +146,18 @@ export function CheckoutClient({
     );
   }, [providerAvailable, preferredKey]);
 
+  const paymentMethodChangeSkipRef = useRef(true);
+  useEffect(() => {
+    if (paymentMethodChangeSkipRef.current) {
+      paymentMethodChangeSkipRef.current = false;
+      return;
+    }
+    setPendingPayment(null);
+    setEmbeddedData(null);
+    setCopyDone(false);
+    setError(null);
+  }, [paymentMethod]);
+
   useEffect(() => {
     if (authStatus !== "authenticated" || !session?.user) {
       setProfileGate("idle");
@@ -169,6 +183,14 @@ export function CheckoutClient({
       setEmail((prev) => (prev.trim() === "" ? e : prev));
     }
   }, [profileGate, session?.user?.email]);
+
+  useEffect(() => {
+    if (initialStripeCheckoutCancel) {
+      setError(
+        "You left the card checkout before paying. Your bag is unchanged. Choose a payment method and continue when you are ready.",
+      );
+    }
+  }, [initialStripeCheckoutCancel]);
 
   const refresh = useCallback(() => {
     setLines(readCart());
@@ -323,19 +345,21 @@ export function CheckoutClient({
         return;
       }
 
-      if (isEmbeddedProvider(paymentMethod)) {
-        const sessionData = result as Record<string, unknown> & typeof result;
-        const stripeClientSecret =
-          typeof sessionData.stripeClientSecret === "string"
-            ? sessionData.stripeClientSecret
-            : undefined;
-        const paypalOrderId =
-          typeof sessionData.paypalOrderId === "string"
-            ? sessionData.paypalOrderId
-            : undefined;
+      const sessionData = result as Record<string, unknown> & typeof result;
+      const stripeClientSecret =
+        typeof sessionData.stripeClientSecret === "string"
+          ? sessionData.stripeClientSecret
+          : undefined;
+      const paypalOrderId =
+        typeof sessionData.paypalOrderId === "string"
+          ? sessionData.paypalOrderId
+          : undefined;
+      const useStripeElement = paymentMethod === "STRIPE" && Boolean(stripeClientSecret);
+      const usePayPalElement = paymentMethod === "PAYPAL" && Boolean(paypalOrderId);
 
+      if (useStripeElement || usePayPalElement) {
         setEmbeddedData({
-          provider: paymentMethod as "STRIPE" | "PAYPAL",
+          provider: useStripeElement ? "STRIPE" : "PAYPAL",
           stripeClientSecret,
           paypalOrderId,
           cartId,
@@ -489,9 +513,10 @@ export function CheckoutClient({
         Checkout
       </h1>
       <p className="font-body text-on-surface-variant mb-4 max-w-lg">
-        Review your bag and choose how to pay. Totals are confirmed when you continue. Card payments use
-        Stripe&apos;s secure payment form after you press continue; PayPal, GCash, PayMaya, and similar
-        options open on the provider&apos;s own page when you continue.
+        Review your bag and choose how to pay. We confirm the final total when you continue. For debit or
+        credit card, you will continue to a secure Stripe checkout page to enter your card. For PayPal,
+        GCash, or PayMaya, we send you to that provider&apos;s secure checkout when you continue. Cash on
+        delivery places your order here with no card step.
       </p>
       <p className="font-body text-sm text-on-surface-variant mb-12 max-w-lg rounded-lg border border-outline-variant/15 bg-surface-container-low/40 px-4 py-3">
         <span className="font-headline text-[10px] font-bold uppercase tracking-widest text-primary">
@@ -542,7 +567,7 @@ export function CheckoutClient({
                         {PAYMENT_PROVIDER_LABELS[key]}
                         {!ok ? (
                           <span className="mt-0.5 block text-xs text-on-surface-variant">
-                            Not enabled for checkout on your store region (or filtered by checkout settings).
+                            Not available for your area or store setup right now.
                           </span>
                         ) : null}
                       </span>
@@ -651,7 +676,7 @@ export function CheckoutClient({
               Your primary saved address from onboarding is on file.
               {paymentMethod === "COD"
                 ? " Cash on delivery ships to that address."
-                : " The payment step may still ask you to confirm shipping with the card or wallet provider."}
+                : " Some payment methods may ask you to confirm shipping or contact details before you pay."}
             </p>
             <p className="mt-3 text-sm text-on-surface-variant leading-relaxed">
               <strong className="text-primary">Buy online, pick up in store:</strong>{" "}
@@ -766,9 +791,8 @@ export function CheckoutClient({
                   Before you pay
                 </p>
                 <p className="text-sm text-on-surface-variant mb-3">
-                  Save this page or copy your tracking link. After payment you
-                  can return here without digging through email. Tracking updates
-                  when your cart completes to an order after payment.
+                  Save this page or copy your tracking link so you can find your order after you pay on the
+                  next screen. Your order status updates once payment succeeds.
                 </p>
                 <p className="font-mono text-[11px] break-all text-primary mb-3">
                   {pendingPayment.trackingPageUrl}
@@ -821,14 +845,15 @@ export function CheckoutClient({
 
             {embeddedData &&
               embeddedData.provider === "STRIPE" &&
-              embeddedData.stripeClientSecret && (
+              embeddedData.stripeClientSecret &&
+              paymentMethod === "STRIPE" && (
                 <div className="mt-6 rounded-lg border border-outline-variant/20 p-4">
                   <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3">
-                    Pay with your card (Stripe)
+                    Pay with your card
                   </p>
-                  <p className="text-xs text-on-surface-variant mb-3">
-                    Card details are collected with Stripe&apos;s Payment Element (official Stripe.js UI), not
-                    stored on this site.
+                  <p className="text-xs text-on-surface-variant mb-3 leading-relaxed">
+                    Enter your card in the secure form below. Your full card number is processed by our
+                    payment partner and is not stored on this shop&apos;s servers.
                   </p>
                   <StripeEmbeddedCheckout
                     clientSecret={embeddedData.stripeClientSecret}
@@ -844,10 +869,14 @@ export function CheckoutClient({
 
             {embeddedData &&
               embeddedData.provider === "PAYPAL" &&
-              embeddedData.paypalOrderId && (
+              embeddedData.paypalOrderId &&
+              paymentMethod === "PAYPAL" && (
                 <div className="mt-6 rounded-lg border border-outline-variant/20 p-4">
                   <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3">
                     Pay with PayPal
+                  </p>
+                  <p className="text-xs text-on-surface-variant mb-3 leading-relaxed">
+                    Sign in to PayPal or pay as a guest in the secure area below.
                   </p>
                   <PayPalEmbeddedCheckout
                     paypalOrderId={embeddedData.paypalOrderId}
@@ -878,10 +907,10 @@ export function CheckoutClient({
                   ? "Placing your order…"
                   : "Starting checkout…"
                 : pendingPayment || embeddedData
-                  ? "Checkout started: see above"
+                  ? "Next step above"
                   : paymentMethod === "COD"
                     ? "Place order (pay on delivery)"
-                    : "Continue to secure payment"}
+                    : "Continue to payment"}
             </button>
 
             {pendingPayment && (
@@ -896,8 +925,11 @@ export function CheckoutClient({
             )}
 
             <p className="text-xs text-on-surface-variant mt-4 text-center">
-              One primary action on this screen. You can still adjust quantities
-              above.
+              {paymentMethod === "COD" && !embeddedData && !pendingPayment ? (
+                <>Choose cash on delivery on the left, then place your order here. You can change quantities above.</>
+              ) : (
+                <>Follow the prompts above after you continue. You can still change quantities in your bag.</>
+              )}
             </p>
 
             <CheckoutTrustBadges />
