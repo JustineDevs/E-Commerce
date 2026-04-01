@@ -1,8 +1,16 @@
+import type { NextRequest } from "next/server";
 import NextAuth from "next-auth";
-import { authOptions } from "@/lib/auth";
+
+import { buildAuthOptions } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-const handler = NextAuth(authOptions);
+type NextAuthRouteContext = { params: Promise<{ nextauth: string[] }> };
 
-export { handler as GET, handler as POST };
+export async function GET(req: NextRequest, context: NextAuthRouteContext) {
+  return NextAuth(req, context, buildAuthOptions());
+}
+
+export async function POST(req: NextRequest, context: NextAuthRouteContext) {
+  return NextAuth(req, context, buildAuthOptions());
+}
