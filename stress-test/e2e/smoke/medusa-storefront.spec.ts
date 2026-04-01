@@ -1,5 +1,7 @@
 import { test, expect } from "@playwright/test";
 
+import { expectCheckoutShellVisible } from "../helpers/storefront";
+
 test.describe("Medusa-oriented storefront probes", () => {
   test("health/sop reports medusa commerce source", async ({ request }) => {
     const res = await request.get("/api/health/sop");
@@ -10,8 +12,6 @@ test.describe("Medusa-oriented storefront probes", () => {
 
   test("checkout page still loads for Medusa-only flow", async ({ page }) => {
     await page.goto("/checkout");
-    await expect(
-      page.getByRole("heading", { name: /checkout/i }),
-    ).toBeVisible();
+    await expectCheckoutShellVisible(page);
   });
 });
