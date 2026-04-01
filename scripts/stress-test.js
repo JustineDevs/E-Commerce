@@ -9,10 +9,10 @@
  *  2. Security check (sensitive files)
  *  3. Audit triage (check-audit-triage.js; aligns with release-gate)
  *  4. Unit/integration + Medusa stress
- *  5. E2E (Playwright smoke, flows)
+ *  5. E2E (Playwright smoke, flows, authenticated admin operations pass)
  *  6. Dogfood (visual screenshots)
  *
- * DB prep (optional, before E2E): pnpm e2e:prep — Medusa seed is skipped when the store API already has products; staff ensure is a no-op when the user is already staff/admin.
+ * DB prep (optional, before E2E): pnpm e2e:prep — Medusa seed is skipped when the store API already has products; staff ensure refreshes `staff_permission_grants` (`*`) for the first ADMIN_ALLOWED_EMAILS user when role is staff.
  *
  * Usage: node scripts/stress-test.js [options]
  *   --no-lint       Skip lint
