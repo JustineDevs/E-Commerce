@@ -1,4 +1,6 @@
 export { AdminPageShell, type AdminPageShellProps } from "./AdminPageShell";
+export { AdminPageHelpTip, AdminPageHelpFromPath } from "./AdminPageHelpTip";
+export { AdminPageTitleWithHelp } from "./AdminPageTitleWithHelp";
 export { CrudManagerLayout, type CrudManagerLayoutProps } from "./CrudManagerLayout";
 export {
   EntityActionBar,
