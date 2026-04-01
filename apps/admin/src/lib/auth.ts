@@ -60,9 +60,14 @@ async function getCachedStaffSnapshot(email: string): Promise<{
 
 const google = loadGoogleCredentials("admin");
 
-const e2eCredentialsEnabled = isAdminE2eCredentialsConfigured();
-
-export const authOptions: NextAuthOptions = {
+/**
+ * Build options per call so the App Router `[...nextauth]` handler can register the E2E
+ * Credentials provider using current `process.env` (matches `/sign-in/e2e`, which is evaluated
+ * per request). `export const authOptions` is still a one-time snapshot for `getServerSession`
+ * callers; JWT verification only needs a stable secret and callbacks.
+ */
+export function buildAuthOptions(): NextAuthOptions {
+  return {
   debug: process.env.NODE_ENV === "development",
   pages: {
     signIn: "/sign-in",
@@ -72,7 +77,7 @@ export const authOptions: NextAuthOptions = {
       clientId: google.clientId,
       clientSecret: google.clientSecret,
     }),
-    ...(e2eCredentialsEnabled
+    ...(isAdminE2eCredentialsConfigured()
       ? [
           CredentialsProvider({
             id: "e2e-credentials",
@@ -122,7 +127,7 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async signIn({ user, account }) {
       if (account?.provider === "e2e-credentials") {
-        if (!e2eCredentialsEnabled) return false;
+        if (!isAdminE2eCredentialsConfigured()) return false;
         if (!user?.email) return false;
         const role = (user as { role?: string }).role;
         if (!isStaffRole(role ?? "")) return false;
@@ -202,3 +207,6 @@ export const authOptions: NextAuthOptions = {
     },
   },
 };
+}
+
+export const authOptions: NextAuthOptions = buildAuthOptions();
