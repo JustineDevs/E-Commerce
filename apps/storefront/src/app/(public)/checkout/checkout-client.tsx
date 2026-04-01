@@ -465,28 +465,31 @@ export function CheckoutClient({
             <h2 className="font-headline text-sm font-bold uppercase tracking-widest text-primary mb-4">
               How you will pay
             </h2>
-            <div className="space-y-3">
+            <div
+              className="space-y-3"
+              role="radiogroup"
+              aria-label="How you will pay"
+            >
               {(Object.keys(PAYMENT_PROVIDER_IDS) as PaymentProviderKey[]).map(
                 (key) => {
                   const ok = providerAvailable[key];
+                  const selected = paymentMethod === key;
                   return (
-                    <label
+                    <button
                       key={key}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      aria-disabled={!ok}
                       data-testid={`payment-${key.toLowerCase()}`}
-                      className={`flex items-center gap-3 rounded-lg border px-3 py-2 ${
+                      disabled={!ok}
+                      onClick={() => ok && setPaymentMethod(key)}
+                      className={`flex w-full items-center gap-3 rounded-lg border px-3 py-3 text-left transition-colors ${
                         ok
-                          ? "cursor-pointer border-outline-variant/20"
+                          ? "cursor-pointer border-outline-variant/20 hover:border-primary/25 hover:bg-surface-container-low/60"
                           : "cursor-not-allowed border-outline-variant/10 opacity-60"
-                      }`}
+                      } ${selected && ok ? "border-primary/40 bg-surface-container-low/40 ring-1 ring-primary/15" : ""}`}
                     >
-                      <input
-                        type="radio"
-                        name="paymentMethod"
-                        disabled={!ok}
-                        checked={paymentMethod === key}
-                        onChange={() => ok && setPaymentMethod(key)}
-                        className="w-4 h-4 accent-primary shrink-0"
-                      />
                       <PaymentProviderLogo
                         providerKey={key}
                         label={PAYMENT_PROVIDER_LABELS[key]}
@@ -499,7 +502,23 @@ export function CheckoutClient({
                           </span>
                         ) : null}
                       </span>
-                    </label>
+                      <span
+                        className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors ${
+                          selected && ok
+                            ? "bg-primary"
+                            : "bg-outline-variant/35"
+                        }`}
+                        aria-hidden
+                      >
+                        <span
+                          className={`inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ease-out ${
+                            selected && ok
+                              ? "translate-x-6"
+                              : "translate-x-1"
+                          }`}
+                        />
+                      </span>
+                    </button>
                   );
                 },
               )}
