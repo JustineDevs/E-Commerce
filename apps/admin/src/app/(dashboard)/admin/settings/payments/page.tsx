@@ -1,6 +1,5 @@
 import { AdminBreadcrumbs, AdminPageShell, AuditTimeline } from "@/components/admin-console";
 import { PaymentProviderLabel } from "@/components/PaymentProviderLabel";
-import { PaymentConnectionsManager } from "@/components/PaymentConnectionsManager";
 import { fetchMedusaPaymentProvidersBundle } from "@/lib/payment-providers-bridge";
 import { requirePagePermission } from "@/lib/require-page-permission";
 
@@ -157,7 +156,18 @@ export default async function PaymentSettingsPage() {
         </div>
       </section>
 
-      <PaymentConnectionsManager />
+      <section className="mt-10 max-w-3xl">
+        <h3 className="text-lg font-bold text-primary font-headline mb-2">
+          Payment provider credentials
+        </h3>
+        <p className="text-on-surface-variant text-sm leading-relaxed">
+          Stripe, PayPal, PayMongo, Maya, and webhooks are configured on the{" "}
+          <strong>Medusa server environment</strong> (for example{" "}
+          <code className="rounded bg-surface-container-high px-1 text-xs">STRIPE_API_KEY</code>,{" "}
+          <code className="rounded bg-surface-container-high px-1 text-xs">PAYMONGO_SECRET_KEY</code>
+          ). Restart Medusa after changing keys. This dashboard does not store PSP secrets.
+        </p>
+      </section>
     </AdminPageShell>
   );
 }
