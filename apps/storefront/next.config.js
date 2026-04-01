@@ -40,6 +40,8 @@ const securityHeaders = [
 
 const nextConfig = {
   poweredByHeader: false,
+  /** Load `.env*` from monorepo root only (no `apps/storefront/.env.local`). */
+  envDir: path.join(__dirname, "../.."),
   outputFileTracingRoot: path.join(__dirname, "../.."),
   transpilePackages: [
     "@apparel-commerce/types",
