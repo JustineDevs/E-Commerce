@@ -54,8 +54,8 @@ export type PaymentProviderKey = keyof typeof PAYMENT_PROVIDER_IDS;
 export const PAYMENT_PROVIDER_LABELS: Record<PaymentProviderKey, string> = {
   STRIPE: "Debit or credit card",
   PAYPAL: "PayPal balance or card",
-  PAYMONGO: "GCash and local e-wallets",
-  MAYA: "Maya, cards, and e-wallets",
+  PAYMONGO: "GCash",
+  MAYA: "PayMaya",
   COD: "Cash on delivery (COD)",
 };
 
