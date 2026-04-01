@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Separator } from "@apparel-commerce/ui";
+import { AdminPageTitleWithHelp } from "./AdminPageTitleWithHelp";
 
 export type AdminPageShellProps = {
   /** Omit when the page provides its own hero (e.g. POS). */
@@ -63,13 +64,9 @@ export function AdminPageShell({
         {bannerSlot ? <div className="mb-6 space-y-4">{bannerSlot}</div> : null}
 
         {!hideHeader && (title || subtitle || actions) ? (
-          <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
-              {title ? (
-                <h1 className="font-headline text-3xl font-extrabold tracking-tighter text-primary">
-                  {title}
-                </h1>
-              ) : null}
+              {title ? <AdminPageTitleWithHelp title={title} /> : null}
               {subtitle ? (
                 <p className="mt-2 max-w-2xl font-body text-sm leading-relaxed text-on-surface-variant">
                   {subtitle}
