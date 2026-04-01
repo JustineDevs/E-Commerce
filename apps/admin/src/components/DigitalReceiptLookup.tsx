@@ -1,6 +1,5 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 type ReceiptPayload = {
@@ -12,10 +11,15 @@ type ReceiptPayload = {
   created_at: string;
 };
 
-export function DigitalReceiptLookup() {
-  const searchParams = useSearchParams();
-  const initialOrderId = searchParams.get("order_id")?.trim() ?? "";
-  const [orderId, setOrderId] = useState(initialOrderId);
+type DigitalReceiptLookupProps = {
+  /** From server `searchParams` so the page avoids `useSearchParams()` and long SSR stalls. */
+  initialOrderId?: string;
+};
+
+export function DigitalReceiptLookup({
+  initialOrderId: initialFromServer = "",
+}: DigitalReceiptLookupProps) {
+  const [orderId, setOrderId] = useState(initialFromServer);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<ReceiptPayload | null>(null);
@@ -53,10 +57,14 @@ export function DigitalReceiptLookup() {
   );
 
   useEffect(() => {
-    if (initialOrderId) {
-      void load(initialOrderId);
+    setOrderId(initialFromServer);
+  }, [initialFromServer]);
+
+  useEffect(() => {
+    if (initialFromServer) {
+      void load(initialFromServer);
     }
-  }, [initialOrderId, load]);
+  }, [initialFromServer, load]);
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
