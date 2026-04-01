@@ -9,7 +9,7 @@ import {
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { authOptions } from "@/lib/auth";
 import { getCorrelationId } from "@/lib/request-correlation";
-import { correlatedJson } from "@/lib/staff-api-response";
+import { correlatedError, correlatedJson } from "@/lib/staff-api-response";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -56,6 +56,21 @@ export async function DELETE(req: NextRequest, ctx: Ctx) {
   const sup = adminSupabaseOr503(cid);
   if ("response" in sup) return sup.response;
   const sb = sup.client;
-  await deleteEmployee(sb, id);
+  try {
+    await deleteEmployee(sb, id);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    const isFk =
+      /foreign key|violates|23503/i.test(msg) ||
+      msg.toLowerCase().includes("referenced");
+    return correlatedError(
+      cid,
+      isFk ? 409 : 502,
+      isFk
+        ? "This employee cannot be deleted while POS shifts, voids, or other records still reference them. Deactivate the employee instead, or remove related records first."
+        : "Unable to delete employee.",
+      isFk ? "CONFLICT" : "INTERNAL_ERROR",
+    );
+  }
   return correlatedJson(cid, { success: true });
 }
