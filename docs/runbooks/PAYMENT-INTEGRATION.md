@@ -12,7 +12,7 @@ This document describes the payment providers integrated into the Maharlika Appa
 | **PayMaya (Maya)** | GCash, Maya wallet, cards, QRPH | Philippines |
 | **Cash on delivery** | COD | In-person or configured regions |
 
-Use `medusa-config.ts`, environment variables, and BYOK rows in `payment_connections` (Supabase) to enable providers per deployment.
+Use `apps/medusa/medusa-config.ts` and **environment variables** on the Medusa process to enable providers per deployment. Restart Medusa after changing keys.
 
 ---
 
@@ -22,9 +22,9 @@ Use `medusa-config.ts`, environment variables, and BYOK rows in `payment_connect
 2. Obtain **Secret key** and **Webhook signing secret** from the Stripe Dashboard.
 3. Register Medusa webhook URL: `https://your-medusa-backend.example.com/hooks/payment/stripe` (exact path follows your Medusa route setup).
 
-### Environment (Medusa / BYOK)
+### Environment (Medusa)
 
-Map via admin payment connections or env (see `apps/medusa/.env.template`): `STRIPE_API_KEY`, `STRIPE_WEBHOOK_SECRET`, and related keys as documented in the Medusa Stripe module.
+Set `STRIPE_API_KEY`, `STRIPE_WEBHOOK_SECRET`, and related keys in the Medusa server environment (see root `.env.example` section 12).
 
 ---
 
@@ -34,9 +34,9 @@ Map via admin payment connections or env (see `apps/medusa/.env.template`): `STR
 2. Configure sandbox vs live via `PAYPAL_ENVIRONMENT`.
 3. Register PayPal webhooks to your Medusa PayPal hook URL.
 
-### Environment (Medusa / BYOK)
+### Environment (Medusa)
 
-`PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_WEBHOOK_ID`, etc. (see template and `payment-provider-secret-env-map` in Medusa).
+`PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_WEBHOOK_ID`, etc. (see root `.env.example`).
 
 ---
 
