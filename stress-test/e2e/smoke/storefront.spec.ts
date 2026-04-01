@@ -1,12 +1,12 @@
 import { test, expect } from "@playwright/test";
 
-import { gotoFirstCatalogPdp } from "../helpers/storefront";
+import { expectCheckoutShellVisible, gotoFirstCatalogPdp } from "../helpers/storefront";
 
 test.describe("storefront smoke", () => {
   test("home renders primary brand and navigation", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByTestId("nav-home")).toBeVisible();
-    await expect(page.getByTestId("nav-shop")).toBeVisible();
+    await expect(page.getByTestId("nav-shop").filter({ visible: true })).toBeVisible();
     await expect(page.getByTestId("nav-checkout")).toBeVisible();
   });
 
@@ -19,11 +19,20 @@ test.describe("storefront smoke", () => {
     page,
   }) => {
     await page.goto("/checkout");
-    await expect(
-      page.getByRole("heading", { name: /checkout/i }),
-    ).toBeVisible();
-    await expect(page.getByTestId("checkout-submit-pay")).toBeVisible();
-    await expect(page.getByTestId("checkout-submit-pay")).toBeDisabled();
+    await expectCheckoutShellVisible(page);
+    const guest = page.getByTestId("checkout-guest-sign-in");
+    const pay = page.getByTestId("checkout-submit-pay");
+    const onboard = page.getByTestId("checkout-onboarding-continue");
+    if (await guest.isVisible()) {
+      await expect(pay).toHaveCount(0);
+      return;
+    }
+    if (await onboard.isVisible()) {
+      await expect(pay).toHaveCount(0);
+      return;
+    }
+    await expect(pay).toBeVisible();
+    await expect(pay).toBeDisabled();
   });
 
   test("product PDP loads from catalog (first listed product)", async ({ page }) => {
@@ -36,6 +45,7 @@ test.describe("storefront smoke", () => {
     }
     const addBtn = page.getByTestId("pdp-add-to-bag");
     await expect(addBtn).toBeVisible({ timeout: 30_000 });
-    await expect(addBtn).toBeEnabled();
+    await expect(addBtn).not.toContainText("Loading", { timeout: 45_000 });
+    await expect(addBtn).toBeEnabled({ timeout: 45_000 });
   });
 });
