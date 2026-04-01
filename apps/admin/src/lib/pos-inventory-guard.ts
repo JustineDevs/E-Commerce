@@ -1,5 +1,6 @@
 import { medusaAdminFetch } from "@/lib/medusa-admin-http";
 import { availableQuantityFromVariantRaw } from "@/lib/inventory-quantity-utils";
+import type { AdminApiErrorCode } from "@/lib/staff-api-response";
 
 const VARIANT_FIELDS =
   "id,sku,manage_inventory,*inventory_items,*inventory_items.inventory,*inventory_items.inventory.location_levels";
@@ -54,7 +55,10 @@ export async function fetchPosVariantAvailability(
  */
 export async function assertPosCartStock(
   items: Array<{ variantId: string; quantity: number }>,
-): Promise<{ ok: true } | { ok: false; message: string; code: string }> {
+): Promise<
+  | { ok: true }
+  | { ok: false; message: string; code: AdminApiErrorCode }
+> {
   const qtyByVariant = new Map<string, number>();
   for (const i of items) {
     const vid = String(i.variantId ?? "").trim();
