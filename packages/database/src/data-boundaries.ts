@@ -4,8 +4,7 @@
  * - **Medusa Postgres** (`apps/medusa` `DATABASE_URL`): authoritative commerce — catalog, cart, order,
  *   payment sessions/collections, inventory, regions, Medusa customers, fulfillments.
  * - **Supabase** (`LEGACY_DATABASE_URL`): platform only — staff identity/RBAC, CMS, audit, POS ops,
- *   bridges (`medusa_*` reference columns), analytics events, BYOK metadata — **not** a second
- *   commerce catalog or order store.
+ *   bridges (`medusa_*` reference columns), analytics events — **not** a second commerce catalog or order store.
  *
  * Do not add legacy tables that duplicate Medusa first-class entities. See `check-commerce-migration-boundary.mjs`.
  * If a legacy database ever contained mistaken copies of Medusa `public` tables (same names as
@@ -92,12 +91,6 @@ export const LEGACY_TABLE_BINDINGS: Record<string, LegacyTableBinding> = {
     kind: "platform",
     notes: "Audience/messaging; cart totals and discounts at checkout remain Medusa.",
   },
-  payment_connections: {
-    surfaces: ["admin", "api"],
-    kind: "platform",
-    notes:
-      "BYOK provider config; payment capture truth remains Medusa. Medusa also reads ciphertext at process start when PAYMENT_CREDENTIALS_SOURCE is platform or supabase (service role, emit script), not a second secret store.",
-  },
   storefront_home_content: {
     surfaces: ["storefront", "admin"],
     kind: "platform",
@@ -152,7 +145,7 @@ export const MEDUSA_EXCLUSIVE_TABLE_NAMES = new Set<string>([
 
 /**
  * Returns true if `name` is a forbidden duplicate of a Medusa first-class table name.
- * Does not flag compound names like `product_reviews` or `payment_connections`.
+ * Does not flag compound names like `product_reviews` or `order_line_items`.
  */
 export function isMedusaExclusiveTableName(name: string): boolean {
   const n = name.trim().toLowerCase();
