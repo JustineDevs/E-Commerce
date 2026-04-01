@@ -84,7 +84,7 @@
     "resend": {
       "source": "resend/resend-skills",
       "sourceType": "github",
-      "computedHash": "e4939d78ff00adc577d54a0f4a669b02fde63ae4cea7e20b7ed7284cd74e9360"
+      "computedHash": "0b7ca6d79f000d8883c2039c7c72ec1293ce7f21961aa071bbd561a3da175931"
     },
     "responsive-design": {
       "source": "supercent-io/skills-template",
