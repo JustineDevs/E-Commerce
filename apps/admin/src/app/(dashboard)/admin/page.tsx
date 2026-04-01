@@ -113,7 +113,7 @@ export default async function AdminDashboardPage({
   return (
     <AdminPageShell
       title="Overview"
-      subtitle="Recent sales and stock summary. One commerce system powers the storefront catalog, inventory, orders, and POS."
+      subtitle="Recent sales and stock at a glance. The website, warehouse counts, orders, and register all use the same store data."
       bannerSlot={bannerSlot}
       inspector={<AuditTimeline title="Recent activity" />}
     >
