@@ -29,7 +29,9 @@ export type AdminApiErrorCode =
   | "INTERNAL_ERROR"
   | "SUPABASE_NOT_CONFIGURED"
   | "MEDUSA_UNAVAILABLE"
-  | "VALIDATION_ERROR";
+  | "VALIDATION_ERROR"
+  | "INSUFFICIENT_STOCK"
+  | "INVENTORY_CHECK_FAILED";
 
 /**
  * Standard error response for admin API routes.
