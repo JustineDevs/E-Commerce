@@ -1,4 +1,21 @@
-import type { Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
+
+/**
+ * Checkout is auth-gated: guests see a Checkout heading and sign-in CTA; signed-in users with a
+ * complete profile see pay controls (`checkout-submit-pay`).
+ */
+export async function expectCheckoutShellVisible(page: Page): Promise<void> {
+  await expect(page.getByRole("heading", { name: /^Checkout$/i })).toBeVisible({
+    timeout: 30_000,
+  });
+  const pay = page.getByTestId("checkout-submit-pay");
+  const guest = page.getByTestId("checkout-guest-sign-in");
+  const onboard = page.getByTestId("checkout-onboarding-continue");
+  const retry = page.getByTestId("checkout-profile-retry");
+  await expect(pay.or(guest).or(onboard).or(retry)).toBeVisible({
+    timeout: 20_000,
+  });
+}
 
 /**
  * Opens /shop and navigates to the first product PDP using CatalogProductCard
