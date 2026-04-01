@@ -46,7 +46,7 @@ The implementation SHALL use the following stack:
 - Monorepo orchestration: Turborepo with pnpm workspaces
 - UI layer: Tailwind CSS with shadcn/ui
 - Authentication: NextAuth/Auth.js with Google provider (staff and customer; admin UI protected by middleware on `/admin/*`)
-- Payments: one or more **Medusa** payment providers (for example Stripe, PayPal, PayMongo, Maya, cash on delivery), selected per region and environment via Medusa configuration and BYOK (`payment_connections`)
+- Payments: one or more **Medusa** payment providers (for example Stripe, PayPal, PayMongo, Maya, cash on delivery), selected per region and Medusa server environment variables (`medusa-config.ts`)
 - Shipment tracking: AfterShip with J&T Express Philippines (Medusa subscriber + webhook hook on Medusa)
 
 Shared types, validation logic, UI primitives, and **clients** (`packages/sdk`, `packages/types`) SHOULD be placed in reusable monorepo packages and consumed by all apps.
@@ -224,7 +224,7 @@ Supported statuses SHALL include:
 
 ### 9. Payment Flow
 
-Payments SHALL be processed through **Medusa payment sessions** using whichever providers are **registered and enabled** for the deployment (see Medusa `medusa-config`, feature flags, and BYOK rows).
+Payments SHALL be processed through **Medusa payment sessions** using whichever providers are **registered and enabled** for the deployment (see Medusa `medusa-config` and environment variables).
 
 The system SHALL support:
 
@@ -364,7 +364,7 @@ This repository’s **as-built** commerce path is **Medusa** for orders and paym
 
 The **as-built** slice **does not yet implement** every stakeholder cell above. Track these deltas in backlog, not as optional “nice-to-haves” when the business has already answered **Yes**:
 
-- **Payments:** The code supports several **Medusa** payment modules; the **live** combination depends on environment variables, BYOK rows, and storefront flags (for example `NEXT_PUBLIC_CHECKOUT_PAYMENT_PROVIDERS`, `NEXT_PUBLIC_MEDUSA_PAYMENT_PROVIDER_ID`). Stakeholder-requested methods such as GCash/Maya with manual proof and bank transfer need explicit product and reconciliation design; they are not automatic substitutes for card or wallet flows.
+- **Payments:** The code supports several **Medusa** payment modules; the **live** combination depends on Medusa environment variables and storefront flags (for example `NEXT_PUBLIC_CHECKOUT_PAYMENT_PROVIDERS`, `NEXT_PUBLIC_MEDUSA_PAYMENT_PROVIDER_ID`). Stakeholder-requested methods such as GCash/Maya with manual proof and bank transfer need explicit product and reconciliation design; they are not automatic substitutes for card or wallet flows.
 - **Catalog:** **Material**, **condition**, **style**, and **bundle** constructs may need Medusa **metadata** or admin UX beyond default product fields.
 - **Pre-orders:** Requires sellable state when `available_qty = 0`, distinct reservations, and fulfillment SLAs.
 - **Shipping:** Automatic J&T rating by weight/dimensions + **zone tables** (Metro / provincial / international) and “free shipping at N pieces” need quote service + rules engine + tests.
