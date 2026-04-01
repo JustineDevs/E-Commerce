@@ -16,6 +16,12 @@ const WEBHOOK_STYLES: Record<IntegrationHealthEntry["webhookStatus"], string> = 
   unknown: "text-neutral-400",
 };
 
+function callbackStatusLabel(status: IntegrationHealthEntry["webhookStatus"]): string {
+  if (status === "healthy") return "OK";
+  if (status === "failing") return "Issue";
+  return "Unknown";
+}
+
 export default function IntegrationHealthPage() {
   const [entries, setEntries] = useState<IntegrationHealthEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,7 +54,8 @@ export default function IntegrationHealthPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Integration Health</h1>
         <p className="text-sm text-neutral-500 mt-1">
-          Status of all payment and shipping provider SDKs. Check env, webhook health, and connection status.
+          Status of payment and shipping connections: software versions, partner callbacks, configuration, and
+          notes from the last check.
         </p>
       </div>
 
@@ -79,9 +86,9 @@ export default function IntegrationHealthPage() {
                 <tr className="border-b bg-neutral-50">
                   <th className="text-left px-4 py-3 font-medium text-neutral-600">Provider</th>
                   <th className="text-left px-4 py-3 font-medium text-neutral-600">Status</th>
-                  <th className="text-left px-4 py-3 font-medium text-neutral-600">SDK</th>
-                  <th className="text-left px-4 py-3 font-medium text-neutral-600">Webhooks</th>
-                  <th className="text-left px-4 py-3 font-medium text-neutral-600">Env</th>
+                  <th className="text-left px-4 py-3 font-medium text-neutral-600">Library</th>
+                  <th className="text-left px-4 py-3 font-medium text-neutral-600">Callbacks</th>
+                  <th className="text-left px-4 py-3 font-medium text-neutral-600">Config</th>
                   <th className="text-left px-4 py-3 font-medium text-neutral-600">Note</th>
                 </tr>
               </thead>
@@ -101,7 +108,7 @@ export default function IntegrationHealthPage() {
                       </td>
                       <td className="px-4 py-3">
                         <span className={`text-xs font-medium ${WEBHOOK_STYLES[entry.webhookStatus]}`}>
-                          {entry.webhookStatus}
+                          {callbackStatusLabel(entry.webhookStatus)}
                         </span>
                         {entry.lastWebhookAt && (
                           <span className="block text-[10px] text-neutral-400 mt-0.5">
@@ -111,7 +118,7 @@ export default function IntegrationHealthPage() {
                       </td>
                       <td className="px-4 py-3">
                         <span className={entry.envPresent ? "text-green-700" : "text-neutral-400"}>
-                          {entry.envPresent ? "Present" : "Missing"}
+                          {entry.envPresent ? "Set" : "Not set"}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-xs text-neutral-500 max-w-[200px] truncate">
