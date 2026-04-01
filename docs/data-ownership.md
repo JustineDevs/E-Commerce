@@ -77,7 +77,7 @@ When an action touches both worlds (e.g. staff action on an order), use **one wr
 
 ## Appendix A: Legacy table inventory (Phase 1 baseline)
 
-Source: `packages/database/supabase/migrations/*.sql` (and `seed.sql` where noted). **Classification** is guidance for migration work; Medusa remains SoR for live commerce per section 1.
+Source: `packages/database/supabase/migrations/*.sql` (and `seed.sql` where noted). **`pnpm db:migrate`** runs those files once per database and records applied names in **`public.legacy_platform_schema_migrations`** (separate from Medusa’s own migrations on `DATABASE_URL`). **Classification** is guidance for migration work; Medusa remains SoR for live commerce per section 1.
 
 | Table | Classification | Notes |
 |-------|----------------|-------|
