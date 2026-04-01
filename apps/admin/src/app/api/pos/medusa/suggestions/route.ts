@@ -4,6 +4,7 @@ import {
   getMedusaRegionId,
   getMedusaStoreSdk,
   optionRowsToSizeColor,
+  resolvePosProductImageUrl,
   variantPricePhpFromCalculated,
   withSalesChannelId,
 } from "@/lib/medusa-pos";
@@ -36,7 +37,7 @@ export async function GET(req: Request) {
         region_id: regionId,
         limit: 12,
         fields:
-          "*variants,*variants.calculated_price,*variants.options,*variants.sku,*variants.barcode,+title,+thumbnail",
+          "*variants,*variants.calculated_price,*variants.options,*variants.sku,*variants.barcode,+title,+thumbnail,*images",
       }) as Parameters<typeof storeSdk.store.product.list>[0],
     );
 
@@ -68,7 +69,7 @@ export async function GET(req: Request) {
           size,
           color,
           price: variantPricePhpFromCalculated(v.calculated_price),
-          imageUrl: p.thumbnail ?? undefined,
+          imageUrl: resolvePosProductImageUrl(p),
         });
         if (suggestions.length >= 8) break;
       }
