@@ -149,7 +149,6 @@ export function CmsCommerceSearch() {
                 <tr key={p.id} className="border-b border-slate-100">
                   <td className="px-3 py-2">
                     {p.thumbnail_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={p.thumbnail_url}
                         alt=""
