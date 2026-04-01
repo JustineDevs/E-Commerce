@@ -1,13 +1,10 @@
 import { resolve } from "node:path";
 import { loadEnv, defineConfig } from "@medusajs/framework/utils";
-import { applyPlatformPaymentCredentialsFromSupabaseSync } from "./src/lib/apply-platform-payment-env";
 import { validateMedusaProcessEnv } from "./src/loaders/validate-process-env";
 
 const env = process.env.NODE_ENV || "development";
 loadEnv(env, resolve(process.cwd(), "../.."));
 loadEnv(env, process.cwd());
-// BYOK sync: decrypt platform rows into process.env before provider arrays read env (required contract).
-applyPlatformPaymentCredentialsFromSupabaseSync();
 validateMedusaProcessEnv();
 
 const stripeProvider = process.env.STRIPE_API_KEY?.trim()
@@ -86,6 +83,15 @@ const paymentProviders = [
   ...paymongoProvider,
   ...mayaProvider,
 ];
+
+if (stripeProvider.length === 0) {
+  console.warn(
+    "[medusa-config] Stripe provider is not registered (STRIPE_API_KEY missing). " +
+      "Regions that list pp_stripe_stripe will fail when creating payment sessions. " +
+      "Set STRIPE_API_KEY (and STRIPE_WEBHOOK_SECRET in production) in the Medusa environment, " +
+      "or remove Stripe from the region in Medusa Admin → Settings → Regions.",
+  );
+}
 
 export default defineConfig({
   projectConfig: {
