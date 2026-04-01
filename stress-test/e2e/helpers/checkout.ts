@@ -185,19 +185,31 @@ export async function fillCheckoutShippingInfo(
 
 /**
  * Selects a payment provider on the checkout page if the option exists.
+ * Storefront checkout uses toggle-style rows (`button[role="radio"]`) with
+ * `data-testid="payment-{provider}"` (lowercase). Legacy radio inputs are still supported.
  */
 export async function selectPaymentProvider(
   page: Page,
   provider: PaymentProvider,
 ): Promise<boolean> {
-  const providerOption = page.locator(
-    `[data-testid="payment-${provider}"], [data-provider="${provider}"], input[value="${provider}"]`,
-  ).first();
-
-  if (await providerOption.isVisible({ timeout: 5_000 }).catch(() => false)) {
-    await providerOption.click();
+  const byTestId = page.getByTestId(`payment-${provider}`);
+  if (await byTestId.isVisible({ timeout: 5_000 }).catch(() => false)) {
+    await byTestId.click();
     return true;
   }
+
+  const byDataProvider = page.locator(`[data-provider="${provider}"]`).first();
+  if (await byDataProvider.isVisible({ timeout: 2_000 }).catch(() => false)) {
+    await byDataProvider.click();
+    return true;
+  }
+
+  const legacyInput = page.locator(`input[value="${provider}"]`).first();
+  if (await legacyInput.isVisible({ timeout: 2_000 }).catch(() => false)) {
+    await legacyInput.click();
+    return true;
+  }
+
   return false;
 }
 
