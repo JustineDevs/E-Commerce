@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { DEFAULT_PUBLIC_SITE_ORIGIN, PH_VAT_RATE, computeDisplayVat } from "@apparel-commerce/sdk";
 import {
   readCart,
@@ -20,7 +20,7 @@ import {
   type CodCartPayload,
   type PaymentProviderKey,
 } from "@/lib/medusa-checkout";
-import { getCheckoutPaymentAvailability } from "@/lib/checkout-payment-availability";
+import { resolveCheckoutPaymentAvailability } from "@/lib/checkout-payment-availability";
 import { PaymentProviderLogo } from "@/components/PaymentProviderLogo";
 import dynamic from "next/dynamic";
 
@@ -101,10 +101,42 @@ export function CheckoutClient({
     }
   }, []);
 
-  const { available: providerAvailable, preferredKey } = useMemo(
-    () => getCheckoutPaymentAvailability(),
-    [],
+  const [payAvailability, setPayAvailability] = useState(() =>
+    resolveCheckoutPaymentAvailability(undefined),
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/checkout/available-payment-methods", {
+          cache: "no-store",
+        });
+        const j = (await res.json()) as {
+          ok?: boolean;
+          keys?: string[];
+        };
+        if (cancelled) return;
+        if (j.ok === true && Array.isArray(j.keys) && j.keys.length > 0) {
+          const allowed = new Set(j.keys);
+          const valid = (Object.keys(PAYMENT_PROVIDER_IDS) as PaymentProviderKey[]).filter(
+            (k) => allowed.has(k),
+          );
+          if (valid.length > 0) {
+            setPayAvailability(resolveCheckoutPaymentAvailability(valid));
+          }
+        }
+      } catch {
+        /* keep env fallback */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const providerAvailable = payAvailability.available;
+  const preferredKey = payAvailability.preferredKey;
 
   useEffect(() => {
     setPaymentMethod((prev) =>
@@ -188,6 +220,7 @@ export function CheckoutClient({
     try {
       const em = email.trim();
       if (
+        paymentMethod !== "COD" &&
         em &&
         !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)
       ) {
@@ -356,6 +389,9 @@ export function CheckoutClient({
   if (authStatus === "loading") {
     return (
       <main className="storefront-page-shell motion-surface max-w-4xl">
+        <h1 className="font-headline text-4xl font-extrabold tracking-tighter text-primary mb-2">
+          Checkout
+        </h1>
         <p className="text-sm text-on-surface-variant">Loading…</p>
       </main>
     );
@@ -373,6 +409,7 @@ export function CheckoutClient({
         </p>
         <Link
           href={`/sign-in?callbackUrl=${encodeURIComponent("/checkout")}`}
+          data-testid="checkout-guest-sign-in"
           className="inline-flex rounded bg-primary px-6 py-3 text-sm font-bold text-on-primary hover:opacity-90"
         >
           Sign in to continue
@@ -384,6 +421,9 @@ export function CheckoutClient({
   if (profileGate === "loading" || profileGate === "idle") {
     return (
       <main className="storefront-page-shell motion-surface max-w-4xl">
+        <h1 className="font-headline text-4xl font-extrabold tracking-tighter text-primary mb-2">
+          Checkout
+        </h1>
         <p className="text-sm text-on-surface-variant">Loading your profile…</p>
       </main>
     );
@@ -400,6 +440,7 @@ export function CheckoutClient({
         </p>
         <button
           type="button"
+          data-testid="checkout-profile-retry"
           className="inline-flex rounded bg-primary px-6 py-3 text-sm font-bold text-on-primary hover:opacity-90"
           onClick={() => {
             setProfileGate("loading");
@@ -433,6 +474,7 @@ export function CheckoutClient({
         ) : null}
         <Link
           href={onboardingHref}
+          data-testid="checkout-onboarding-continue"
           className="inline-flex rounded bg-primary px-6 py-3 text-sm font-bold text-on-primary hover:opacity-90"
         >
           Complete delivery details
@@ -447,7 +489,9 @@ export function CheckoutClient({
         Checkout
       </h1>
       <p className="font-body text-on-surface-variant mb-4 max-w-lg">
-        Review your bag. Pick how you would like to pay. Totals are double-checked when you continue.
+        Review your bag and choose how to pay. Totals are confirmed when you continue. Card payments use
+        Stripe&apos;s secure payment form after you press continue; PayPal, GCash, PayMaya, and similar
+        options open on the provider&apos;s own page when you continue.
       </p>
       <p className="font-body text-sm text-on-surface-variant mb-12 max-w-lg rounded-lg border border-outline-variant/15 bg-surface-container-low/40 px-4 py-3">
         <span className="font-headline text-[10px] font-bold uppercase tracking-widest text-primary">
@@ -498,7 +542,7 @@ export function CheckoutClient({
                         {PAYMENT_PROVIDER_LABELS[key]}
                         {!ok ? (
                           <span className="mt-0.5 block text-xs text-on-surface-variant">
-                            Not available for this shop right now.
+                            Not enabled for checkout on your store region (or filtered by checkout settings).
                           </span>
                         ) : null}
                       </span>
@@ -524,11 +568,31 @@ export function CheckoutClient({
               )}
             </div>
             {paymentMethod === "COD" ? (
-              <p className="mt-3 text-xs leading-relaxed text-on-surface-variant rounded-lg border border-outline-variant/15 bg-surface-container-low/40 px-3 py-2">
-                Cash on delivery uses your saved delivery address and the email on your account.
-                Update them under Account if needed. Pay the rider in Philippine pesos when your order
-                arrives.
-              </p>
+              <div
+                className="mt-3 space-y-2 rounded-lg border border-outline-variant/15 bg-surface-container-low/40 px-3 py-3 text-xs leading-relaxed text-on-surface-variant"
+                role="region"
+                aria-label="Cash on delivery steps"
+              >
+                <p className="font-semibold text-on-surface">How cash on delivery works</p>
+                <ol className="list-decimal space-y-1.5 pl-4 text-on-surface-variant">
+                  <li>
+                    Confirm your bag and delivery profile (address and phone from onboarding). Update them under
+                    Account if anything is wrong.
+                  </li>
+                  <li>
+                    Choose cash on delivery here, then use the button below to place the order. No card or wallet step
+                    runs for this option.
+                  </li>
+                  <li>
+                    After you submit, you go to the order tracking page. We use the email on your account for order
+                    updates.
+                  </li>
+                  <li>
+                    When the rider arrives, pay in Philippine pesos for the total shown on your confirmation. Keep
+                    mobile contact details handy in case the courier calls.
+                  </li>
+                </ol>
+              </div>
             ) : null}
           </section>
 
@@ -545,11 +609,21 @@ export function CheckoutClient({
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               autoComplete="email"
-              className="w-full bg-surface-container-lowest border border-outline-variant/30 rounded px-4 py-3 font-body text-sm outline-none focus:ring-2 focus:ring-primary/30"
+              disabled={paymentMethod === "COD"}
+              className="w-full bg-surface-container-lowest border border-outline-variant/30 rounded px-4 py-3 font-body text-sm outline-none focus:ring-2 focus:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-60"
             />
             <p className="text-xs text-on-surface-variant mt-2">
-              Defaults to your sign-in email. Change it if you want order updates somewhere else. We only check that the
-              format looks correct.
+              {paymentMethod === "COD" ? (
+                <>
+                  Cash on delivery uses the email on your account for confirmations. Switch payment method if you need
+                  to type a different address here.
+                </>
+              ) : (
+                <>
+                  Defaults to your sign-in email. Change it if you want order updates somewhere else. We only check
+                  that the format looks correct.
+                </>
+              )}
             </p>
             <label className="block text-xs font-medium text-on-surface-variant mt-4 mb-2">
               Loyalty points to use (optional)
@@ -574,7 +648,10 @@ export function CheckoutClient({
               Delivery and pickup
             </h2>
             <p className="text-sm text-on-surface-variant">
-              Your primary saved address from onboarding is on file. Hosted card or wallet steps may still ask you to confirm shipping for the payment provider.
+              Your primary saved address from onboarding is on file.
+              {paymentMethod === "COD"
+                ? " Cash on delivery ships to that address."
+                : " The payment step may still ask you to confirm shipping with the card or wallet provider."}
             </p>
             <p className="mt-3 text-sm text-on-surface-variant leading-relaxed">
               <strong className="text-primary">Buy online, pick up in store:</strong>{" "}
@@ -747,7 +824,11 @@ export function CheckoutClient({
               embeddedData.stripeClientSecret && (
                 <div className="mt-6 rounded-lg border border-outline-variant/20 p-4">
                   <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3">
-                    Pay with your card
+                    Pay with your card (Stripe)
+                  </p>
+                  <p className="text-xs text-on-surface-variant mb-3">
+                    Card details are collected with Stripe&apos;s Payment Element (official Stripe.js UI), not
+                    stored on this site.
                   </p>
                   <StripeEmbeddedCheckout
                     clientSecret={embeddedData.stripeClientSecret}
@@ -793,10 +874,14 @@ export function CheckoutClient({
               className="w-full mt-6 py-4 bg-primary text-on-primary font-headline font-bold text-sm uppercase tracking-widest rounded hover:opacity-90 active:scale-[0.99] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {loading
-                ? "Starting checkout…"
+                ? paymentMethod === "COD"
+                  ? "Placing your order…"
+                  : "Starting checkout…"
                 : pendingPayment || embeddedData
                   ? "Checkout started: see above"
-                  : "Continue to secure payment"}
+                  : paymentMethod === "COD"
+                    ? "Place order (pay on delivery)"
+                    : "Continue to secure payment"}
             </button>
 
             {pendingPayment && (
