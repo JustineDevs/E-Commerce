@@ -24,13 +24,9 @@ export default async function ChannelsPage() {
             Details for IT or your developer
           </summary>
           <p className="mt-2 border-l-2 border-outline-variant/40 pl-3 leading-relaxed">
-            Partners send updates to an inbound webhook. In production, set{" "}
-            <code className="text-[11px] bg-surface-container-high px-1 rounded">CHANNEL_WEBHOOK_SECRET</code>{" "}
-            and validate the <code className="text-[11px]">x-channel-signature</code> header (HMAC-SHA256
-            of the raw body). Endpoint path:{" "}
-            <code className="text-[11px] bg-surface-container-high px-1 rounded">
-              /api/integrations/channels/webhook
-            </code>
+            Partners send updates to a dedicated inbound URL. Production setups should use a shared secret and
+            verify the signed request body. Your developer can find the exact path and header names in the
+            integration documentation for this project.
           </p>
         </details>
       <div className="overflow-hidden rounded-lg bg-surface-container-lowest shadow">
