@@ -29,7 +29,6 @@
   },
   "dependencies": {
     "@aftership/tracking-sdk": "^15.0.1",
-    "@apparel-commerce/payment-connection-crypto": "workspace:*",
     "@apparel-commerce/resend-mail": "workspace:*",
     "@apparel-commerce/types": "workspace:*",
     "@paypal/paypal-server-sdk": "^2.0.0",
