@@ -1,6 +1,11 @@
 {
   "version": 1,
   "skills": {
+    "agent-hub": {
+      "source": "justinedevs/collection",
+      "sourceType": "github",
+      "computedHash": "34649754abc1d10e39f7cc62800235882ec4bbcf6cd6369452244a29fd0c9473"
+    },
     "authentication-setup": {
       "source": "supercent-io/skills-template",
       "sourceType": "github",
