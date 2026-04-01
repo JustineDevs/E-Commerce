@@ -1,6 +1,7 @@
 /**
  * Upserts a Supabase `users` row and `user_roles` = staff for E2E admin credentials sign-in.
  * Uses the first email in ADMIN_ALLOWED_EMAILS (same list as admin promotion). No separate E2E_* email var.
+ * Grants `staff_permission_grants` = `*` so Playwright can hit protected routes (same as admin wildcard).
  *
  * Usage (from repo root): pnpm e2e:ensure-staff
  */
@@ -34,6 +35,19 @@ async function main(): Promise<void> {
   const email = normalizeEmail(firstFromList);
   const supabase = createClient(url, key);
 
+  async function ensureWildcardGrants(userId: string): Promise<void> {
+    const { error: delErr } = await supabase
+      .from("staff_permission_grants")
+      .delete()
+      .eq("user_id", userId);
+    if (delErr) throw delErr;
+    const { error: insErr } = await supabase.from("staff_permission_grants").insert({
+      user_id: userId,
+      permission_key: "*",
+    });
+    if (insErr) throw insErr;
+  }
+
   const { data: existingUser } = await supabase
     .from("users")
     .select("id")
@@ -47,9 +61,16 @@ async function main(): Promise<void> {
       .eq("user_id", existingUser.id)
       .maybeSingle();
     const role = roleRow?.role as string | undefined;
-    if (role === "staff" || role === "admin") {
+    if (role === "staff") {
+      await ensureWildcardGrants(existingUser.id);
       console.log(
-        `E2E staff user already present (${email}, role ${role}). No database changes.`,
+        `E2E staff user already present (${email}); refreshed staff_permission_grants (*).`,
+      );
+      return;
+    }
+    if (role === "admin") {
+      console.log(
+        `E2E allow-list user already admin (${email}). No database changes (admin uses wildcard in session).`,
       );
       return;
     }
@@ -71,7 +92,9 @@ async function main(): Promise<void> {
     .upsert({ user_id: user.id, role: "staff" }, { onConflict: "user_id" });
   if (rErr) throw rErr;
 
-  console.log(`E2E staff user ready: ${email} (role staff)`);
+  await ensureWildcardGrants(user.id);
+
+  console.log(`E2E staff user ready: ${email} (role staff, grants *)`);
 }
 
 main().catch((e) => {
