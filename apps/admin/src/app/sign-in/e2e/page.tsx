@@ -12,7 +12,7 @@ import {
   CardTitle,
 } from "@apparel-commerce/ui";
 import { AdminE2eCredentialsForm } from "@/components/AdminE2eCredentialsForm";
-import { authOptions } from "@/lib/auth";
+import { buildAuthOptions } from "@/lib/auth";
 import {
   firstAdminAllowedEmail,
   isAdminE2eCredentialsConfigured,
@@ -36,7 +36,7 @@ export default async function AdminE2eSignInPage({
     notFound();
   }
 
-  const session = await getServerSession(authOptions);
+  const session = await getServerSession(buildAuthOptions());
   const role = session?.user?.role as string | undefined;
   if (role === "admin" || role === "staff") {
     redirect("/admin");
