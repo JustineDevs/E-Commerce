@@ -1,4 +1,3 @@
-import { Suspense } from "react";
 import {
   AdminBreadcrumbs,
   AdminPageShell,
@@ -9,8 +8,15 @@ import { requirePagePermission } from "@/lib/require-page-permission";
 
 export const dynamic = "force-dynamic";
 
-export default async function ReceiptsPage() {
+export default async function ReceiptsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ order_id?: string }>;
+}) {
   await requirePagePermission("receipts:read");
+  const sp = await searchParams;
+  const initialOrderId =
+    typeof sp.order_id === "string" ? sp.order_id.trim() : "";
 
   return (
     <AdminPageShell
@@ -23,13 +29,7 @@ export default async function ReceiptsPage() {
       }
       inspector={<AuditTimeline title="Recent activity" />}
     >
-      <Suspense
-        fallback={
-          <p className="text-sm text-on-surface-variant">Loading…</p>
-        }
-      >
-        <DigitalReceiptLookup />
-      </Suspense>
+      <DigitalReceiptLookup initialOrderId={initialOrderId} />
     </AdminPageShell>
   );
 }
