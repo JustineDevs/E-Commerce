@@ -45,7 +45,7 @@ function StripeForm({
       });
 
       if (error) {
-        onError(error.message ?? "Payment failed.");
+        onError(error.message ?? "We could not complete this payment. Try again or use another method.");
         setLoading(false);
       } else {
         onSuccess();
@@ -64,7 +64,7 @@ function StripeForm({
         disabled={!stripe || loading}
         className="w-full py-4 bg-primary text-on-primary font-headline font-bold text-sm uppercase tracking-widest rounded hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
       >
-        {loading ? "Processing…" : "Pay with Stripe"}
+        {loading ? "Processing…" : "Complete payment"}
       </button>
     </form>
   );
