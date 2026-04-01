@@ -15,7 +15,7 @@ description: Runs and scopes automated tests for this Turborepo (unit, package f
 | Playwright E2E | `pnpm test:e2e` (UI: `pnpm test:e2e:ui`) |
 | Pre-deploy style check | `pnpm predeploy` |
 
-`pnpm test` runs packages in a fixed order (platform-data, UI build, sdk, validation, rate-limits, api, database, payment-connection-crypto, admin, storefront, Medusa unit + Medusa stress). Prefer **scoped** runs when the user only touched one area.
+`pnpm test` runs packages in a fixed order (platform-data, UI build, sdk, validation, rate-limits, api, database, admin, storefront, Medusa unit + Medusa stress). Prefer **scoped** runs when the user only touched one area.
 
 ## Scoped runs
 
