@@ -11,8 +11,10 @@ const badPatterns = [
   /medusa-admin-fetch/,
   /from ["']@\/lib\/medusa-admin-fetch["']/,
   /MEDUSA_SECRET_API_KEY/,
+  /MEDUSA_SECRET(?!_)/,
   /MEDUSA_ADMIN_API_SECRET/,
   /SUPABASE_SERVICE_ROLE_KEY/,
+  /NEXT_PUBLIC_[A-Z0-9_]*SECRET/i,
 ];
 
 function walk(dir, out = []) {
