@@ -1,12 +1,21 @@
 /**
- * Applies listed `supabase/migrations/*.sql` in order using Postgres (no Supabase CLI).
- * Filenames are explicit in MIGRATION_FILES so order stays stable.
- * When you add `supabase/migrations/0xx_*.sql`, append the filename here in numeric order
- * (the script does not auto-discover files).
- * Uses LEGACY_DATABASE_URL (Supabase pooler URI) from repo root `.env`.
+ * Legacy Supabase / platform Postgres migrations (NOT Medusa `DATABASE_URL`).
  *
- * For `supabase db push` instead, install the Supabase CLI globally and run:
- *   pnpm --filter @apparel-commerce/database migrate:cli
+ * Medusa-style behavior:
+ * - Each file in MIGRATION_FILES runs at most once per database.
+ * - Applied filenames are recorded in `public.legacy_platform_schema_migrations`.
+ * - New database: empty ledger, every file runs in order inside a transaction.
+ * - Existing database (first use of this runner): empty ledger, all files run once;
+ *   SQL is idempotent (`IF NOT EXISTS`, `DROP IF EXISTS`, etc.) where possible.
+ * - Subsequent runs: only pending files run.
+ *
+ * Append new `supabase/migrations/*.sql` names to MIGRATION_FILES in numeric order.
+ * Uses LEGACY_DATABASE_URL from repo root `.env`.
+ *
+ * Flags:
+ *   --status   List applied vs pending and exit (exit 1 if any pending).
+ *
+ * Supabase CLI alternative: `pnpm --filter @apparel-commerce/database migrate:cli`
  */
 import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
@@ -29,20 +38,19 @@ const MIGRATION_FILES = [
   "010_pos_offline_commit_idempotency.sql",
   "011_storefront_public_metadata.sql",
   "012_product_reviews_moderation.sql",
-  "013_payment_connections.sql",
-  "014_payment_connections_envelope_crypto.sql",
+  "013_drop_legacy_payment_connections.sql",
   "015_drop_accidental_medusa_core_tables_from_legacy.sql",
-  "016_rls_payment_connections_staff.sql",
-  "017_payment_connections_aftership.sql",
+  "016_platform_rls_authenticated_denies.sql",
   "018_outbox_events.sql",
   "019_background_jobs.sql",
   "020_storefront_profiles_product_qa.sql",
   "021_cms_content_navigation_expansion.sql",
   "022_cms_sprint_extensions.sql",
-  "023_remove_lemonsqueezy_payment_connections.sql",
   "enable_rls.sql",
   "rls_deny_anon_sensitive.sql",
 ] as const;
+
+const MIGRATIONS_TABLE = "legacy_platform_schema_migrations";
 
 const databaseUrl = process.env.LEGACY_DATABASE_URL;
 if (!databaseUrl?.trim()) {
@@ -55,6 +63,9 @@ if (!databaseUrl?.trim()) {
   process.exit(1);
 }
 
+const args = process.argv.slice(2);
+const statusOnly = args.includes("--status");
+
 function switchPoolerPort(url: string, port: number): string {
   try {
     const u = new URL(url);
@@ -65,45 +76,132 @@ function switchPoolerPort(url: string, port: number): string {
   }
 }
 
-async function runSql(connectionString: string, sql: string): Promise<void> {
-  const client = new pg.Client({
-    connectionString,
-    connectionTimeoutMillis: 20_000,
-  });
-  await client.connect();
-  await client.query(sql);
-  await client.end();
-}
+async function connectWithPoolerFallback(): Promise<{
+  client: pg.Client;
+  url: string;
+}> {
+  const tryConnect = async (url: string) => {
+    const client = new pg.Client({
+      connectionString: url,
+      connectionTimeoutMillis: 20_000,
+    });
+    await client.connect();
+    return client;
+  };
 
-async function runOnceWithFallback(sql: string): Promise<void> {
   try {
-    await runSql(databaseUrl!, sql);
+    const client = await tryConnect(databaseUrl!);
+    return { client, url: databaseUrl! };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    if (databaseUrl!.includes("pooler.supabase.com")) {
-      const currentPort = new URL(databaseUrl!).port;
-      const altPort = currentPort === "5432" ? "6543" : "5432";
-      const altUrl = switchPoolerPort(databaseUrl!, altPort);
-      console.log(
-        `Primary pooler (${currentPort}) failed (${msg}). Trying port ${altPort}...`,
-      );
-      await runSql(altUrl, sql);
-      return;
+    if (!databaseUrl!.includes("pooler.supabase.com")) {
+      throw err;
     }
-    throw err;
+    const currentPort = new URL(databaseUrl!).port;
+    const altPort = currentPort === "5432" ? "6543" : "5432";
+    const altUrl = switchPoolerPort(databaseUrl!, Number(altPort));
+    console.log(
+      `Primary pooler (${currentPort}) failed (${msg}). Trying port ${altPort}...`,
+    );
+    const client = await tryConnect(altUrl);
+    return { client, url: altUrl };
   }
+}
+
+async function ensureMigrationsTable(client: pg.Client): Promise<void> {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS public.${MIGRATIONS_TABLE} (
+      filename text PRIMARY KEY,
+      applied_at timestamptz NOT NULL DEFAULT now()
+    );
+  `);
+  await client.query(`
+    COMMENT ON TABLE public.${MIGRATIONS_TABLE} IS
+      'Applied platform SQL migrations from packages/database (pnpm migrate). Separate from Medusa mikro_orm_migrations.';
+  `);
+}
+
+async function getAppliedSet(client: pg.Client): Promise<Set<string>> {
+  const { rows } = await client.query<{ filename: string }>(
+    `SELECT filename FROM public.${MIGRATIONS_TABLE}`,
+  );
+  return new Set(rows.map((r) => r.filename));
+}
+
+async function printStatusAndExit(
+  client: pg.Client,
+  applied: Set<string>,
+): Promise<never> {
+  const defined = new Set<string>(MIGRATION_FILES);
+  const pending = MIGRATION_FILES.filter((f) => !applied.has(f));
+  const appliedInOrder = MIGRATION_FILES.filter((f) => applied.has(f));
+  const orphan = [...applied].filter((f) => !defined.has(f));
+
+  console.log(`Migrations table: public.${MIGRATIONS_TABLE}`);
+  console.log(`Total defined in runner: ${MIGRATION_FILES.length}`);
+  console.log(`Applied (known files): ${appliedInOrder.length}`);
+  if (orphan.length > 0) {
+    console.warn(
+      `Orphan rows in ledger (not in MIGRATION_FILES; remove manually if stale): ${orphan.join(", ")}`,
+    );
+  }
+  if (pending.length === 0) {
+    console.log("Pending: none");
+    await client.end();
+    process.exit(0);
+  }
+  console.log(`Pending (${pending.length}):`);
+  for (const p of pending) {
+    console.log(`  - ${p}`);
+  }
+  await client.end();
+  process.exit(1);
 }
 
 async function main(): Promise<void> {
-  const dir = join(__dirname, "..", "supabase", "migrations");
-  for (const name of MIGRATION_FILES) {
-    const sqlPath = join(dir, name);
-    const sql = readFileSync(sqlPath, "utf-8");
-    process.stdout.write(`Applying ${name}... `);
-    await runOnceWithFallback(sql);
-    console.log("ok");
+  const { client } = await connectWithPoolerFallback();
+  try {
+    await ensureMigrationsTable(client);
+    const applied = await getAppliedSet(client);
+
+    if (statusOnly) {
+      await printStatusAndExit(client, applied);
+    }
+
+    const dir = join(__dirname, "..", "supabase", "migrations");
+    let ran = 0;
+    for (const name of MIGRATION_FILES) {
+      if (applied.has(name)) {
+        console.log(`skip ${name} (already applied)`);
+        continue;
+      }
+      const sqlPath = join(dir, name);
+      const sql = readFileSync(sqlPath, "utf-8");
+      process.stdout.write(`Applying ${name}... `);
+      await client.query("BEGIN");
+      try {
+        await client.query(sql);
+        await client.query(
+          `INSERT INTO public.${MIGRATIONS_TABLE} (filename) VALUES ($1)`,
+          [name],
+        );
+        await client.query("COMMIT");
+        console.log("ok");
+        ran += 1;
+      } catch (e) {
+        await client.query("ROLLBACK");
+        console.log("failed");
+        throw e;
+      }
+    }
+    if (ran === 0) {
+      console.log("No pending migrations.");
+    } else {
+      console.log(`Applied ${ran} migration(s).`);
+    }
+  } finally {
+    await client.end();
   }
-  console.log("All migrations applied.");
 }
 
 main().catch((e) => {
