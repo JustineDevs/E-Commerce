@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import type { Product } from "@apparel-commerce/types";
@@ -19,8 +19,17 @@ export function AddToCartSection({ product }: { product: Product }) {
     () => [...new Set(product.variants.map((v) => v.color))],
     [product.variants],
   );
-  const [size, setSize] = useState(sizes[0] ?? "");
-  const [color, setColor] = useState(colors[0] ?? "");
+  const defaultPair = useMemo(() => {
+    const v0 = product.variants[0];
+    return { size: v0?.size ?? "", color: v0?.color ?? "" };
+  }, [product.variants]);
+  const [size, setSize] = useState(defaultPair.size);
+  const [color, setColor] = useState(defaultPair.color);
+
+  useEffect(() => {
+    setSize(defaultPair.size);
+    setColor(defaultPair.color);
+  }, [product.slug, defaultPair.size, defaultPair.color]);
 
   const variant = useMemo(
     () => product.variants.find((v) => v.size === size && v.color === color),
