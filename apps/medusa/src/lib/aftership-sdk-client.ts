@@ -1,3 +1,5 @@
+import { MarkTrackingCompletedByIdRequestReason } from "@aftership/tracking-sdk/dist/model/MarkTrackingCompletedByIdRequestReason";
+
 type AfterShipModule = typeof import("@aftership/tracking-sdk");
 type AfterShipInstance = InstanceType<AfterShipModule["AfterShip"]>;
 
@@ -139,7 +141,7 @@ export async function markTrackingComplete(
     const id = await resolveTrackingId(client, slug, trackingNumber);
     if (!id) return false;
     await client.tracking.markTrackingCompletedById(id, {
-      reason: "DELIVERED",
+      reason: MarkTrackingCompletedByIdRequestReason.DELIVERED,
     });
     return true;
   } catch {
