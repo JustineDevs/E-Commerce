@@ -7,14 +7,17 @@ loadEnv(env, resolve(process.cwd(), "../.."));
 loadEnv(env, process.cwd());
 validateMedusaProcessEnv();
 
+/** Hosted Stripe Checkout (checkout.sessions) — same provider id `pp_stripe_stripe` as the stock plugin. */
 const stripeProvider = process.env.STRIPE_API_KEY?.trim()
   ? [
       {
-        resolve: "@medusajs/payment-stripe",
+        resolve: "./src/modules/stripe-checkout-payment",
         id: "stripe",
         options: {
           apiKey: process.env.STRIPE_API_KEY,
           webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+          successUrl: process.env.STRIPE_CHECKOUT_SUCCESS_URL?.trim(),
+          cancelUrl: process.env.STRIPE_CHECKOUT_CANCEL_URL?.trim(),
         },
       },
     ]
