@@ -173,7 +173,7 @@ function SortableHeaderRow({
 }: {
   id: string;
   link: HeaderRow;
-  onChange: (l: HeaderRow) => void;
+  onChange: (_l: HeaderRow) => void;
   onRemove: () => void;
   disabled: boolean;
 }) {
@@ -337,7 +337,7 @@ function SortableSocialRow({
 }: {
   id: string;
   link: SocialRow;
-  onChange: (l: SocialRow) => void;
+  onChange: (_l: SocialRow) => void;
   onRemove: () => void;
   disabled: boolean;
 }) {
@@ -428,7 +428,7 @@ function SortableFooterLinkRow({
   link: FooterLinkRow;
   colIndex: number;
   dragAriaLabel?: string;
-  onChange: (l: FooterLinkRow) => void;
+  onChange: (_l: FooterLinkRow) => void;
   onRemove: () => void;
   disabled: boolean;
 }) {
@@ -503,7 +503,7 @@ function SortableFooterColumnCard({
 }: {
   column: FooterColRow;
   colIndex: number;
-  onChangeColumn: (c: FooterColRow) => void;
+  onChangeColumn: (_c: FooterColRow) => void;
   onRemoveColumn: () => void;
   disabled: boolean;
 }) {
@@ -634,7 +634,7 @@ function navigationValidationHints(e: EditorNav): string[] {
     check(`Footer column "${col.title || `#${ci + 1}`}"`, col.links);
   });
   check("Social", e.socialLinks);
-  e.headerLinks.forEach((h, hi) => {
+  e.headerLinks.forEach((h, _hi) => {
     h.children.forEach((c, ci) => {
       if (!c.href.trim())
         hints.push(`Header "${h.label}" submenu ${ci + 1}: URL is empty`);
