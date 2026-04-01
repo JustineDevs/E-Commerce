@@ -10,8 +10,11 @@ import {
 } from "@/lib/cart-api-helpers";
 import { extractSessionEmail } from "@apparel-commerce/sdk";
 
+/** IP window kept long enough that sequential E2E bursts under load still hit 429 before the window resets. */
+const ATTACH_CUSTOMER_IP_WINDOW_MS = 300_000;
+
 export async function POST(req: Request) {
-  const rl = await applyRateLimit(req, "cart-attach", 25, 60_000);
+  const rl = await applyRateLimit(req, "cart-attach", 25, ATTACH_CUSTOMER_IP_WINDOW_MS);
   if (!rl.ok) return rl.response;
 
   const session = await getServerSession(authOptions);
