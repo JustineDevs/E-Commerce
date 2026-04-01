@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { staffSessionAllows, tryCreateSupabaseClient } from "@apparel-commerce/database";
+import { staffSessionAllows } from "@apparel-commerce/database";
 import { authOptions } from "@/lib/auth";
 
 export type IntegrationHealthEntry = {
@@ -38,16 +38,6 @@ export async function GET() {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const supabase = tryCreateSupabaseClient();
-  const { data: connections } = supabase
-    ? await supabase
-        .from("payment_connections")
-        .select("provider, status, webhook_status, last_verified_at, mode")
-        .order("provider")
-    : { data: null as null };
-
-  const connRows = connections ?? [];
-
   const entries: IntegrationHealthEntry[] = Object.keys(PROVIDER_ENV_KEYS).map(
     (provider) => {
       const envKeys = PROVIDER_ENV_KEYS[provider] ?? [];
@@ -55,44 +45,19 @@ export async function GET() {
         (k) => typeof process.env[k] === "string" && process.env[k]!.trim() !== "",
       );
 
-      const conn = connRows.find((c) => c.provider === provider);
-      const webhookStatus: IntegrationHealthEntry["webhookStatus"] =
-        (conn?.webhook_status as IntegrationHealthEntry["webhookStatus"]) ?? "unknown";
-
-      let status: IntegrationHealthEntry["status"] = "unconfigured";
-      if (conn) {
-        if (conn.status === "enabled" && envPresent) {
-          status = webhookStatus === "failing" ? "degraded" : "healthy";
-        } else if (conn.status === "disabled") {
-          status = "down";
-        } else if (conn.status === "sandbox_verified" || conn.status === "draft") {
-          status = "degraded";
-        } else {
-          status = "unconfigured";
-        }
-      } else if (envPresent) {
-        status = "degraded";
-      }
-
-      const note =
-        status === "unconfigured"
-          ? `Missing env: ${envKeys.join(", ")}`
-          : status === "degraded" && !conn
-            ? "Env present but no BYOK connection record"
-            : status === "degraded" && webhookStatus === "failing"
-              ? "Webhooks are failing. Check endpoint."
-              : status === "healthy"
-                ? "Operational"
-                : conn?.status === "disabled"
-                  ? "Disabled by admin"
-                  : "";
+      const status: IntegrationHealthEntry["status"] = envPresent
+        ? "healthy"
+        : "unconfigured";
+      const note = envPresent
+        ? "Env keys present for this app process (Medusa may use its own env)."
+        : `Missing env: ${envKeys.join(", ")}`;
 
       return {
         provider,
         status,
         sdkVersion: SDK_VERSIONS[provider] ?? null,
-        lastWebhookAt: conn?.last_verified_at ?? null,
-        webhookStatus,
+        lastWebhookAt: null,
+        webhookStatus: "unknown" as const,
         envPresent,
         note,
       };
