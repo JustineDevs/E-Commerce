@@ -183,7 +183,7 @@ export async function POST(req: Request) {
       rememberCompletedPosCommit(idempotencyKey, orderNumber);
     }
 
-    const orderRaw = order as Record<string, unknown> | null | undefined;
+    const orderRaw = order as unknown as Record<string, unknown> | null | undefined;
     const totalMinor = Math.round(Number(orderRaw?.total ?? 0));
 
     logAdminApiEvent({
