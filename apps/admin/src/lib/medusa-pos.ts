@@ -74,3 +74,44 @@ export function variantPricePhpFromCalculated(
   }
   return Math.round((amt / 100) * 100) / 100;
 }
+
+export type ProductThumbSource = {
+  thumbnail?: string | null;
+  images?: Array<{ url?: string | null } | null> | null;
+};
+
+/** Prefer `thumbnail`, else first product image URL from Medusa list/retrieve payloads. */
+export function pickProductThumbnailRaw(
+  p: ProductThumbSource | null | undefined,
+): string | undefined {
+  const th = typeof p?.thumbnail === "string" ? p.thumbnail.trim() : "";
+  if (th) return th;
+  for (const im of p?.images ?? []) {
+    const u = typeof im?.url === "string" ? im.url.trim() : "";
+    if (u) return u;
+  }
+  return undefined;
+}
+
+/**
+ * Medusa `thumbnail` may be absolute (file module URL) or a path under the store API origin.
+ * Browser `<img src>` on admin (3001) needs an absolute URL to load assets from Medusa (9000).
+ */
+export function resolvePosThumbnailUrl(
+  thumbnail: string | null | undefined,
+): string | undefined {
+  const t = typeof thumbnail === "string" ? thumbnail.trim() : "";
+  if (!t) return undefined;
+  if (/^https?:\/\//i.test(t)) {
+    return t;
+  }
+  const base = getMedusaStoreBaseUrl().replace(/\/$/, "");
+  const path = t.startsWith("/") ? t : `/${t}`;
+  return `${base}${path}`;
+}
+
+export function resolvePosProductImageUrl(
+  p: ProductThumbSource | null | undefined,
+): string | undefined {
+  return resolvePosThumbnailUrl(pickProductThumbnailRaw(p));
+}
