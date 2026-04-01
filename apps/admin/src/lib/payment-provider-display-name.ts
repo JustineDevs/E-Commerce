@@ -8,8 +8,8 @@ const EXACT: Record<string, string> = {
   pp_cod_cod: "Cash on delivery (COD)",
   pp_paypal_paypal: "PayPal",
   pp_stripe_stripe: "Stripe",
-  pp_maya_maya: "Maya",
-  pp_paymongo_paymongo: "PayMongo",
+  pp_maya_maya: "PayMaya",
+  pp_paymongo_paymongo: "GCash",
 };
 
 const STRIPE_SUFFIX = /^pp_stripe-(.+)_stripe$/;
