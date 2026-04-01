@@ -12,7 +12,7 @@ This document is the **live** counterpart to archived notes under `output/full-a
 
 | Check | Script / workflow |
 | --- | --- |
-| Dependency audit triage | `scripts/check-audit-triage.js` |
+| Dependency audit triage | `scripts/check-audit-triage.js` (document highs in `internal/docs/audit-triage.md`) |
 | Storefront client bundle (no server secrets) | `scripts/check-storefront-client-boundary.mjs` |
 | Legacy DB migrations vs Medusa commerce tables | `scripts/check-commerce-migration-boundary.mjs` |
 | Admin API routes must show staff or internal guard patterns | `scripts/check-admin-api-staff-guard.mjs` |
