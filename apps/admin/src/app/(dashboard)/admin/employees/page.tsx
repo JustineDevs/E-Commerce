@@ -33,6 +33,9 @@ export default function EmployeesPage() {
   const [saving, setSaving] = useState(false);
   const [pinModal, setPinModal] = useState<{ id: string; name: string } | null>(null);
   const [pinValue, setPinValue] = useState("");
+  const [deleteModal, setDeleteModal] = useState<{ id: string; name: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const fetchEmployees = useCallback(async () => {
     setLoading(true);
@@ -100,6 +103,40 @@ export default function EmployeesPage() {
     setPinValue("");
   }
 
+  async function confirmDeleteEmployee() {
+    if (!deleteModal) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch(`/api/admin/employees/${deleteModal.id}`, {
+        method: "DELETE",
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        message?: string;
+      };
+      if (!res.ok) {
+        setDeleteError(
+          typeof body.error === "string"
+            ? body.error
+            : `Delete failed (${res.status})`,
+        );
+        setDeleting(false);
+        return;
+      }
+      if (editId === deleteModal.id) {
+        setShowForm(false);
+        setEditId(null);
+      }
+      setDeleteModal(null);
+      void fetchEmployees();
+    } catch {
+      setDeleteError("Network error. Try again.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <AdminPageShell
       title="Employees"
@@ -156,6 +193,16 @@ export default function EmployeesPage() {
                     <button onClick={() => setPinModal({ id: emp.id, name: emp.full_name })} className="text-xs text-secondary hover:underline">
                       Set PIN
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDeleteError(null);
+                        setDeleteModal({ id: emp.id, name: emp.full_name });
+                      }}
+                      className="text-xs text-red-700 hover:underline"
+                    >
+                      Delete
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -211,6 +258,46 @@ export default function EmployeesPage() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {deleteModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-8 space-y-5">
+            <h2 className="text-lg font-bold font-headline">Delete employee</h2>
+            <p className="text-sm text-on-surface-variant">
+              Remove{" "}
+              <span className="font-semibold text-on-surface">{deleteModal.name}</span>{" "}
+              from the directory? This cannot be undone. Related POS history may keep references
+              by id; only remove if you are sure.
+            </p>
+            {deleteError ? (
+              <p className="text-sm text-red-700" role="alert">
+                {deleteError}
+              </p>
+            ) : null}
+            <div className="flex gap-3 justify-end pt-2">
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => {
+                  setDeleteModal(null);
+                  setDeleteError(null);
+                }}
+                className="px-5 py-2.5 text-xs font-bold uppercase tracking-widest text-on-surface-variant hover:bg-surface-container-high rounded transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => void confirmDeleteEmployee()}
+                className="bg-red-700 text-white px-5 py-2.5 text-xs font-bold uppercase tracking-widest hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                {deleting ? "Deleting…" : "Delete"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
