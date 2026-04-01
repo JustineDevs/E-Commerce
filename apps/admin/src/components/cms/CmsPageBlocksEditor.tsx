@@ -113,7 +113,7 @@ function SortableBlockRow({
   disabled,
 }: {
   block: CmsBlock;
-  onChange: (b: CmsBlock) => void;
+  onChange: (_b: CmsBlock) => void;
   onRemove: () => void;
   disabled: boolean;
 }) {
@@ -572,7 +572,7 @@ export function CmsPageBlocksEditor({
   disabled,
 }: {
   value: unknown;
-  onChange: (blocks: CmsBlock[]) => void;
+  onChange: (_blocks: CmsBlock[]) => void;
   disabled: boolean;
 }) {
   const blocks = normalizeBlocks(value);
