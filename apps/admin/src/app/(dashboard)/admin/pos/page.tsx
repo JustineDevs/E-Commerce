@@ -11,7 +11,11 @@ import {
 } from "@/lib/terminal-print";
 import { storeOfflineSale, isOnline as checkOnline } from "@/lib/offline-pos";
 import { useOfflineSync } from "@/lib/use-offline-sync";
-import { AdminBreadcrumbs, AdminPageShell } from "@/components/admin-console";
+import {
+  AdminBreadcrumbs,
+  AdminPageHelpFromPath,
+  AdminPageShell,
+} from "@/components/admin-console";
 
 type CartItem = {
   id: string;
@@ -34,6 +38,7 @@ type VariantLookup = {
   color: string;
   price: number;
   products: { name?: string } | null;
+  imageUrl?: string;
 };
 
 type ShiftData = {
@@ -55,6 +60,29 @@ type PosProductHit = {
   price: number;
   imageUrl?: string;
 };
+
+function PosProductImage({
+  url,
+  alt,
+  className,
+}: {
+  url?: string;
+  alt: string;
+  className?: string;
+}) {
+  const [broken, setBroken] = useState(false);
+  if (!url?.trim() || broken) {
+    return <div className={className} aria-hidden />;
+  }
+  return (
+    <img
+      src={url}
+      alt={alt}
+      className={className}
+      onError={() => setBroken(true)}
+    />
+  );
+}
 
 export default function POSPage() {
   const [barcodeInput, setBarcodeInput] = useState("");
@@ -205,6 +233,7 @@ export default function POSPage() {
         barcode: variant.barcode,
         price: Number(variant.price),
         qty: 1,
+        imageUrl: variant.imageUrl,
       });
       setBarcodeInput("");
     } else {
@@ -500,9 +529,12 @@ export default function POSPage() {
         <header className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-4xl font-extrabold font-headline tracking-tight text-primary">
-                {activeShift?.device_name ?? "Terminal 01"}
-              </h1>
+              <div className="flex flex-wrap items-start gap-2">
+                <h1 className="text-4xl font-extrabold font-headline tracking-tight text-primary">
+                  {activeShift?.device_name ?? "Terminal 01"}
+                </h1>
+                <AdminPageHelpFromPath />
+              </div>
               <p className="text-on-surface-variant font-body mt-2">
                 {activeShift
                   ? `Shift open since ${new Date(activeShift.opened_at).toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit" })}`
@@ -606,6 +638,7 @@ export default function POSPage() {
                           color: p.color,
                           price: p.price,
                           qty: 1,
+                          imageUrl: p.imageUrl,
                         });
                         setSearchInput("");
                         setSearchResults([]);
@@ -657,11 +690,18 @@ export default function POSPage() {
                       color: p.color,
                       price: p.price,
                       qty: 1,
+                      imageUrl: p.imageUrl,
                     })
                   }
                   className="w-full text-left"
                 >
-                  <div className="aspect-square mb-4 overflow-hidden rounded bg-surface-container-high" />
+                  <div className="relative mb-4 aspect-square w-full overflow-hidden rounded bg-surface-container-high">
+                    <PosProductImage
+                      url={p.imageUrl}
+                      alt={p.name}
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
                   <p className="text-xs font-bold uppercase tracking-tighter font-headline">
                     {p.name}
                   </p>
@@ -704,10 +744,18 @@ export default function POSPage() {
                         color: p.color,
                         price: p.price,
                         qty: 1,
+                        imageUrl: p.imageUrl,
                       })
                     }
                     className="w-full pr-12 text-left"
                   >
+                    <div className="relative mb-2 aspect-[5/4] w-full overflow-hidden rounded bg-surface-container-high">
+                      <PosProductImage
+                        url={p.imageUrl}
+                        alt={p.name}
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
                     <p className="text-xs font-bold uppercase tracking-tighter font-headline line-clamp-2">
                       {p.name}
                     </p>
@@ -744,7 +792,13 @@ export default function POSPage() {
             ) : (
               cart.map((item) => (
                 <div key={item.id} className="flex gap-4">
-                  <div className="w-16 h-16 bg-surface-container-low rounded overflow-hidden flex-shrink-0" />
+                  <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded bg-surface-container-low">
+                    <PosProductImage
+                      url={item.imageUrl}
+                      alt={item.name}
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
                   <div className="flex-grow">
                     <div className="flex justify-between items-start">
                       <h4 className="text-xs font-bold font-headline uppercase">
@@ -854,12 +908,9 @@ export default function POSPage() {
               Open cash drawer
             </button>
             <p className="text-[10px] text-on-surface-variant leading-relaxed px-1">
-              Receipt and product labels use the local terminal agent (default{" "}
-              <span className="font-mono">127.0.0.1:17711</span>). Configure{" "}
-              <span className="font-mono">NEXT_PUBLIC_TERMINAL_AGENT_URL</span>, optional{" "}
-              <span className="font-mono">NEXT_PUBLIC_TERMINAL_PRINT_VIA_API=true</span>, and printer{" "}
-              <span className="font-mono">PRINTER_TCP_HOST</span> on the agent. Labels print ESC/POS text
-              (barcode digits from Medusa when set).
+              Receipts and shelf labels use the print program running on this computer. If printing fails, ask
+              whoever maintains your store setup to check the register connection and printer. Barcodes use
+              catalog data when available.
             </p>
             {hardwareMessage ? (
               <p className="text-xs text-amber-800 px-1">{hardwareMessage}</p>
