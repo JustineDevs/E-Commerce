@@ -35,7 +35,7 @@ export default function ReconciliationPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Payment Reconciliation</h1>
-          <p className="text-sm text-gray-500 mt-1">PSP settlement vs Medusa orders</p>
+          <p className="text-sm text-gray-500 mt-1">Payment provider payouts compared with store orders</p>
         </div>
         <select
           value={days}
@@ -55,13 +55,13 @@ export default function ReconciliationPage() {
         <>
           <div className="grid grid-cols-3 gap-4 mb-6">
             <div className="bg-white border border-gray-200 rounded-lg p-4">
-              <p className="text-xs text-gray-500 uppercase tracking-wide">Medusa Total</p>
+              <p className="text-xs text-gray-500 uppercase tracking-wide">Store total</p>
               <p className="text-2xl font-semibold mt-1">
                 {(data.totalMedusaMinor / 100).toLocaleString("en-PH", { style: "currency", currency: "PHP" })}
               </p>
             </div>
             <div className="bg-white border border-gray-200 rounded-lg p-4">
-              <p className="text-xs text-gray-500 uppercase tracking-wide">PSP Settlement</p>
+              <p className="text-xs text-gray-500 uppercase tracking-wide">Provider settlement</p>
               <p className="text-2xl font-semibold mt-1">
                 {(data.totalPspMinor / 100).toLocaleString("en-PH", { style: "currency", currency: "PHP" })}
               </p>
@@ -80,9 +80,9 @@ export default function ReconciliationPage() {
                 <tr>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Date</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Provider</th>
-                  <th className="text-right px-4 py-3 font-medium text-gray-600">Medusa Orders</th>
-                  <th className="text-right px-4 py-3 font-medium text-gray-600">Medusa Total</th>
-                  <th className="text-right px-4 py-3 font-medium text-gray-600">PSP Settled</th>
+                  <th className="text-right px-4 py-3 font-medium text-gray-600">Store orders</th>
+                  <th className="text-right px-4 py-3 font-medium text-gray-600">Store total</th>
+                  <th className="text-right px-4 py-3 font-medium text-gray-600">Provider paid</th>
                   <th className="text-right px-4 py-3 font-medium text-gray-600">Discrepancy</th>
                   <th className="text-center px-4 py-3 font-medium text-gray-600">Status</th>
                 </tr>
