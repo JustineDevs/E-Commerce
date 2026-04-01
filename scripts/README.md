@@ -17,7 +17,7 @@ node scripts/check-audit-triage.js
 **If it fails:**
 
 1. Fix critical issues, or
-2. For high findings you accept for now: add/update `internal/docs/audit-triage.md` with an explicit ACCEPT note and context (the script looks for triage content when highs remain).
+2. For high findings you accept for now: add/update `internal/docs/audit-triage.md` with explicit **ACCEPT** or **FIX** rows and enough detail (script requires a substantive doc: length plus ACCEPT/FIX/CVE/high-severity wording when highs remain).
 
 ---
 
