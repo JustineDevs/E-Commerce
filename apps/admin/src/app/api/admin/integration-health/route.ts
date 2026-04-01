@@ -22,7 +22,7 @@ const PROVIDER_ENV_KEYS: Record<string, string[]> = {
 };
 
 const SDK_VERSIONS: Record<string, string> = {
-  stripe: "@medusajs/payment-stripe (Medusa built-in)",
+  stripe: "stripe (Checkout Session provider in apps/medusa/src/modules/stripe-checkout-payment)",
   paypal: "@paypal/paypal-server-sdk",
   paymongo: "typed REST wrapper (no official Node SDK)",
   maya: "typed REST wrapper (no official Node SDK)",
