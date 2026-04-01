@@ -4,10 +4,10 @@ import {
 } from "@/lib/medusa-checkout";
 
 /**
- * BYOK / owner configuration: set `NEXT_PUBLIC_CHECKOUT_PAYMENT_PROVIDERS` to a comma-separated
- * list of keys (STRIPE, PAYPAL, PAYMONGO, MAYA, COD). Only listed providers are selectable.
+ * Set `NEXT_PUBLIC_CHECKOUT_PAYMENT_PROVIDERS` to a comma-separated list of keys
+ * (STRIPE, PAYPAL, PAYMONGO, MAYA, COD). Only listed providers are selectable.
  * If unset, the default online provider from `NEXT_PUBLIC_MEDUSA_PAYMENT_PROVIDER_ID` plus COD
- * are available (typical Philippines setup). Other PSPs show as not configured.
+ * are available (typical Philippines setup).
  */
 export function getCheckoutPaymentAvailability(): {
   available: Record<PaymentProviderKey, boolean>;
