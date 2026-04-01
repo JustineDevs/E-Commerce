@@ -2,10 +2,12 @@ import { NextResponse } from "next/server";
 import { logAdminApiEvent } from "@/lib/admin-api-log";
 import { getCorrelationId } from "@/lib/request-correlation";
 import {
+  type ProductThumbSource,
   getMedusaAdminSdk,
   getMedusaRegionId,
   getMedusaStoreSdk,
   optionRowsToSizeColor,
+  resolvePosProductImageUrl,
   variantPricePhpFromCalculated,
   withSalesChannelId,
 } from "@/lib/medusa-pos";
@@ -64,6 +66,7 @@ export async function POST(req: Request) {
 
   let variant: VariantLike | null = null;
   let productTitle = "";
+  let thumbSource: ProductThumbSource | undefined;
 
   try {
     const storeList = await storeSdk.store.product.list(
@@ -72,7 +75,7 @@ export async function POST(req: Request) {
         q: trimmed,
         limit: 50,
         fields:
-          "*variants,*variants.calculated_price,*variants.options,*variants.sku,*variants.barcode,+title",
+          "*variants,*variants.calculated_price,*variants.options,*variants.sku,*variants.barcode,+title,+thumbnail,*images",
       }) as Parameters<typeof storeSdk.store.product.list>[0],
     );
     outerStore: for (const p of storeList.products ?? []) {
@@ -85,6 +88,7 @@ export async function POST(req: Request) {
         if (vSku === trimmed || barcodeMatch) {
           variant = v as VariantLike;
           productTitle = p.title ?? "";
+          thumbSource = p;
           break outerStore;
         }
       }
@@ -114,12 +118,13 @@ export async function POST(req: Request) {
             withSalesChannelId({
               region_id: regionId,
               fields:
-                "*variants,*variants.calculated_price,*variants.options,*variants.sku,*variants.barcode,+title",
+                "*variants,*variants.calculated_price,*variants.options,*variants.sku,*variants.barcode,+title,+thumbnail,*images",
             }) as Parameters<typeof storeSdk.store.product.retrieve>[1],
           );
           const vmatch = prod.product?.variants?.find((x) => x.id === pick.id);
           variant = (vmatch ?? pick) as VariantLike;
           productTitle = prod.product?.title ?? p.title ?? "";
+          thumbSource = prod.product ?? thumbSource;
           break outerAdmin;
         }
       }
@@ -159,5 +164,6 @@ export async function POST(req: Request) {
     color,
     price,
     products: { name: productTitle },
+    imageUrl: resolvePosProductImageUrl(thumbSource),
   });
 }
