@@ -113,35 +113,6 @@ export function validateMedusaProcessEnv(): void {
     );
   }
 
-  const credSrc = process.env.PAYMENT_CREDENTIALS_SOURCE?.trim().toLowerCase();
-
-  if (process.env.NODE_ENV === "production") {
-    const mandateOff = process.env.MEDUSA_BYOK_MANDATE_OFF?.trim() === "1";
-    if (!mandateOff) {
-      if (credSrc !== "platform" && credSrc !== "supabase") {
-        throw new Error(
-          "Medusa: production requires PAYMENT_CREDENTIALS_SOURCE=platform or supabase (BYOK via Supabase payment_connections). " +
-            "Remove plaintext PSP keys from deployment env when using platform source. " +
-            "Break-glass only: MEDUSA_BYOK_MANDATE_OFF=1.",
-        );
-      }
-    }
-  }
-
-  if (credSrc === "platform" || credSrc === "supabase") {
-    const need = [
-      "SUPABASE_URL",
-      "SUPABASE_SERVICE_ROLE_KEY",
-      "PAYMENT_CONNECTIONS_ENCRYPTION_KEY",
-    ] as const;
-    const missing = need.filter((k) => !process.env[k]?.trim());
-    if (missing.length > 0) {
-      throw new Error(
-        `Medusa: PAYMENT_CREDENTIALS_SOURCE=platform requires ${missing.join(", ")}`,
-      );
-    }
-  }
-
   if (process.env.NODE_ENV === "production") {
     const jwt = process.env.JWT_SECRET?.trim() ?? "";
     const cookie = process.env.COOKIE_SECRET?.trim() ?? "";
