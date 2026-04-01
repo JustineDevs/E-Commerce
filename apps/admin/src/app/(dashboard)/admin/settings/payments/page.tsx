@@ -161,11 +161,9 @@ export default async function PaymentSettingsPage() {
           Payment provider credentials
         </h3>
         <p className="text-on-surface-variant text-sm leading-relaxed">
-          Stripe, PayPal, PayMongo, Maya, and webhooks are configured on the{" "}
-          <strong>Medusa server environment</strong> (for example{" "}
-          <code className="rounded bg-surface-container-high px-1 text-xs">STRIPE_API_KEY</code>,{" "}
-          <code className="rounded bg-surface-container-high px-1 text-xs">PAYMONGO_SECRET_KEY</code>
-          ). Restart Medusa after changing keys. This dashboard does not store PSP secrets.
+          Card and wallet providers (for example Stripe, PayPal, GCash, PayMaya) and their notifications are
+          configured on the commerce server by your technical contact. After any key change, that server
+          usually needs a restart. This screen is read-only and does not store payment secrets.
         </p>
       </section>
     </AdminPageShell>
