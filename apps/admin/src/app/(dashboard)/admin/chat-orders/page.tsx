@@ -36,14 +36,11 @@ export default async function ChatOrdersPage() {
     >
       <details className="mb-8 max-w-3xl text-xs text-on-surface-variant">
         <summary className="cursor-pointer font-medium text-on-surface select-none">
-          Technical integration
+          Setup for IT or your developer
         </summary>
         <p className="mt-2 border-l-2 border-outline-variant/40 pl-3 leading-relaxed">
-          Automated intake may POST to{" "}
-          <code className="text-[11px] bg-surface-container-high px-1 rounded">
-            /api/integrations/chat-orders/intake
-          </code>{" "}
-          (staff session or x-internal-key). Line items must use Medusa variant ids.
+          Automated systems can send orders to the chat intake endpoint using an approved staff session or
+          internal key. Each line must reference a real product variant from your catalog.
         </p>
       </details>
       <section className="mb-10 max-w-xl">
