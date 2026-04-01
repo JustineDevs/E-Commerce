@@ -95,17 +95,34 @@ async function rateLimitUpstash(
   return { ok: true };
 }
 
+/** Sticky backend: avoid mixing Upstash and in-process for the same key in one process (would reset counts). */
+let useUpstashForRateLimit: boolean | null = null;
+
+function upstashEnvConfigured(): boolean {
+  return !!(
+    process.env.UPSTASH_REDIS_REST_URL?.trim() &&
+    process.env.UPSTASH_REDIS_REST_TOKEN?.trim()
+  );
+}
+
 /**
  * Fixed-window limit. Uses Upstash when configured; otherwise in-process.
+ * If Upstash is configured but a call returns null (HTTP/parse failure), subsequent calls use in-process only.
  */
 export async function rateLimitFixedWindow(
   key: string,
   max: number,
   windowMs: number,
 ): Promise<{ ok: true } | { ok: false; retryAfterSec: number }> {
-  const remote = await rateLimitUpstash(key, max, windowMs);
-  if (remote !== null) {
-    return remote;
+  if (useUpstashForRateLimit === null) {
+    useUpstashForRateLimit = upstashEnvConfigured();
+  }
+  if (useUpstashForRateLimit) {
+    const remote = await rateLimitUpstash(key, max, windowMs);
+    if (remote !== null) {
+      return remote;
+    }
+    useUpstashForRateLimit = false;
   }
   return rateLimitInProcess(key, max, windowMs);
 }
