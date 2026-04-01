@@ -4,10 +4,8 @@ import dotenv from "dotenv";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Load root .env for shared secrets (GOOGLE_*, NEXTAUTH_SECRET, etc.)
+// Load root .env (same file as other apps). Next also loads env from envDir (repo root).
 dotenv.config({ path: path.join(__dirname, "../../.env") });
-// Admin-local overrides (NEXTAUTH_URL=http://localhost:3001) take precedence
-dotenv.config({ path: path.join(__dirname, ".env.local"), override: true });
 
 function imageRemotePatterns() {
   const raw =
@@ -38,8 +36,10 @@ function imageRemotePatterns() {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
+  /** Load `.env*` from monorepo root only (no `apps/admin/.env.local`). */
+  envDir: path.join(__dirname, "../.."),
   outputFileTracingRoot: path.join(__dirname, "../.."),
-  serverExternalPackages: ["@aws-sdk/client-kms"],
+  serverExternalPackages: [],
   experimental: {
     externalDir: true,
     optimizePackageImports: [
@@ -62,7 +62,6 @@ const nextConfig = {
     "@apparel-commerce/ui",
     "@apparel-commerce/database",
     "@apparel-commerce/platform-data",
-    "@apparel-commerce/payment-connection-crypto",
   ],
 };
 
