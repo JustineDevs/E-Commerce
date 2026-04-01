@@ -1,7 +1,12 @@
 # ADR-0001: BYOK Credential Management
 
 ## Status
-Accepted
+
+**Superseded (2026-03-31).** The repository no longer implements Supabase BYOK for payment credentials. Medusa PSP keys are configured only via environment variables. This document is kept for historical context.
+
+## Previous status
+
+Accepted (superseded)
 
 ## Date
 2026-03-31
@@ -13,7 +18,7 @@ Payment provider credentials (API keys, webhook secrets, client IDs) must be ava
 Adopt a Bring Your Own Keys (BYOK) model where credentials are stored in Supabase `payment_connections` table and hydrated at runtime.
 
 ### Architecture
-1. Credentials stored in `public.payment_connections` (Supabase) with RLS policies restricting access to service_role (see migration lineage through `016_rls_payment_connections_staff.sql`).
+1. Credentials stored in `public.payment_connections` (Supabase) with RLS policies restricting access to service_role (**table removed**; see `013_drop_legacy_payment_connections.sql` in the platform migration set).
 2. **Medusa boot (sync):** `apps/medusa/src/lib/apply-platform-payment-env.ts` runs `src/scripts/emit-platform-payment-env.ts`, which decrypts `secret_ciphertext` via `@apparel-commerce/payment-connection-crypto` and prints env key JSON for `process.env`.
 3. **Medusa runtime refresh (async):** `apps/medusa/src/lib/apply-platform-payment-env-async.ts` loads the same rows on an interval (`BYOK_LAZY_POLL_INTERVAL_MS`, default 5 minutes) when `PAYMENT_CREDENTIALS_SOURCE` is `platform` or `supabase`. Exposes health via `getByokHealthStatus()` and `GET /admin/payment-health` (`operatorAlertRecommended`, decrypt failure counts).
 4. Admin dashboard manages connections through staff API routes (`apps/admin/src/app/api/admin/payment-connections/*`) with audit logging; client-facing errors sanitize crypto-related failures.
