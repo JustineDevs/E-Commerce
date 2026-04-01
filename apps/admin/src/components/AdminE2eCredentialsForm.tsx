@@ -28,11 +28,23 @@ export function AdminE2eCredentialsForm({ callbackUrl, defaultEmail }: Props) {
         email: email.trim(),
         password,
         callbackUrl,
-        redirect: true,
+        redirect: false,
       });
-      if (res?.error) {
-        setError("Sign in failed. Check E2E user exists in Supabase with staff or admin role.");
+      if (!res?.ok) {
+        setError(
+          res?.error === "CredentialsSignin"
+            ? "Email, password, or staff access did not match. Use the first allowed email, NEXTAUTH_SECRET as password, and run pnpm e2e:ensure-staff."
+            : (res?.error?.trim() ||
+                "Sign-in did not complete. Confirm the email is allowed, the password matches your test secret, and this account has staff access."),
+        );
+        return;
       }
+      const raw =
+        typeof res.url === "string" && res.url.length > 0 ? res.url : callbackUrl;
+      const target = raw.startsWith("http")
+        ? raw
+        : `${window.location.origin}${raw.startsWith("/") ? raw : `/${raw}`}`;
+      window.location.assign(target);
     } finally {
       setBusy(false);
     }
