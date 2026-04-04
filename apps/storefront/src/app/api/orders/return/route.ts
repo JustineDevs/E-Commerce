@@ -1,8 +1,11 @@
+import { enqueueJob, insertCustomerReturnRequestAudit } from "@apparel-commerce/platform-data";
+
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 
 import { authOptions } from "@/lib/auth";
 import { medusaAdminFetch } from "@/lib/medusa-admin-fetch";
+import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 import {
   getRequestIp,
   rateLimitFixedWindow,
@@ -110,5 +113,25 @@ export async function POST(req: Request) {
   }
 
   const data = (await returnRes.json()) as unknown;
+
+  const sb = createStorefrontServiceSupabase();
+  let staffJobId: string | null = null;
+  if (sb) {
+    staffJobId = await enqueueJob(
+      sb,
+      "return_request_review",
+      { order_id: orderId, email },
+      "storefront_return",
+    ).catch(() => null);
+    await insertCustomerReturnRequestAudit(sb, {
+      medusaOrderId: orderId,
+      customerEmail: email,
+      items: items.map((it) => ({ ...it })),
+      note: typeof body.note === "string" ? body.note.trim() || null : null,
+      medusaResponse: data,
+      staffReviewJobId: staffJobId,
+    }).catch(() => {});
+  }
+
   return NextResponse.json({ ok: true, data });
 }
