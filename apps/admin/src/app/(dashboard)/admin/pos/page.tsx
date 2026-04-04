@@ -334,6 +334,7 @@ export default function POSPage() {
           variantId: c.variantId,
           quantity: c.qty,
         })),
+        shiftId: activeShift?.id,
       }),
     });
     setCommitLoading(false);
