@@ -4,7 +4,7 @@
  */
 
 export type CheckoutCompletionPayload = {
-  stage: "complete_medusa_cart";
+  stage: "complete_medusa_cart" | "cod_place_order";
   outcome: "success" | "failure";
   httpStatus?: number;
   cartIdSuffix?: string;
