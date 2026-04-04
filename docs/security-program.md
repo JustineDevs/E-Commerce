@@ -7,6 +7,7 @@ This document is the **live** counterpart to archived notes under `output/full-a
 - **Medusa** registers payment modules from **`process.env`** at startup (`apps/medusa/medusa-config.ts`). Set `STRIPE_API_KEY`, `PAYPAL_*`, `PAYMONGO_*`, `MAYA_*`, and webhook secrets in the Medusa deployment environment; restart Medusa after rotation.
 - **Observability:** `GET /admin/payment-health` on Medusa returns which providers have env keys present (no secret values).
 - **Storefront** must not bundle server-only PSP secrets (`scripts/check-storefront-client-boundary.mjs`).
+- **Payment-state reconciliation** is part of production readiness, not only credential hygiene: Supabase `payment_attempts`, server finalize routes, optional `GET /api/cron/finalize-payment-attempts` on the storefront, and staff **Payment attempts** in admin together reduce stuck orders when webhooks or browser returns fail. Treat missing cron or misconfigured `STOREFRONT_*` recovery env vars as an operational gap, not only a security gap.
 
 ## 2. Automated gates (CI and release)
 
