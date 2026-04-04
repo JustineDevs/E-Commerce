@@ -1,3 +1,5 @@
+import { evaluatePosSalePolicy } from "@apparel-commerce/omnichannel-policy";
+import { getShiftById } from "@apparel-commerce/platform-data";
 import { logAdminApiEvent } from "@/lib/admin-api-log";
 import { medusaAdminFetch } from "@/lib/medusa-admin-http";
 import { patchMedusaOrderMetadata } from "@/lib/medusa-order-bridge";
@@ -6,6 +8,7 @@ import {
   rememberCompletedPosCommit,
 } from "@/lib/pos-commit-idempotency";
 import { assertPosCartStock } from "@/lib/pos-inventory-guard";
+import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { getCorrelationId } from "@/lib/request-correlation";
 import {
   getMedusaAdminSdk,
@@ -109,6 +112,8 @@ export async function POST(req: Request) {
     email?: string;
     /** IndexedDB offline sale id; replays return the same Medusa order when already synced. */
     offlineSaleId?: string;
+    /** Supabase pos_shifts.id for register-grade reconciliation (metadata on Medusa order). */
+    shiftId?: string;
   };
   const items = body.items ?? [];
   if (items.length === 0) {
@@ -142,6 +147,38 @@ export async function POST(req: Request) {
     return correlatedError(correlationId, status, stock.message, stock.code);
   }
 
+  const shiftId =
+    typeof body.shiftId === "string" ? body.shiftId.trim() : "";
+  let hasOpenShift = false;
+  if (shiftId) {
+    const sup = adminSupabaseOr503(correlationId);
+    if ("response" in sup) {
+      if (idempotencyKey) inflight.delete(idempotencyKey);
+      return tagResponse(sup.response, correlationId);
+    }
+    const row = await getShiftById(sup.client, shiftId);
+    hasOpenShift = row?.status === "open";
+  }
+
+  const posPolicy = evaluatePosSalePolicy({
+    stockVerified: true,
+    hasOpenShift,
+    shiftIdProvided: Boolean(shiftId),
+  });
+  if (!posPolicy.allowed) {
+    if (idempotencyKey) inflight.delete(idempotencyKey);
+    return correlatedError(
+      correlationId,
+      403,
+      posPolicy.violations.join("; ") || "POS policy denied",
+      "POS_POLICY_DENIED",
+    );
+  }
+
+  const draftMetadata: Record<string, unknown> = {};
+  if (offlineSaleId) draftMetadata.pos_offline_id = offlineSaleId;
+  if (shiftId) draftMetadata.pos_shift_id = shiftId;
+
   try {
     const { draft_order } = await adminSdk.admin.draftOrder.create({
       email: (body.email?.trim() || "pos@instore.local").slice(0, 320),
@@ -151,8 +188,8 @@ export async function POST(req: Request) {
         variant_id: i.variantId,
         quantity: Math.max(1, Math.floor(i.quantity)),
       })),
-      ...(offlineSaleId
-        ? { metadata: { pos_offline_id: offlineSaleId } as Record<string, unknown> }
+      ...(Object.keys(draftMetadata).length > 0
+        ? { metadata: draftMetadata }
         : {}),
     } as never);
 
@@ -169,10 +206,11 @@ export async function POST(req: Request) {
       draft_order.id,
     );
 
-    if (offlineSaleId && order?.id) {
-      await patchMedusaOrderMetadata(order.id, {
-        pos_offline_id: offlineSaleId,
-      });
+    if (order?.id && (offlineSaleId || shiftId)) {
+      const patch: Record<string, unknown> = {};
+      if (offlineSaleId) patch.pos_offline_id = offlineSaleId;
+      if (shiftId) patch.pos_shift_id = shiftId;
+      await patchMedusaOrderMetadata(order.id, patch);
     }
 
     const orderNumber =
