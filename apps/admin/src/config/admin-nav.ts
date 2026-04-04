@@ -29,6 +29,12 @@ export const ADMIN_NAV_GROUPS: { label: string; items: readonly AdminNavItem[] }
       },
       { href: "/admin/inventory", label: "Inventory", icon: "inventory_2", permission: "inventory:read" },
       { href: "/admin/orders", label: "Orders", icon: "shopping_cart", permission: "orders:read" },
+      {
+        href: "/admin/payments",
+        label: "Payment attempts",
+        icon: "account_balance_wallet",
+        permission: "dashboard:read",
+      },
       { href: "/admin/pos", label: "POS", icon: "dock", permission: "pos:use" },
       {
         href: "/admin/offline-queue",
