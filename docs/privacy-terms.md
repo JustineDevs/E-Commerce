@@ -6,7 +6,7 @@
 
 ## Executive Summary
 
-This document specifies the Product Requirements for an apparel commerce platform designed to serve a shorts/apparel retail business in the Philippines. The platform provides a unified system for online storefront sales, point-of-sale transactions, inventory management, and J&T Express shipping integration. The system uses a single source of truth for product variants, stock levels, orders, payments, and shipment tracking across both web and retail channels.
+This document specifies product requirements for an apparel commerce stack for a shorts and apparel retail business in the Philippines. The implementation is **Medusa-first** for commerce (catalog, cart, orders, payments, inventory records) with a Next.js storefront and admin, Supabase for staff and operational data, and integrations such as AfterShip for tracking. **Inventory and reservations** follow Medusa and configured modules. **POS** features are workflow scaffolding unless you deploy a full register process. Marketing language should not claim a fully unified omnichannel engine unless those behaviors are deployed and tested end to end.
 
 ***
 
@@ -26,8 +26,8 @@ This document specifies the Product Requirements for an apparel commerce platfor
 
 ## Business Objectives
 
-1. **Unify sales channels** – Enable online and retail sales through one system
-2. **Eliminate inventory drift** – One product database across web and POS
+1. **Align sales channels** – Online and retail flows on a Medusa-centered catalog and orders
+2. **Reduce inventory drift** – Medusa inventory records as commerce truth; visibility depends on configuration
 3. **Enable global tax compliance** – Hosted payments handle VAT and sales tax
 4. **Reduce fulfillment friction** – Integrated tracking and label generation for J&T Express
 5. **Support high-volume apparel SKUs** – Handle size/color variants efficiently
