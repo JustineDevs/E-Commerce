@@ -99,6 +99,10 @@ export default class CodPaymentProviderService extends AbstractPaymentProvider<R
         ...prior,
         cod_capture_at: new Date().toISOString(),
         cod_capture_source: "medusa_capture_payment",
+        capture_expected_via:
+          typeof prior.capture_expected_via === "string"
+            ? prior.capture_expected_via
+            : "aftership_delivered_webhook",
       },
     };
   }
