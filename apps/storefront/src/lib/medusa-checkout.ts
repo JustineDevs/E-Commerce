@@ -1,4 +1,3 @@
-import Medusa from "@medusajs/js-sdk";
 import {
   formatMedusaCheckoutError,
   tryDeleteStoreCart,
@@ -8,19 +7,16 @@ import {
   getMedusaRegionId,
   getMedusaStoreBaseUrl,
   getMedusaPublishableKey,
-  withSalesChannelId,
 } from "./storefront-medusa-env";
-import { medusaMinorToMajor } from "./medusa-money";
-import type { MedusaCartAddressPayload } from "@/lib/medusa-profile-address";
+import {
+  prepareMedusaStoreCart,
+  reconcileMedusaCartGrandTotalMajor,
+  type MedusaCheckoutLine,
+  type CodCartPayload,
+  type MedusaCheckoutTotalsPreview,
+} from "./medusa-checkout-cart-prep";
 
-export type MedusaCheckoutLine = { variantId: string; quantity: number };
-
-/** Server from POST /api/checkout/cod-cart-payload; required when paying with COD. */
-export type CodCartPayload = {
-  email: string;
-  shipping_address: MedusaCartAddressPayload;
-  billing_address: MedusaCartAddressPayload;
-};
+export type { MedusaCheckoutLine, CodCartPayload, MedusaCheckoutTotalsPreview };
 
 export type MedusaCheckoutResult = {
   checkoutUrl: string;
@@ -63,6 +59,53 @@ function isCodProviderId(providerId: string): boolean {
   return providerId === PAYMENT_PROVIDER_IDS.COD || providerId.includes("cod_cod");
 }
 
+/**
+ * Loads live totals from the server (same Medusa path as pay). Prefer over calling Medusa from the browser.
+ */
+export async function previewMedusaCheckoutTotals(input: {
+  lines: MedusaCheckoutLine[];
+  email?: string;
+  loyaltyPointsToRedeem?: number;
+  paymentMethod: PaymentProviderKey;
+}): Promise<MedusaCheckoutTotalsPreview> {
+  if (typeof window === "undefined") {
+    throw new Error("Checkout preview must run in the browser.");
+  }
+  const res = await fetch("/api/checkout/medusa-totals-preview", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      lines: input.lines,
+      email: input.email,
+      loyaltyPointsToRedeem: input.loyaltyPointsToRedeem,
+      paymentMethod: input.paymentMethod,
+    }),
+  });
+  const data = (await res.json().catch(() => ({}))) as MedusaCheckoutTotalsPreview & {
+    error?: string;
+    missingFields?: string[];
+  };
+  if (!res.ok) {
+    const hint =
+      Array.isArray(data.missingFields) && data.missingFields.length
+        ? ` ${data.missingFields.join(", ")}`
+        : "";
+    throw new Error(
+      (typeof data.error === "string" && data.error.trim()
+        ? data.error
+        : `Could not load checkout totals (${res.status}).`) + hint,
+    );
+  }
+  if (
+    typeof data.total !== "number" ||
+    typeof data.currencyCode !== "string"
+  ) {
+    throw new Error("Invalid totals response from server.");
+  }
+  return data as MedusaCheckoutTotalsPreview;
+}
+
 export async function startMedusaCheckout(input: {
   lines: MedusaCheckoutLine[];
   email?: string;
@@ -84,7 +127,6 @@ export async function startMedusaCheckout(input: {
     );
   }
 
-  const sdk = new Medusa({ baseUrl, publishableKey });
   const providerId =
     input.providerId?.trim() || getMedusaPaymentProviderId();
   const codFlow = isCodProviderId(providerId);
@@ -98,72 +140,17 @@ export async function startMedusaCheckout(input: {
 
   let cartId: string | undefined;
   try {
-    const { cart: created } = await sdk.store.cart.create(
-      withSalesChannelId({ region_id: regionId }) as Parameters<
-        typeof sdk.store.cart.create
-      >[0],
+    const ctx = await prepareMedusaStoreCart(
+      {
+        lines: input.lines,
+        email: codFlow ? undefined : input.email?.trim(),
+        codCartPayload: codFlow ? input.codCartPayload : undefined,
+        loyaltyPointsToRedeem: input.loyaltyPointsToRedeem,
+      },
+      codFlow,
     );
-    cartId = created?.id;
-    if (!cartId) {
-      throw new Error("The store did not return a cart id.");
-    }
-
-    for (const line of input.lines) {
-      await sdk.store.cart.createLineItem(cartId, {
-        variant_id: line.variantId,
-        quantity: line.quantity,
-      });
-    }
-
-    const cartEmail = codFlow
-      ? input.codCartPayload!.email.trim()
-      : input.email?.trim();
-    if (cartEmail) {
-      await sdk.store.cart.update(cartId, { email: cartEmail });
-    }
-
-    if (codFlow && input.codCartPayload) {
-      await sdk.store.cart.update(cartId, {
-        shipping_address: input.codCartPayload.shipping_address,
-        billing_address: input.codCartPayload.billing_address,
-      });
-    }
-
-    const { shipping_options } = await sdk.store.fulfillment.listCartOptions({
-      cart_id: cartId,
-    });
-    const firstOption = shipping_options?.[0];
-    if (!firstOption?.id) {
-      throw new Error(
-        "No shipping options available for this cart. Check your region and shipping setup.",
-      );
-    }
-
-    await sdk.store.cart.addShippingMethod(cartId, { option_id: firstOption.id });
-
-    const loyaltyPts = Math.floor(Number(input.loyaltyPointsToRedeem ?? 0));
-    if (loyaltyPts > 0) {
-      if (!cartEmail) {
-        throw new Error("Email is required on the cart before redeeming loyalty points.");
-      }
-      const loyaltyRes = await fetch(
-        `${baseUrl.replace(/\/$/, "")}/store/carts/${encodeURIComponent(cartId)}/loyalty`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-publishable-api-key": publishableKey,
-          },
-          body: JSON.stringify({ points: loyaltyPts }),
-        },
-      );
-      if (!loyaltyRes.ok) {
-        const errText = await loyaltyRes.text().catch(() => "");
-        throw new Error(
-          errText || `Loyalty redemption failed (${loyaltyRes.status}).`,
-        );
-      }
-    }
+    cartId = ctx.cartId;
+    const { sdk } = ctx;
 
     const { cart: refreshedForPayment } = await sdk.store.cart.retrieve(cartId, {
       fields: "+payment_collection,*payment_collection.payment_sessions",
@@ -215,17 +202,21 @@ export async function startMedusaCheckout(input: {
       : "Payment";
 
     const { cart: priced } = await sdk.store.cart.retrieve(cartId, {
-      fields: "id,total,currency_code,subtotal,tax_total",
+      fields:
+        "id,total,currency_code,subtotal,tax_total,shipping_total,discount_total",
     } as never);
-    const rawTotal = priced && typeof priced === "object" && "total" in priced
-      ? Number((priced as { total?: unknown }).total)
-      : NaN;
-    const totalMinor = Number.isFinite(rawTotal) ? rawTotal : 0;
+    const pricedObj =
+      priced && typeof priced === "object"
+        ? (priced as unknown as Record<string, unknown>)
+        : {};
     const currencyRaw =
       priced && typeof priced === "object" && "currency_code" in priced
         ? String((priced as { currency_code?: string }).currency_code ?? "PHP")
         : "PHP";
-    const confirmedTotal = medusaMinorToMajor(totalMinor, currencyRaw);
+    const { totalMajor: confirmedTotal } = reconcileMedusaCartGrandTotalMajor(
+      pricedObj,
+      currencyRaw,
+    );
 
     if (codSession) {
       const completeFn = (
@@ -283,4 +274,3 @@ export async function startMedusaCheckout(input: {
     throw new Error(formatMedusaCheckoutError(e));
   }
 }
-
