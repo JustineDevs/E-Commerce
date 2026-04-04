@@ -35,7 +35,9 @@ export async function GET(req: Request) {
     const stuck = await listStuckPaymentAttempts(sb, 25);
     for (const row of stuck) {
       processed += 1;
-      const result = await finalizeMedusaCartFromServer(row.cart_id);
+      const result = await finalizeMedusaCartFromServer(row.cart_id, {
+        maxCompleteAttempts: 12,
+      });
       if (result.ok) {
         completed += 1;
         await updatePaymentAttemptByCorrelationId(sb, row.correlation_id, {
