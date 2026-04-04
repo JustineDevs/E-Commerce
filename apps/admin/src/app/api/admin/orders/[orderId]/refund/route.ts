@@ -1,4 +1,11 @@
 import { staffSessionAllows } from "@apparel-commerce/database";
+import {
+  completePaymentRefundAudit,
+  enqueueOutboxEvent,
+  insertPaymentRefundAudit,
+  PAYMENT_OUTBOX_EVENT_TYPES,
+  tryCreateSupabaseClient,
+} from "@apparel-commerce/platform-data";
 import { getServerSession } from "next-auth/next";
 import { logAdminApiEvent } from "@/lib/admin-api-log";
 import { authOptions } from "@/lib/auth";
@@ -95,6 +102,34 @@ export async function POST(
     detail: { orderId, paymentId, amountMinor },
   });
 
+  const sb = tryCreateSupabaseClient();
+  let refundAuditId: string | null = null;
+  if (sb) {
+    refundAuditId = await insertPaymentRefundAudit(sb, {
+      medusaOrderId: orderId,
+      medusaPaymentId: paymentId,
+      amountMinor,
+      actorEmail: typeof session.user.email === "string" ? session.user.email : null,
+      note: typeof body.note === "string" ? body.note : null,
+      requestCorrelationId: correlationId,
+    }).catch(() => null);
+    await enqueueOutboxEvent(sb, {
+      aggregate_type: "payment_refund",
+      aggregate_id: orderId,
+      event_type: PAYMENT_OUTBOX_EVENT_TYPES.PAYMENT_ATTEMPT_REFUND_REQUESTED,
+      payload: {
+        order_id: orderId,
+        payment_id: paymentId,
+        amount_minor: amountMinor,
+        actor_email:
+          typeof session.user.email === "string" ? session.user.email : null,
+        note: typeof body.note === "string" ? body.note : null,
+        request_correlation_id: correlationId,
+        refund_audit_id: refundAuditId,
+      },
+    }).catch(() => {});
+  }
+
   const result = await refundMedusaPayment(
     paymentId,
     amountMinor,
@@ -102,6 +137,11 @@ export async function POST(
   );
 
   if (!result.ok) {
+    if (sb && refundAuditId) {
+      await completePaymentRefundAudit(sb, refundAuditId, false, result.error ?? "refund_failed").catch(
+        () => {},
+      );
+    }
     logAdminApiEvent({
       route: "POST /api/admin/orders/[orderId]/refund",
       correlationId,
@@ -113,6 +153,10 @@ export async function POST(
       { error: result.error ?? "Refund did not complete" },
       { status: result.status >= 400 ? result.status : 502 },
     );
+  }
+
+  if (sb && refundAuditId) {
+    await completePaymentRefundAudit(sb, refundAuditId, true, null).catch(() => {});
   }
 
   logAdminApiEvent({
