@@ -113,7 +113,7 @@ export default async function AdminDashboardPage({
   return (
     <AdminPageShell
       title="Overview"
-      subtitle="Recent sales and stock at a glance. The website, warehouse counts, orders, and register all use the same store data."
+      subtitle="Recent sales and stock at a glance. Figures come from your Medusa store connection. POS and offline flows depend on your setup."
       bannerSlot={bannerSlot}
       inspector={<AuditTimeline title="Recent activity" />}
     >
@@ -144,7 +144,7 @@ export default async function AdminDashboardPage({
               <div className="flex items-center gap-1">
                 <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
                 <span className="text-[10px] font-bold text-emerald-600">
-                  Live
+                  Active
                 </span>
               </div>
             )}
