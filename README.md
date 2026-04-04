@@ -4,18 +4,18 @@
 
 # Apparel Commerce Platform
 
-A composable commerce system for apparel sales across storefront, POS, and fulfillment. Built for a shorts and clothing business operating through a customer storefront, internal admin dashboard, point-of-sale terminal, and centralized order management system.
+A **Medusa-first** apparel commerce stack with custom back-office tooling, POS scaffolding, and merchant workflows. Built for a shorts and clothing business using a customer storefront, internal admin dashboard, local terminal agent, and Medusa as the commerce system of record.
 
 ## Overview
 
-The platform uses a shared monorepo and a single transactional database so that product variants, inventory, orders, payments, and shipment tracking remain consistent across both online and in-store sales.
+The monorepo connects **Medusa** (products, carts, orders, payments, inventory) with **Supabase** for staff identity, RBAC, audits, and operational tables. Web and admin surfaces read commerce through Medusa APIs. This is **headless apparel commerce with custom operational modules**, not a single proprietary OMS engine.
 
 ### Key Features
 
 - **Storefront**: Product discovery, cart, checkout, order tracking, and customer account
-- **Admin Dashboard**: Analytics, inventory management, order fulfillment hub, POS terminal
-- **Unified OMS**: One source of truth for products, variants, inventory, orders, payments, and shipments
-- **Payments**: Medusa payment providers (Stripe, PayPal, PayMongo, Maya, cash on delivery) with webhook-verified capture where applicable
+- **Admin Dashboard**: Analytics, **inventory visibility** from Medusa, order tools, POS workflow scaffolding
+- **Medusa-centered operations**: Commerce truth lives in Medusa. Supabase holds platform and staff data per `docs/data-ownership.md`
+- **Payments**: Medusa providers (Stripe, PayPal, PayMongo, Maya, COD). Hosted checkout and webhooks where configured. COD authorization at checkout; capture on delivery via AfterShip where wired
 - **Shipping**: AfterShip integration with J&T Express Philippines for tracking
 
 ### Tech Stack
