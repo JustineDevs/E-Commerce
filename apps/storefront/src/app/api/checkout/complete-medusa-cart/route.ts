@@ -10,7 +10,9 @@ import { finalizeMedusaCartFromServer } from "@/lib/finalize-medusa-cart-server"
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 
 /**
- * Legacy cart completion (cookie-bound). Prefer POST …/payments/checkout-intents/:id/finalize when a ledger row exists.
+ * @deprecated Legacy cart completion (cookie-bound). Primary path: POST
+ * `/api/payments/checkout-intents/:correlationId/finalize` (or COD `/api/checkout/cod-place-order`).
+ * When `STOREFRONT_STRICT_PAYMENT_LEDGER=true`, requires `correlationId` in JSON body or returns 400.
  */
 export async function POST(req: Request) {
   const rl = await applyRateLimit(req, "complete-medusa-cart", 40, 60_000);
@@ -44,10 +46,23 @@ export async function POST(req: Request) {
     correlationId = undefined;
   }
 
+  const strictLedger = process.env.STOREFRONT_STRICT_PAYMENT_LEDGER === "true";
+  if (strictLedger && !correlationId) {
+    return NextResponse.json(
+      {
+        error:
+          "Use POST /api/payments/checkout-intents/:correlationId/finalize with a registered payment attempt.",
+      },
+      { status: 400 },
+    );
+  }
+
   const sb = createStorefrontServiceSupabase();
 
   try {
-    const result = await finalizeMedusaCartFromServer(cartId);
+    const result = await finalizeMedusaCartFromServer(cartId, {
+      maxCompleteAttempts: strictLedger ? 2 : 6,
+    });
 
     if (!result.ok) {
       logCheckoutCompletionEvent({
