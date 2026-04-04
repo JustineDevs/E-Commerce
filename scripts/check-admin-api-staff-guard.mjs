@@ -16,6 +16,7 @@ const ALLOWLIST = new Set([
 
 const GUARD_RES = [
   /\brequireStaffSession\b/,
+  /\brequireStaffApiSession\b/,
   /\bgetServerSession\s*\(/,
   /\bstaffSessionAllows\b/,
   /\bINTERNAL_CHAT_INTAKE_KEY\b/,
