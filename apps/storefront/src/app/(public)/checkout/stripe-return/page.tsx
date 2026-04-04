@@ -4,22 +4,76 @@ import Link from "next/link";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
+const STORAGE_KEY = "payment_checkout_correlation_id";
+
+async function resolveCorrelationId(
+  paymentMethod: string,
+): Promise<string | undefined> {
+  let id = sessionStorage.getItem(STORAGE_KEY)?.trim();
+  if (id) return id;
+  const rec = await fetch(
+    `/api/payments/checkout-intents/recover?provider=${encodeURIComponent(paymentMethod)}`,
+    { credentials: "include" },
+  );
+  const recJson = (await rec.json().catch(() => ({}))) as {
+    found?: boolean;
+    correlationId?: string;
+  };
+  if (
+    rec.ok &&
+    recJson.found === true &&
+    typeof recJson.correlationId === "string"
+  ) {
+    id = recJson.correlationId;
+    try {
+      sessionStorage.setItem(STORAGE_KEY, id);
+    } catch {
+      /* ignore */
+    }
+    return id;
+  }
+  return undefined;
+}
+
 function StripeReturnInner() {
   const searchParams = useSearchParams();
-  const [message, setMessage] = useState("Confirming your payment…");
+  const [message, setMessage] = useState("Payment received. Finalizing your order…");
   const [failed, setFailed] = useState(false);
   const cancelled = useRef(false);
 
   useEffect(() => {
-    const stripeSession = searchParams.get("stripe_session")?.trim();
-    if (!stripeSession) {
-      setMessage("This return link is missing payment details. Go back to checkout and try again.");
-      setFailed(true);
-      return;
-    }
-
     async function attempt(tryIndex: number): Promise<void> {
       if (cancelled.current) return;
+
+      const correlationId = await resolveCorrelationId("stripe");
+
+      if (correlationId) {
+        const res = await fetch(
+          `/api/payments/checkout-intents/${encodeURIComponent(correlationId)}/finalize`,
+          { method: "POST", credentials: "include" },
+        );
+        const json = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          redirectUrl?: string;
+        };
+        if (cancelled.current) return;
+        if (res.ok && typeof json.redirectUrl === "string" && json.redirectUrl.length > 0) {
+          window.location.href = json.redirectUrl;
+          return;
+        }
+        if (tryIndex < 12 && (res.status === 409 || res.status === 500)) {
+          setMessage("Payment received. Waiting for confirmation, then we will finish your order…");
+          await new Promise((r) => setTimeout(r, 1500));
+          return attempt(tryIndex + 1);
+        }
+        setMessage(
+          json.error ??
+            "Your payment may still be processing. Check your email or open order tracking from your account in a few minutes.",
+        );
+        setFailed(true);
+        return;
+      }
+
       const res = await fetch("/api/checkout/complete-medusa-cart", {
         method: "POST",
         credentials: "include",
@@ -34,6 +88,7 @@ function StripeReturnInner() {
         return;
       }
       if (tryIndex < 12 && (res.status === 409 || res.status === 500)) {
+        setMessage("Payment received. Waiting for confirmation, then we will finish your order…");
         await new Promise((r) => setTimeout(r, 1500));
         return attempt(tryIndex + 1);
       }
@@ -42,6 +97,11 @@ function StripeReturnInner() {
           "Your payment may still be processing. Check your email or open order tracking from your account in a few minutes.",
       );
       setFailed(true);
+    }
+
+    const stripeSession = searchParams.get("stripe_session")?.trim();
+    if (!stripeSession) {
+      setMessage("Finalizing your order…");
     }
 
     void attempt(0);
