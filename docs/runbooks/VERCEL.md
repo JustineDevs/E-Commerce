@@ -1,5 +1,7 @@
 # Vercel Deployment (Storefront)
 
+This runbook covers **only the Next.js storefront** on Vercel. Production also requires a reachable **Medusa** backend, **Supabase** (for the payment ledger, staff RBAC, and related platform data), and scheduled calls to the storefront **payment recovery** cron route when using hosted checkout. See `docs/runbooks/PAYMENT-INTEGRATION.md` for the full payment lifecycle. Admin and internal API apps deploy separately (for example Render or another host).
+
 ## Required Environment Variables
 
 Set these in Vercel → Project → Settings → Environment Variables. Without them, the storefront shows "Catalog service unavailable" or "Invalid URL".
