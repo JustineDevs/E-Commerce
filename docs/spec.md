@@ -320,7 +320,7 @@ The platform SHOULD satisfy the following operational goals:
 - Shared types across all applications
 - Consistent UI primitives across storefront and internal tools
 - Clear service boundaries between UI, business logic, and database access
-- Production-ready TypeScript code
+- TypeScript code with linting and tests. Calling a deployment production-ready requires separate operational validation (monitoring, runbooks, provider health)
 - Migration-based database evolution
 - Copy-pasteable environment configuration
 - Deployment compatibility with branch-based staging and production workflows
