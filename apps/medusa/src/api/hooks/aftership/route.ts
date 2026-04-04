@@ -149,6 +149,17 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         await capturePaymentWorkflow(req.scope).run({
           input: { payment_id: uncapturedCod.id },
         });
+        const okLogger = req.scope.resolve(ContainerRegistrationKeys.LOGGER) as {
+          info?: (m: string) => void;
+        };
+        okLogger.info?.(
+          JSON.stringify({
+            event: "cod_capture_on_delivery",
+            order_id: orderId,
+            payment_id: uncapturedCod.id,
+            ts: new Date().toISOString(),
+          }),
+        );
       }
     } catch (err) {
       const logger = req.scope.resolve(ContainerRegistrationKeys.LOGGER) as {
