@@ -104,6 +104,7 @@ export {
   openShift,
   closeShift,
   getActiveShift,
+  getShiftById,
   listShifts,
   type PosShift,
 } from "./pos-shifts";
@@ -357,3 +358,14 @@ export {
   loadCmsAbExperimentsActivePublic,
   loadCmsSitemapEntries,
 } from "./cms-storefront";
+
+export {
+  findOpenPaymentAttemptForCart,
+  registerPaymentAttempt,
+  getPaymentAttemptByCorrelationId,
+  updatePaymentAttemptByCorrelationId,
+  incrementFinalizeAttempts,
+  listStuckPaymentAttempts,
+  type PaymentAttemptRow,
+  type RegisterPaymentAttemptInput,
+} from "./payment-ledger";
