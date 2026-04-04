@@ -1,3 +1,10 @@
+/**
+ * Browser checkout orchestration (three conceptual phases):
+ * 1) `prepareMedusaStoreCart` in medusa-checkout-cart-prep (cart + shipping + loyalty).
+ * 2) Medusa `initiatePaymentSession` (provider session / embedded data).
+ * 3) Ledger + server completion: POST /api/payments/checkout-intents, then finalize
+ *    (hosted: …/finalize; COD: /api/checkout/cod-place-order). No order finalization here alone.
+ */
 import {
   formatMedusaCheckoutError,
   tryDeleteStoreCart,
@@ -10,6 +17,7 @@ import {
 } from "./storefront-medusa-env";
 import {
   prepareMedusaStoreCart,
+  readMedusaCartMinorField,
   reconcileMedusaCartGrandTotalMajor,
   type MedusaCheckoutLine,
   type CodCartPayload,
@@ -219,38 +227,52 @@ export async function startMedusaCheckout(input: {
     );
 
     if (codSession) {
-      const completeFn = (
-        sdk.store.cart as unknown as {
-          complete?: (
-            _id: string,
-            _query?: unknown,
-          ) => Promise<{
-            type?: string;
-            order?: { id?: string };
-            cart?: unknown;
-            error?: { message?: string } | string;
-          }>;
-        }
-      ).complete;
-      if (typeof completeFn !== "function") {
-        throw new Error("Store SDK does not support cart completion. Update @medusajs/js-sdk.");
+      const amountMinor = Math.max(0, Math.floor(readMedusaCartMinorField(pricedObj, "total")));
+      const medusaPaymentSessionId =
+        typeof session?.id === "string" ? session.id : undefined;
+      const reg = await fetch("/api/payments/checkout-intents", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider: "cod",
+          amountMinor,
+          currencyCode: currencyRaw,
+          medusaPaymentSessionId,
+        }),
+      });
+      const regJson = (await reg.json().catch(() => ({}))) as {
+        correlationId?: string;
+        error?: string;
+      };
+      if (!reg.ok || typeof regJson.correlationId !== "string" || !regJson.correlationId) {
+        throw new Error(
+          typeof regJson.error === "string" && regJson.error.trim()
+            ? regJson.error
+            : "Could not register COD checkout. Try again or contact support.",
+        );
       }
-      const completed = await completeFn(cartId, {} as never);
-      if (completed?.type !== "order" || !completed.order?.id) {
-        const errMsg =
-          typeof completed?.error === "string"
-            ? completed.error
-            : completed?.error &&
-                typeof completed.error === "object" &&
-                "message" in completed.error
-              ? String((completed.error as { message?: string }).message)
-              : "Could not place your COD order. Check shipping options and try again.";
-        throw new Error(errMsg);
+      const place = await fetch("/api/checkout/cod-place-order", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ correlationId: regJson.correlationId }),
+      });
+      const placeJson = (await place.json().catch(() => ({}))) as {
+        orderId?: string;
+        error?: string;
+      };
+      if (!place.ok || typeof placeJson.orderId !== "string" || !placeJson.orderId) {
+        throw new Error(
+          typeof placeJson.error === "string" && placeJson.error.trim()
+            ? placeJson.error
+            : "Could not place your COD order. Check shipping options and try again.",
+        );
       }
       return {
         checkoutUrl: "",
         cartId,
-        orderId: completed.order.id,
+        orderId: placeJson.orderId,
         providerLabel,
         confirmedTotal,
         currencyCode: currencyRaw.toUpperCase(),
