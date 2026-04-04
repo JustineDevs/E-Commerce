@@ -56,12 +56,27 @@ const nextConfig = {
     formats: ["image/avif", "image/webp"],
     remotePatterns: imageRemotePatterns(),
   },
+  async headers() {
+    const securityHeaders = [
+      { key: "X-Content-Type-Options", value: "nosniff" },
+      { key: "X-Frame-Options", value: "DENY" },
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+      {
+        key: "Permissions-Policy",
+        value: "camera=(), microphone=(), geolocation=()",
+      },
+      { key: "X-DNS-Prefetch-Control", value: "on" },
+    ];
+    return [{ source: "/(.*)", headers: securityHeaders }];
+  },
   transpilePackages: [
     "@apparel-commerce/types",
     "@apparel-commerce/sdk",
     "@apparel-commerce/ui",
     "@apparel-commerce/database",
     "@apparel-commerce/platform-data",
+    "@apparel-commerce/omnichannel-policy",
+    "@apparel-commerce/validation",
   ],
 };
 
