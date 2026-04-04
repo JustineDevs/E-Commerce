@@ -1,4 +1,8 @@
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http";
+import {
+  getPaymentPlatformMetrics,
+  tryCreateSupabaseClient,
+} from "../../../lib/payment-supabase-bridge";
 
 type ProviderStatus = {
   configured: boolean;
@@ -18,8 +22,7 @@ function checkProvider(
 }
 
 /**
- * Reports which payment providers have credentials configured in process.env
- * (Medusa `medusa-config.ts` registration). Admin-only.
+ * Reports payment provider env configuration and Supabase ledger / job backlog metrics when available.
  */
 export async function GET(
   _req: MedusaRequest,
@@ -37,9 +40,35 @@ export async function GET(
     (p) => p.configured,
   ).length;
 
+  const supabaseConfigured = Boolean(
+    process.env.SUPABASE_URL?.trim() &&
+      (process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || process.env.SUPABASE_ANON_KEY?.trim()),
+  );
+
+  let platformMetrics: Awaited<ReturnType<typeof getPaymentPlatformMetrics>> = null;
+  const sb = tryCreateSupabaseClient();
+  if (sb) {
+    platformMetrics = await getPaymentPlatformMetrics(sb);
+  }
+
+  const storefrontCronConfigured = Boolean(
+    process.env.STOREFRONT_PAYMENT_CRON_SECRET?.trim() ||
+      process.env.STOREFRONT_ORIGIN?.trim(),
+  );
+
   res.json({
     configuredCount,
     providers,
     timestamp: new Date().toISOString(),
+    supabaseConfigured,
+    storefrontReconciliation: {
+      description:
+        "Durable payment state in Supabase payment_attempts. Stale rows recover via storefront GET /api/cron/finalize-payment-attempts and admin /admin/payments.",
+      medusaRole:
+        "Medusa remains PSP webhooks and order or capture source of truth; ledger bridges hosted pay and COD capture.",
+      cronSecretConfigured: storefrontCronConfigured,
+      ledgerMetrics: platformMetrics,
+      reconciliationWorkerAlive: null as boolean | null,
+    },
   });
 }
