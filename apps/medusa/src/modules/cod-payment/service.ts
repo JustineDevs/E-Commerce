@@ -33,7 +33,8 @@ import {
 } from "@medusajs/framework/utils";
 
 /**
- * Cash on delivery: no external PSP. Payment is authorized when the customer confirms COD at checkout.
+ * Cash on delivery: no external PSP. Authorize at checkout; capture runs when AfterShip reports
+ * delivered (see `api/hooks/aftership`). Refunds are operational, not card-network refunds.
  */
 export default class CodPaymentProviderService extends AbstractPaymentProvider<Record<string, never>> {
   static identifier = "cod";
@@ -60,12 +61,21 @@ export default class CodPaymentProviderService extends AbstractPaymentProvider<R
       );
     }
 
+    const ctxCurrency = (
+      input.context as { currency_code?: string } | undefined
+    )?.currency_code?.trim().toLowerCase();
+    const currency =
+      ctxCurrency && ctxCurrency.length === 3 ? ctxCurrency : "php";
+
     return {
       id: `cod_${sessionId}`,
       status: PaymentSessionStatus.REQUIRES_MORE,
       data: {
         session_id: sessionId,
         cod: true,
+        amount_minor: Math.round(amount),
+        currency_code: currency,
+        capture_expected_via: "aftership_delivered_webhook",
       },
     };
   }
@@ -83,7 +93,14 @@ export default class CodPaymentProviderService extends AbstractPaymentProvider<R
   }
 
   async capturePayment(input: CapturePaymentInput): Promise<CapturePaymentOutput> {
-    return { data: input.data ?? {} };
+    const prior = (input.data as Record<string, unknown>) ?? {};
+    return {
+      data: {
+        ...prior,
+        cod_capture_at: new Date().toISOString(),
+        cod_capture_source: "medusa_capture_payment",
+      },
+    };
   }
 
   async cancelPayment(input: CancelPaymentInput): Promise<CancelPaymentOutput> {
