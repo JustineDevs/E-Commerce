@@ -1,7 +1,7 @@
 "use client";
 
 import type { CmsAbExperimentRow } from "@apparel-commerce/platform-data";
-import { pickCmsAbVariantId } from "@apparel-commerce/sdk";
+import { pickCmsAbVariantId } from "@apparel-commerce/sdk/cms-experiment-pick";
 import { useEffect } from "react";
 
 export function CmsExperimentAssigner({ experiments }: { experiments: CmsAbExperimentRow[] }) {
