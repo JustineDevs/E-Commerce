@@ -1,0 +1,68 @@
+import { availableQuantityFromVariantRaw } from "@apparel-commerce/validation";
+import { medusaAdminFetch } from "@/lib/medusa-admin-fetch";
+import type { MedusaCheckoutLine } from "@/lib/medusa-checkout-cart-prep";
+
+const VARIANT_FIELDS =
+  "id,sku,manage_inventory,*inventory_items,*inventory_items.inventory,*inventory_items.inventory.location_levels";
+
+export type StorefrontStockResult =
+  | { ok: true }
+  | { ok: false; message: string; code: "INSUFFICIENT_STOCK" | "INVENTORY_CHECK_FAILED" };
+
+/**
+ * Server-side stock check against Medusa Admin API (same source as POS). Runs before cart creation.
+ */
+export async function assertStorefrontLinesStock(
+  lines: MedusaCheckoutLine[],
+): Promise<StorefrontStockResult> {
+  const qtyByVariant = new Map<string, number>();
+  for (const l of lines) {
+    const vid = String(l.variantId ?? "").trim();
+    if (!vid) continue;
+    const q = Math.max(1, Math.floor(Number(l.quantity) || 1));
+    qtyByVariant.set(vid, (qtyByVariant.get(vid) ?? 0) + q);
+  }
+
+  for (const [variantId, need] of qtyByVariant) {
+    let res: Response;
+    try {
+      res = await medusaAdminFetch(
+        `/admin/product-variants/${encodeURIComponent(variantId)}?fields=${encodeURIComponent(VARIANT_FIELDS)}`,
+        { method: "GET" },
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Inventory check failed";
+      return { ok: false, message: msg, code: "INVENTORY_CHECK_FAILED" };
+    }
+    if (!res.ok) {
+      return {
+        ok: false,
+        message: `Variant lookup failed (${res.status})`,
+        code: "INVENTORY_CHECK_FAILED",
+      };
+    }
+    const json = (await res.json()) as { variant?: Record<string, unknown> };
+    const v = json.variant;
+    if (!v || typeof v !== "object") {
+      return {
+        ok: false,
+        message: "Variant not found",
+        code: "INVENTORY_CHECK_FAILED",
+      };
+    }
+    const manage = Boolean(v.manage_inventory);
+    if (!manage) continue;
+    const available = Math.floor(availableQuantityFromVariantRaw(v));
+    if (available < need) {
+      const sku = String(v.sku ?? "").trim();
+      const label = sku ? `${sku} (${variantId.slice(0, 8)}…)` : variantId;
+      return {
+        ok: false,
+        message: `Insufficient stock for ${label}: need ${need}, available ${available}`,
+        code: "INSUFFICIENT_STOCK",
+      };
+    }
+  }
+
+  return { ok: true };
+}
