@@ -16,6 +16,14 @@ export type MedusaCartCompleteResult =
       attempts: number;
     };
 
+export type FinalizeMedusaCartOptions = {
+  /**
+   * Total `cart.complete()` calls (including the first). Interactive API routes use a low value;
+   * cron/workers pass a higher value. Capped at 20.
+   */
+  maxCompleteAttempts?: number;
+};
+
 type CompleteResponse = {
   type?: string;
   order?: { id?: string };
@@ -24,8 +32,17 @@ type CompleteResponse = {
 
 /**
  * Server-only: completes the Medusa cart and builds tracking URL. Used by API routes and cron recovery.
+ * Retries belong here only for transient Medusa lag; heavy recovery is cron/worker-driven.
  */
-export async function finalizeMedusaCartFromServer(cartId: string): Promise<MedusaCartCompleteResult> {
+export async function finalizeMedusaCartFromServer(
+  cartId: string,
+  options?: FinalizeMedusaCartOptions,
+): Promise<MedusaCartCompleteResult> {
+  const maxAttempts = Math.max(
+    1,
+    Math.min(20, options?.maxCompleteAttempts ?? 3),
+  );
+
   const sdk = createStorefrontMedusaSdk();
   const storeCart = sdk.store.cart as unknown as {
     complete?: (id: string, body?: unknown) => Promise<CompleteResponse>;
@@ -41,12 +58,11 @@ export async function finalizeMedusaCartFromServer(cartId: string): Promise<Medu
 
   let completed = await storeCart.complete(cartId, {});
   let attempts = 1;
-  const maxExtraAttempts = 5;
-  for (let attempt = 1; attempt <= maxExtraAttempts; attempt++) {
-    if (completed?.type === "order" && completed.order?.id) {
-      break;
-    }
-    await new Promise((r) => setTimeout(r, 280 + attempt * 120));
+  while (
+    attempts < maxAttempts &&
+    (completed?.type !== "order" || !completed.order?.id)
+  ) {
+    await new Promise((r) => setTimeout(r, 280 + attempts * 120));
     completed = await storeCart.complete(cartId, {});
     attempts += 1;
   }
