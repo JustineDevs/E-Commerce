@@ -2,6 +2,16 @@
 
 This document describes the payment providers integrated into the Maharlika Apparel e-commerce platform (Medusa v2).
 
+## Storefront checkout lifecycle (runtime truth)
+
+1. **Cart preparation** happens on the storefront server (Medusa store APIs) before a payment session is created.
+2. **Payment attempt** rows in Supabase (`payment_attempts`) record `correlation_id`, cart, provider, and status. Register via `POST /api/payments/checkout-intents` before hosted PSP redirect or COD completion.
+3. **Provider session** is created through Medusa `initiatePaymentSession` (Stripe Elements, PayPal, Paymongo, Maya, or COD session data).
+4. **Completion** is server-owned: hosted flows call `POST /api/payments/checkout-intents/:correlationId/finalize`. **COD** calls `POST /api/checkout/cod-place-order` with the same `correlationId`. The browser does not call `cart.complete` for COD.
+5. **Recovery**: `GET /api/cron/finalize-payment-attempts` (secret header) processes stuck rows. Operators use **Admin → Payment attempts** (`/admin/payments`) for retry and escalation when `STOREFRONT_ORIGIN` and `STOREFRONT_INTERNAL_RECONCILE_SECRET` are set.
+
+Legacy `POST /api/checkout/complete-medusa-cart` remains for backward compatibility; optional strict mode: `STOREFRONT_STRICT_PAYMENT_LEDGER=true` requires a ledger correlation id.
+
 ## Overview
 
 | Provider | Methods | Use Case |
