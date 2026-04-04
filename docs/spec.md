@@ -22,6 +22,13 @@ requires tech stack:
 
 This specification defines a composable apparel commerce platform for a shorts and clothing business operating through a customer storefront, internal admin dashboard, point-of-sale terminal, and centralized order management. **Commerce truth for catalog, cart, checkout, orders, and payments runs on Medusa 2.x** (`apparel-commerce/apps/medusa`) with a **dedicated PostgreSQL** database. Legacy **Supabase** schema and `packages/database` remain for **staff OAuth user records**, **compliance exports**, **migration tooling**, and optional historical data; they are **not** the runtime path for new web checkout when the storefront is wired to Medusa.
 
+### Implementation status (do not over-read this document)
+
+- **Medusa commerce core**: implemented in-repo.
+- **Supabase payment ledger** (`payment_attempts`, webhooks table): implemented; bridges hosted pay and recovery paths.
+- **Server-owned COD completion**: implemented via `POST /api/checkout/cod-place-order` (browser no longer calls `cart.complete` for COD in `medusa-checkout.ts`).
+- **Strict stock / inventory rules**: see `docs/data-ownership.md` and code; not every paragraph in this file is a hard runtime guarantee unless verified in code and tests.
+
 
 ## Specification
 
