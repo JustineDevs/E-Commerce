@@ -49,6 +49,7 @@ const nextConfig = {
     "@apparel-commerce/ui",
     "@apparel-commerce/validation",
     "@apparel-commerce/platform-data",
+    "@apparel-commerce/omnichannel-policy",
   ],
   experimental: {
     optimizePackageImports: [
