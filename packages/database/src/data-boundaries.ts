@@ -111,6 +111,17 @@ export const LEGACY_TABLE_BINDINGS: Record<string, LegacyTableBinding> = {
     kind: "platform",
     notes: "Offline queue metadata; committed sales are Medusa orders.",
   },
+  payment_attempts: {
+    surfaces: ["storefront", "admin"],
+    kind: "bridge",
+    notes:
+      "Operational checkout/payment lifecycle keyed by Medusa cart_id; does not replace Medusa payment_session rows.",
+  },
+  payment_webhook_events: {
+    surfaces: ["storefront", "admin", "api"],
+    kind: "bridge",
+    notes: "Webhook inbox for idempotent provider event audit and replay; Medusa remains payment SoR.",
+  },
 };
 
 /** Exact table names that must never be created in Supabase (Medusa-exclusive). */
