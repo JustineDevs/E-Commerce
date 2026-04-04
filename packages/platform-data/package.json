@@ -11,7 +11,7 @@
   },
   "scripts": {
     "lint": "eslint src --ext .ts",
-    "test": "node --import tsx/esm --test src/admin-users.test.ts src/permissions.test.ts src/storefront-home-cms.test.ts src/storefront-public-metadata.test.ts src/supabase-errors.test.ts src/cms-public-visibility.test.ts"
+    "test": "node --import tsx/esm --test src/admin-users.test.ts src/permissions.test.ts src/storefront-home-cms.test.ts src/storefront-public-metadata.test.ts src/supabase-errors.test.ts src/cms-public-visibility.test.ts src/payment-ledger-list.test.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0"
