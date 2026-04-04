@@ -14,6 +14,7 @@
     "generate:icons": "python scripts/generate-favicons.py"
   },
   "dependencies": {
+    "@apparel-commerce/omnichannel-policy": "workspace:*",
     "@apparel-commerce/platform-data": "workspace:*",
     "@apparel-commerce/resend-mail": "workspace:*",
     "@apparel-commerce/sdk": "workspace:*",
