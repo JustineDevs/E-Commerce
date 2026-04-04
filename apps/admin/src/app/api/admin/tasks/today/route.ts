@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireStaffApiSession } from "@/lib/requireStaffSession";
 
 type TaskItem = {
   id: string;
@@ -11,6 +12,9 @@ type TaskItem = {
 };
 
 export async function GET() {
+  const staff = await requireStaffApiSession("dashboard:read");
+  if (!staff.ok) return staff.response;
+
   const tasks: TaskItem[] = [];
 
   try {
