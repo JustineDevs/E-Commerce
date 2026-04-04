@@ -4,6 +4,8 @@
  * Re-exports platform data from @apparel-commerce/platform-data.
  * Supabase = identity, RBAC, compliance, audit only. Medusa owns commerce.
  * See `data-boundaries.ts`, ADR-0002, and docs/data-ownership.md.
+ *
+ * Runtime enforcement is in app code and CI (e.g. migration-boundary checks), not in this package alone.
  */
 export {
   LEGACY_TABLE_BINDINGS,
