@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireStaffApiSession } from "@/lib/requireStaffSession";
 
 export type CostLineItem = {
   service: string;
@@ -15,6 +16,9 @@ export type CostVisibilitySummary = {
 };
 
 export async function GET() {
+  const staff = await requireStaffApiSession("dashboard:read");
+  if (!staff.ok) return staff.response;
+
   const items: CostLineItem[] = [
     { service: "Vercel (Storefront)", category: "hosting", monthlyCostUsd: 0, note: "Free tier / Pro plan" },
     { service: "Vercel (Admin)", category: "hosting", monthlyCostUsd: 0, note: "Free tier / Pro plan" },
