@@ -149,7 +149,8 @@ export async function prepareMedusaStoreCart(
   return { sdk, cartId, baseUrl, publishableKey };
 }
 
-function readCartMinorField(
+/** Medusa cart monetary fields are integers in the smallest currency unit. */
+export function readMedusaCartMinorField(
   cart: Record<string, unknown>,
   key: string,
 ): number {
@@ -157,6 +158,13 @@ function readCartMinorField(
   if (typeof v === "bigint") return Number(v);
   const n = typeof v === "number" ? v : Number(v);
   return Number.isFinite(n) ? n : 0;
+}
+
+function readCartMinorField(
+  cart: Record<string, unknown>,
+  key: string,
+): number {
+  return readMedusaCartMinorField(cart, key);
 }
 
 const TOTAL_RECONCILE_TOLERANCE_MAJOR = 0.02;
