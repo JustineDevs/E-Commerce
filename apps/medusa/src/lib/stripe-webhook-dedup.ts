@@ -1,5 +1,7 @@
 import pg from "pg";
 
+import { logWebhookDedupDuplicate } from "./webhook-dedup-metrics";
+
 let pool: pg.Pool | null = null;
 let tableEnsured = false;
 
@@ -44,5 +46,9 @@ export async function claimStripeWebhookDedup(dedupId: string): Promise<boolean>
     `INSERT INTO stripe_webhook_dedup (id) VALUES ($1) ON CONFLICT (id) DO NOTHING RETURNING id`,
     [dedupId],
   );
-  return (res.rowCount ?? 0) >= 1;
+  const first = (res.rowCount ?? 0) >= 1;
+  if (!first) {
+    logWebhookDedupDuplicate("stripe", dedupId);
+  }
+  return first;
 }
