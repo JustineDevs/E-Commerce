@@ -1,13 +1,26 @@
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http";
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils";
 import { capturePaymentWorkflow } from "@medusajs/medusa/core-flows";
+import {
+  enqueueReconciliationJob,
+  findPaymentAttemptByMedusaOrderId,
+  markWebhookProcessed,
+  mergePaymentAttemptPayloadByMedusaOrderId,
+  PAYMENT_RECONCILIATION_JOB_TYPES,
+  recordWebhookEvent,
+  tryCreateSupabaseClient,
+} from "../../../lib/payment-supabase-bridge";
 import crypto from "node:crypto";
-import { buildAftershipWebhookDedupId, claimAftershipWebhookDedup } from "../../../lib/aftership-webhook-dedup";
+import { mapAftershipTag } from "../../../lib/aftership-status-map";
+import {
+  buildAftershipWebhookDedupId,
+  claimAftershipWebhookDedup,
+} from "../../../lib/aftership-webhook-dedup";
 
 function verifyAftershipHmac(
   rawBody: Buffer,
   signatureHeader: string | undefined,
-  secret: string
+  secret: string,
 ): boolean {
   if (!signatureHeader) {
     return false;
@@ -37,16 +50,25 @@ function pickMedusaOrderId(tracking: Record<string, unknown>): string | undefine
   return undefined;
 }
 
-function mapAftershipTag(tag: string | undefined): string {
-  const t = (tag ?? "").toLowerCase().replace(/[\s_]/g, "");
-  if (t === "delivered") return "delivered";
-  if (t === "outfordelivery") return "out_for_delivery";
-  if (t === "intransit") return "in_transit";
-  if (t === "pending" || t === "inforeceived") return "pending";
-  return "in_transit";
+function logAftership(
+  logger: { info?: (m: string) => void; warn?: (m: string) => void },
+  event: string,
+  fields: Record<string, unknown>,
+): void {
+  const line = JSON.stringify({ source: "aftership_webhook", event, ts: new Date().toISOString(), ...fields });
+  if (event.includes("fail") || event.includes("error")) {
+    logger.warn?.(line);
+  } else {
+    logger.info?.(line);
+  }
 }
 
 export async function POST(req: MedusaRequest, res: MedusaResponse) {
+  const logger = req.scope.resolve(ContainerRegistrationKeys.LOGGER) as {
+    info?: (m: string) => void;
+    warn?: (m: string) => void;
+  };
+
   const secret = process.env.AFTERSHIP_WEBHOOK_SECRET?.trim();
   if (!secret) {
     res.status(503).json({ error: "Webhook signing not configured", code: "WEBHOOK_DISABLED" });
@@ -94,11 +116,38 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     (tracking.subtag_message as string | undefined) ??
     (tracking.subtag as string | undefined);
 
+  const trackingId =
+    typeof tracking.id === "string"
+      ? tracking.id
+      : typeof (tracking as { tracking_number?: string }).tracking_number === "string"
+        ? (tracking as { tracking_number: string }).tracking_number
+        : undefined;
+
   const dedupId = buildAftershipWebhookDedupId(orderId, tag);
   const isFirst = await claimAftershipWebhookDedup(dedupId);
   if (!isFirst) {
+    logAftership(logger, "deduped", { order_id: orderId, dedup_id: dedupId });
     res.status(200).json({ received: true, duplicate: true });
     return;
+  }
+
+  logAftership(logger, "received", {
+    order_id: orderId,
+    tag: tag ?? null,
+    tracking_id: trackingId ?? null,
+  });
+
+  const supabase = tryCreateSupabaseClient();
+  let webhookRowId: string | undefined;
+  if (supabase) {
+    const rec = await recordWebhookEvent(supabase, {
+      provider: "aftership",
+      eventId: dedupId,
+      eventType: tag ?? "unknown",
+      payload: { order_id: orderId, tracking: trackingId, tag },
+      payloadHash: null,
+    });
+    webhookRowId = rec.id ?? undefined;
   }
 
   const checkpoints = tracking.checkpoints as
@@ -126,9 +175,22 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     },
   });
 
-  // When J&T delivers, capture COD payment (authorized at checkout, captured on delivery)
   const mappedStatus = mapAftershipTag(tag);
+
+  if (supabase) {
+    await mergePaymentAttemptPayloadByMedusaOrderId(supabase, orderId, {
+      aftership_tag: tag ?? null,
+      aftership_status: mappedStatus,
+      aftership_tracking_id: trackingId ?? null,
+      aftership_last_checkpoint: lastCheckpoint || null,
+      ...(mappedStatus === "delivered"
+        ? { aftership_delivered_at: new Date().toISOString() }
+        : {}),
+    }).catch(() => {});
+  }
+
   if (mappedStatus === "delivered") {
+    logAftership(logger, "delivered_processing", { order_id: orderId });
     try {
       const query = req.scope.resolve(ContainerRegistrationKeys.QUERY);
       const { data: orders } = await query.graph({
@@ -137,40 +199,74 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         filters: { id: orderId },
       });
       const order = orders?.[0] as
-        | { payment_collections?: Array<{ payments?: Array<{ id: string; provider_id?: string; captured_at?: string | null }> }> }
+        | {
+            payment_collections?: Array<{
+              payments?: Array<{ id: string; provider_id?: string; captured_at?: string | null }>;
+            }>;
+          }
         | undefined;
       const payments = order?.payment_collections?.[0]?.payments ?? [];
       const uncapturedCod = payments.find(
-        (p) =>
-          p.provider_id?.toLowerCase().includes("cod") &&
-          !p.captured_at,
+        (p) => p.provider_id?.toLowerCase().includes("cod") && !p.captured_at,
       );
+
       if (uncapturedCod) {
+        if (supabase) {
+          const attempt = await findPaymentAttemptByMedusaOrderId(supabase, orderId);
+          if (attempt) {
+            const prev =
+              attempt.provider_payload && typeof attempt.provider_payload === "object"
+                ? (attempt.provider_payload as Record<string, unknown>)
+                : {};
+            if (prev.cod_capture_complete === true) {
+              logAftership(logger, "capture_skipped_already_captured", { order_id: orderId });
+              if (webhookRowId) await markWebhookProcessed(supabase, webhookRowId, true);
+              res.status(200).json({ received: true, cod_capture: "already_captured" });
+              return;
+            }
+          }
+          await mergePaymentAttemptPayloadByMedusaOrderId(supabase, orderId, {
+            cod_capture_started_at: new Date().toISOString(),
+            cod_capture_source_pending: "aftership_webhook",
+          }).catch(() => {});
+        }
+
+        logAftership(logger, "capture_started", { order_id: orderId, payment_id: uncapturedCod.id });
+
         await capturePaymentWorkflow(req.scope).run({
           input: { payment_id: uncapturedCod.id },
         });
-        const okLogger = req.scope.resolve(ContainerRegistrationKeys.LOGGER) as {
-          info?: (m: string) => void;
-        };
-        okLogger.info?.(
-          JSON.stringify({
-            event: "cod_capture_on_delivery",
-            order_id: orderId,
-            payment_id: uncapturedCod.id,
-            ts: new Date().toISOString(),
-          }),
-        );
+
+        logAftership(logger, "capture_success", { order_id: orderId, payment_id: uncapturedCod.id });
+
+        if (supabase) {
+          await mergePaymentAttemptPayloadByMedusaOrderId(supabase, orderId, {
+            cod_capture_complete: true,
+            cod_capture_source: "aftership_webhook",
+            cod_captured_at: new Date().toISOString(),
+          }).catch(() => {});
+        }
       }
     } catch (err) {
-      const logger = req.scope.resolve(ContainerRegistrationKeys.LOGGER) as {
-        warn?: (m: string) => void;
-      };
-      logger.warn?.(
-        `[aftership] COD capture on delivery failed for order ${orderId}: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-      );
+      const msg = err instanceof Error ? err.message : String(err);
+      logAftership(logger, "capture_failed", { order_id: orderId, error: msg });
+      if (supabase) {
+        await mergePaymentAttemptPayloadByMedusaOrderId(supabase, orderId, {
+          cod_capture_last_error: msg.slice(0, 500),
+          cod_needs_review: true,
+        }).catch(() => {});
+        await enqueueReconciliationJob(
+          supabase,
+          PAYMENT_RECONCILIATION_JOB_TYPES.CAPTURE_COD_PAYMENT,
+          { order_id: orderId, reason: "aftership_capture_failed", error: msg },
+          "aftership",
+        ).catch(() => {});
+      }
     }
+  }
+
+  if (supabase && webhookRowId) {
+    await markWebhookProcessed(supabase, webhookRowId, true).catch(() => {});
   }
 
   res.status(200).json({ received: true });
