@@ -134,3 +134,8 @@ export const storefrontCustomerProfilePatchSchema = z
 export type StorefrontCustomerProfilePatch = z.infer<
   typeof storefrontCustomerProfilePatchSchema
 >;
+
+export {
+  stockedQuantityFromVariantRaw,
+  availableQuantityFromVariantRaw,
+} from "./medusa-inventory-math";
