@@ -1,6 +1,6 @@
-# Render Blueprint — Medusa commerce backend
-# Auto-deploys only when Medusa or its dependencies change (see buildFilter).
-# Connect this repo in Render Dashboard; Render reads this file automatically.
+# Render Blueprint — full stack (Medusa + storefront + admin + internal API + payment recovery cron).
+# Many teams deploy the Next apps on Vercel instead; this file is a working Render-native topology.
+# Connect the repo in Render Dashboard; set sync: false secrets in the dashboard.
 
 services:
   - type: web
@@ -8,8 +8,6 @@ services:
     runtime: docker
     dockerfilePath: ./Dockerfile.medusa
     region: singapore
-
-    # Deploy only when these paths change
     buildFilter:
       paths:
         - apps/medusa/**
@@ -18,9 +16,7 @@ services:
         - package.json
         - pnpm-lock.yaml
         - pnpm-workspace.yaml
-
     healthCheckPath: /health
-
     envVars:
       - key: NODE_ENV
         value: production
@@ -35,4 +31,92 @@ services:
       - key: ADMIN_CORS
         sync: false
       - key: AUTH_CORS
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+
+  - type: web
+    name: maharlika-storefront
+    runtime: node
+    region: singapore
+    buildCommand: corepack enable && pnpm install && pnpm --filter @apparel-commerce/storefront build
+    startCommand: pnpm --filter @apparel-commerce/storefront start
+    buildFilter:
+      paths:
+        - apps/storefront/**
+        - packages/**
+        - package.json
+        - pnpm-lock.yaml
+        - pnpm-workspace.yaml
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: NEXT_PUBLIC_MEDUSA_URL
+        sync: false
+      - key: NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
+        sync: false
+      - key: STOREFRONT_PAYMENT_CRON_SECRET
+        sync: false
+      - key: STOREFRONT_INTERNAL_RECONCILE_SECRET
+        sync: false
+
+  - type: web
+    name: maharlika-admin
+    runtime: node
+    region: singapore
+    buildCommand: corepack enable && pnpm install && pnpm --filter @apparel-commerce/admin build
+    startCommand: pnpm --filter @apparel-commerce/admin start
+    buildFilter:
+      paths:
+        - apps/admin/**
+        - packages/**
+        - package.json
+        - pnpm-lock.yaml
+        - pnpm-workspace.yaml
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: STOREFRONT_ORIGIN
+        sync: false
+
+  - type: web
+    name: maharlika-internal-api
+    runtime: node
+    region: singapore
+    buildCommand: corepack enable && pnpm install && pnpm --filter @apparel-commerce/api build
+    startCommand: pnpm --filter @apparel-commerce/api start
+    buildFilter:
+      paths:
+        - apps/api/**
+        - packages/**
+        - package.json
+        - pnpm-lock.yaml
+        - pnpm-workspace.yaml
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: INTERNAL_API_KEY
+        sync: false
+
+  - type: cron
+    name: maharlika-payment-recovery
+    runtime: node
+    region: singapore
+    schedule: "*/10 * * * *"
+    buildCommand: corepack enable && pnpm install
+    startCommand: curl -fsS -H "Authorization: Bearer $STOREFRONT_PAYMENT_CRON_SECRET" "$STOREFRONT_ORIGIN/api/cron/finalize-payment-attempts"
+    envVars:
+      - key: STOREFRONT_ORIGIN
+        sync: false
+      - key: STOREFRONT_PAYMENT_CRON_SECRET
         sync: false
