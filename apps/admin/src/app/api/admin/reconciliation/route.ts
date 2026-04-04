@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireStaffApiSession } from "@/lib/requireStaffSession";
 
 export type ReconciliationRow = {
   date: string;
@@ -20,6 +21,9 @@ export type ReconciliationSummary = {
 };
 
 export async function GET(request: Request) {
+  const staff = await requireStaffApiSession("dashboard:read");
+  if (!staff.ok) return staff.response;
+
   const { searchParams } = new URL(request.url);
   const days = Math.min(Number(searchParams.get("days")) || 7, 90);
   const provider = searchParams.get("provider") || "all";
