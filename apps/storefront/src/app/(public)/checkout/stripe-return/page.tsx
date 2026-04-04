@@ -35,40 +35,70 @@ async function resolveCorrelationId(
   return undefined;
 }
 
+const POLL_MS = 2000;
+const POLL_MAX = 20;
+
 function StripeReturnInner() {
   const searchParams = useSearchParams();
-  const [message, setMessage] = useState("Payment received. Finalizing your order…");
+  const [message, setMessage] = useState(
+    "Payment received. Finalizing your order…",
+  );
   const [failed, setFailed] = useState(false);
   const cancelled = useRef(false);
 
   useEffect(() => {
-    async function attempt(tryIndex: number): Promise<void> {
-      if (cancelled.current) return;
-
+    async function run(): Promise<void> {
       const correlationId = await resolveCorrelationId("stripe");
 
       if (correlationId) {
-        const res = await fetch(
+        const finalizeOnce = await fetch(
           `/api/payments/checkout-intents/${encodeURIComponent(correlationId)}/finalize`,
           { method: "POST", credentials: "include" },
         );
-        const json = (await res.json().catch(() => ({}))) as {
+        const finalizeJson = (await finalizeOnce.json().catch(() => ({}))) as {
           error?: string;
           redirectUrl?: string;
         };
         if (cancelled.current) return;
-        if (res.ok && typeof json.redirectUrl === "string" && json.redirectUrl.length > 0) {
-          window.location.href = json.redirectUrl;
+        if (
+          finalizeOnce.ok &&
+          typeof finalizeJson.redirectUrl === "string" &&
+          finalizeJson.redirectUrl.length > 0
+        ) {
+          window.location.href = finalizeJson.redirectUrl;
           return;
         }
-        if (tryIndex < 12 && (res.status === 409 || res.status === 500)) {
-          setMessage("Payment received. Waiting for confirmation, then we will finish your order…");
-          await new Promise((r) => setTimeout(r, 1500));
-          return attempt(tryIndex + 1);
-        }
+
         setMessage(
-          json.error ??
-            "Your payment may still be processing. Check your email or open order tracking from your account in a few minutes.",
+          "Confirming payment with our servers. You can leave this page; your order will update in your account.",
+        );
+
+        for (let i = 0; i < POLL_MAX; i++) {
+          if (cancelled.current) return;
+          await new Promise((r) => setTimeout(r, POLL_MS));
+          const st = await fetch(
+            `/api/payments/checkout-intents/${encodeURIComponent(correlationId)}`,
+            { credentials: "include" },
+          );
+          const stJson = (await st.json().catch(() => ({}))) as {
+            status?: string;
+            medusaOrderId?: string | null;
+          };
+          if (cancelled.current) return;
+          if (
+            st.ok &&
+            stJson.status === "completed" &&
+            typeof stJson.medusaOrderId === "string" &&
+            stJson.medusaOrderId
+          ) {
+            window.location.href = `/track/${encodeURIComponent(stJson.medusaOrderId)}`;
+            return;
+          }
+        }
+
+        setMessage(
+          finalizeJson.error ??
+            "Your payment may still be processing. Open your account or order tracking in a few minutes.",
         );
         setFailed(true);
         return;
@@ -77,6 +107,8 @@ function StripeReturnInner() {
       const res = await fetch("/api/checkout/complete-medusa-cart", {
         method: "POST",
         credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
       });
       const json = (await res.json().catch(() => ({}))) as {
         error?: string;
@@ -87,10 +119,27 @@ function StripeReturnInner() {
         window.location.href = json.redirectUrl;
         return;
       }
-      if (tryIndex < 12 && (res.status === 409 || res.status === 500)) {
-        setMessage("Payment received. Waiting for confirmation, then we will finish your order…");
-        await new Promise((r) => setTimeout(r, 1500));
-        return attempt(tryIndex + 1);
+      if (!res.ok && res.status >= 500) {
+        const retry = await fetch("/api/checkout/complete-medusa-cart", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+        const retryJson = (await retry.json().catch(() => ({}))) as {
+          redirectUrl?: string;
+        };
+        if (
+          cancelled.current ||
+          (retry.ok &&
+            typeof retryJson.redirectUrl === "string" &&
+            retryJson.redirectUrl.length > 0)
+        ) {
+          if (retry.ok && retryJson.redirectUrl) {
+            window.location.href = retryJson.redirectUrl;
+          }
+          return;
+        }
       }
       setMessage(
         json.error ??
@@ -104,7 +153,7 @@ function StripeReturnInner() {
       setMessage("Finalizing your order…");
     }
 
-    void attempt(0);
+    void run();
     return () => {
       cancelled.current = true;
     };
