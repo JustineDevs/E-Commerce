@@ -138,9 +138,22 @@ export default class StripeCheckoutPaymentProviderService extends AbstractPaymen
       );
     }
 
-    const currency = String(
-      (input.context as { currency_code?: string } | undefined)?.currency_code ?? "usd",
-    ).toLowerCase();
+    const ctxCurrency = (
+      input.context as { currency_code?: string } | undefined
+    )?.currency_code?.trim().toLowerCase();
+    const envFallback = process.env.STRIPE_CHECKOUT_FALLBACK_CURRENCY?.trim().toLowerCase();
+    const currency =
+      ctxCurrency && ctxCurrency.length === 3
+        ? ctxCurrency
+        : envFallback && envFallback.length === 3
+          ? envFallback
+          : null;
+    if (!currency) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        'Stripe initiatePayment: missing currency_code on payment context. Set the cart region currency in Medusa or STRIPE_CHECKOUT_FALLBACK_CURRENCY (e.g. "php"). Defaulting to "usd" caused wrong Checkout amounts when the cart was PHP.',
+      );
+    }
 
     const idempotencyKey =
       typeof (input.context as { idempotency_key?: string } | undefined)?.idempotency_key ===
@@ -159,6 +172,7 @@ export default class StripeCheckoutPaymentProviderService extends AbstractPaymen
           payment_intent_data: {
             metadata: { session_id: sessionId },
           },
+          adaptive_pricing: { enabled: false },
           line_items: [
             {
               price_data: {
@@ -171,7 +185,7 @@ export default class StripeCheckoutPaymentProviderService extends AbstractPaymen
               quantity: 1,
             },
           ],
-        },
+        } as Stripe.Checkout.SessionCreateParams,
         idempotencyKey ? { idempotencyKey } : undefined,
       );
 
