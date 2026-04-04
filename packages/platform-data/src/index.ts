@@ -363,9 +363,55 @@ export {
   findOpenPaymentAttemptForCart,
   registerPaymentAttempt,
   getPaymentAttemptByCorrelationId,
+  findPaymentAttemptByMedusaOrderId,
   updatePaymentAttemptByCorrelationId,
+  mergePaymentAttemptProviderPayload,
+  mergePaymentAttemptPayloadByMedusaOrderId,
   incrementFinalizeAttempts,
   listStuckPaymentAttempts,
+  listStalePaymentAttempts,
+  listRecentPaymentAttempts,
+  countPaymentAttemptsByStatuses,
   type PaymentAttemptRow,
   type RegisterPaymentAttemptInput,
 } from "./payment-ledger";
+
+export {
+  insertPaymentRefundAudit,
+  completePaymentRefundAudit,
+  insertCustomerReturnRequestAudit,
+  type PaymentRefundAuditRow,
+} from "./payment-ops-audit";
+
+export { getPaymentPlatformMetrics, type PaymentPlatformMetrics } from "./payment-platform-metrics";
+
+export { PAYMENT_OUTBOX_EVENT_TYPES } from "./payment-outbox-events";
+
+export {
+  enqueueJob,
+  completeJob,
+  failJob,
+  claimNextRunnableJob,
+  releaseJobFailure,
+  type BackgroundJob,
+  type JobStatus,
+} from "./background-jobs";
+
+export {
+  PAYMENT_RECONCILIATION_JOB_TYPES,
+  enqueueReconciliationJob,
+} from "./payment-reconciliation-jobs";
+
+export {
+  recordWebhookEvent,
+  markWebhookProcessed,
+  type PaymentWebhookEventRow,
+} from "./payment-webhook-inbox";
+
+export {
+  enqueueOutboxEvent,
+  listPendingOutboxEvents,
+  processOutboxBatch,
+  failOutboxEventWithBackoff,
+  type OutboxEvent,
+} from "./outbox";
