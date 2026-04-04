@@ -88,6 +88,23 @@ export async function getActiveShift(
   return rowToShift(data as Record<string, unknown>);
 }
 
+export async function getShiftById(
+  supabase: SupabaseClient,
+  shiftId: string,
+): Promise<PosShift | null> {
+  const { data, error } = await supabase
+    .from("pos_shifts")
+    .select("*")
+    .eq("id", shiftId)
+    .maybeSingle();
+  if (error) {
+    if (isMissingTableOrSchemaError(error)) return null;
+    throw error;
+  }
+  if (!data) return null;
+  return rowToShift(data as Record<string, unknown>);
+}
+
 export async function listShifts(
   supabase: SupabaseClient,
   opts?: { limit?: number; status?: "open" | "closed" },
