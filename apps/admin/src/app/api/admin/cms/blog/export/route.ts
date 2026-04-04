@@ -4,6 +4,7 @@ import { staffSessionAllows } from "@apparel-commerce/database";
 import { listCmsBlogPosts } from "@apparel-commerce/platform-data";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { authOptions } from "@/lib/auth";
+import { getCorrelationId } from "@/lib/request-correlation";
 
 function csvEscape(s: string): string {
   if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
@@ -11,6 +12,7 @@ function csvEscape(s: string): string {
 }
 
 export async function GET(req: NextRequest) {
+  const cid = getCorrelationId(req);
   const session = await getServerSession(authOptions);
   if (!session?.user) {
     return new Response("Unauthorized", { status: 401 });
