@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULT_PUBLIC_SITE_ORIGIN, PH_VAT_RATE, computeDisplayVat } from "@apparel-commerce/sdk";
 import {
   readCart,
@@ -13,14 +13,17 @@ import {
 } from "@/lib/cart";
 import { CheckoutTrustBadges } from "@/components/CheckoutTrustBadges";
 import {
+  previewMedusaCheckoutTotals,
   startMedusaCheckout,
   PAYMENT_PROVIDER_IDS,
   PAYMENT_PROVIDER_LABELS,
   type CodCartPayload,
+  type MedusaCheckoutTotalsPreview,
   type PaymentProviderKey,
 } from "@/lib/medusa-checkout";
 import { resolveCheckoutPaymentAvailability } from "@/lib/checkout-payment-availability";
 import { PaymentProviderLogo } from "@/components/PaymentProviderLogo";
+import { minorUnitDivisor } from "@/lib/medusa-money";
 import dynamic from "next/dynamic";
 
 const StripeEmbeddedCheckout = dynamic(
@@ -43,6 +46,20 @@ const SITE_ORIGIN = (
   process.env.NEXT_PUBLIC_SITE_URL ?? DEFAULT_PUBLIC_SITE_ORIGIN
 ).replace(/\/$/, "");
 
+function formatCheckoutMoney(amount: number, currencyCode: string): string {
+  const code = currencyCode.length === 3 ? currencyCode.toUpperCase() : "PHP";
+  try {
+    return new Intl.NumberFormat("en-PH", {
+      style: "currency",
+      currency: code,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  } catch {
+    return `${code} ${amount.toFixed(2)}`;
+  }
+}
+
 export function CheckoutClient({
   initialResumeCartId,
   initialStripeCheckoutCancel,
@@ -53,6 +70,7 @@ export function CheckoutClient({
 }) {
   const { data: session, status: authStatus } = useSession();
   const payInFlightRef = useRef(false);
+  const medusaPreviewSeqRef = useRef(0);
   const [lines, setLines] = useState<CartLine[]>([]);
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -65,6 +83,8 @@ export function CheckoutClient({
     confirmedTotal: number;
     currencyCode: string;
     priceMismatch: boolean;
+    /** Ledger id for server-owned finalization after hosted PSP return */
+    correlationId?: string;
   } | null>(null);
   const [embeddedData, setEmbeddedData] = useState<{
     provider: "STRIPE" | "PAYPAL";
@@ -78,6 +98,11 @@ export function CheckoutClient({
   const [copyDone, setCopyDone] = useState(false);
   const [loyaltyPoints, setLoyaltyPoints] = useState("");
   const [hydrated, setHydrated] = useState(false);
+  const [medusaPricePreview, setMedusaPricePreview] =
+    useState<MedusaCheckoutTotalsPreview | null>(null);
+  const [medusaPriceStatus, setMedusaPriceStatus] = useState<
+    "idle" | "loading" | "ready" | "error"
+  >("idle");
   type ProfileGate = "idle" | "loading" | "complete" | "incomplete" | "error";
   const [profileGate, setProfileGate] = useState<ProfileGate>("idle");
   const [profileMissing, setProfileMissing] = useState<string[]>([]);
@@ -219,9 +244,76 @@ export function CheckoutClient({
     };
   }, [initialResumeCartId]);
 
-  const subtotal = lines.reduce((s, l) => s + l.price * l.quantity, 0);
-  const tax = computeDisplayVat(subtotal);
-  const total = Math.round((subtotal + tax) * 100) / 100;
+  const checkoutLinesSignature = useMemo(
+    () => lines.map((l) => `${l.variantId}:${l.quantity}`).join("|"),
+    [lines],
+  );
+
+  useEffect(() => {
+    if (profileGate !== "complete" || !hydrated || lines.length === 0) {
+      setMedusaPricePreview(null);
+      setMedusaPriceStatus("idle");
+      return;
+    }
+
+    setMedusaPriceStatus("loading");
+    const seq = ++medusaPreviewSeqRef.current;
+    let cancelled = false;
+    const t = setTimeout(() => {
+      void (async () => {
+        try {
+          const lp = loyaltyPoints.trim();
+          const parsedLoyalty =
+            lp === "" ? undefined : Math.max(0, Math.floor(Number(lp)));
+
+          const preview = await previewMedusaCheckoutTotals({
+            lines: lines.map((l) => ({
+              variantId: l.variantId,
+              quantity: l.quantity,
+            })),
+            email:
+              paymentMethod === "COD" ? undefined : email.trim() || undefined,
+            loyaltyPointsToRedeem:
+              parsedLoyalty !== undefined && parsedLoyalty > 0
+                ? parsedLoyalty
+                : undefined,
+            paymentMethod,
+          });
+          if (!cancelled && seq === medusaPreviewSeqRef.current) {
+            setMedusaPricePreview(preview);
+            setMedusaPriceStatus("ready");
+          }
+        } catch {
+          if (!cancelled && seq === medusaPreviewSeqRef.current) {
+            setMedusaPricePreview(null);
+            setMedusaPriceStatus("error");
+          }
+        }
+      })();
+    }, 400);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [
+    profileGate,
+    hydrated,
+    checkoutLinesSignature,
+    loyaltyPoints,
+    email,
+    paymentMethod,
+  ]);
+
+  const localSubtotal = lines.reduce((s, l) => s + l.price * l.quantity, 0);
+  const localTax = computeDisplayVat(localSubtotal);
+  const localTotal = Math.round((localSubtotal + localTax) * 100) / 100;
+
+  const useMedusaBagTotals =
+    medusaPriceStatus === "ready" && medusaPricePreview != null;
+  const displayCurrency = useMedusaBagTotals
+    ? medusaPricePreview.currencyCode
+    : "PHP";
 
   async function handlePay() {
     if (lines.length === 0 || payInFlightRef.current || !hydrated) return;
@@ -369,11 +461,39 @@ export function CheckoutClient({
         });
         setCopyDone(false);
       } else {
-        const tol = Math.max(0.5, total * 0.02);
+        const comparableBagTotal =
+          medusaPricePreview?.total ?? localTotal;
+        const tol = Math.max(0.5, comparableBagTotal * 0.02);
         const priceMismatch =
           Number.isFinite(confirmedTotal) &&
-          Number.isFinite(total) &&
-          Math.abs(confirmedTotal - total) > tol;
+          Number.isFinite(comparableBagTotal) &&
+          Math.abs(confirmedTotal - comparableBagTotal) > tol;
+
+        const providerKey = paymentMethod.toLowerCase();
+        const amountMinor = Math.round(
+          confirmedTotal * minorUnitDivisor(currencyCode),
+        );
+        let checkoutCorrelationId: string | undefined;
+        try {
+          const regRes = await fetch("/api/payments/checkout-intents", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              provider: providerKey,
+              amountMinor,
+              currencyCode,
+            }),
+          });
+          const regJson = (await regRes.json().catch(() => ({}))) as {
+            correlationId?: string;
+          };
+          if (regRes.ok && typeof regJson.correlationId === "string") {
+            checkoutCorrelationId = regJson.correlationId;
+          }
+        } catch {
+          /* Ledger is optional; hosted checkout still works without it. */
+        }
 
         setPendingPayment({
           checkoutUrl,
@@ -382,6 +502,7 @@ export function CheckoutClient({
           confirmedTotal,
           currencyCode,
           priceMismatch,
+          correlationId: checkoutCorrelationId,
         });
         setCopyDone(false);
       }
@@ -395,6 +516,16 @@ export function CheckoutClient({
 
   function continueToHostedCheckout() {
     if (!pendingPayment) return;
+    if (pendingPayment.correlationId) {
+      try {
+        sessionStorage.setItem(
+          "payment_checkout_correlation_id",
+          pendingPayment.correlationId,
+        );
+      } catch {
+        /* ignore */
+      }
+    }
     clearCart();
     window.location.href = pendingPayment.checkoutUrl;
   }
@@ -753,7 +884,23 @@ export function CheckoutClient({
                       </div>
                     </div>
                     <p className="font-medium text-primary shrink-0">
-                      PHP {(l.price * l.quantity).toLocaleString("en-PH")}
+                      {formatCheckoutMoney(
+                        (() => {
+                          const fromMedusa =
+                            medusaPricePreview?.lineSubtotalsByVariantId[
+                              l.variantId
+                            ];
+                          if (
+                            useMedusaBagTotals &&
+                            fromMedusa != null &&
+                            Number.isFinite(fromMedusa)
+                          ) {
+                            return fromMedusa;
+                          }
+                          return l.price * l.quantity;
+                        })(),
+                        displayCurrency,
+                      )}
                     </p>
                   </li>
                 ))}
@@ -761,18 +908,96 @@ export function CheckoutClient({
             )}
 
             <div className="mt-8 pt-6 border-t border-surface-container-high space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-on-surface-variant">Subtotal</span>
-                <span>PHP {subtotal.toLocaleString("en-PH")}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-on-surface-variant">VAT ({(PH_VAT_RATE * 100).toFixed(0)}%)</span>
-                <span>PHP {tax.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between font-headline font-bold text-lg pt-2">
-                <span>Total</span>
-                <span>PHP {total.toFixed(2)}</span>
-              </div>
+              {medusaPriceStatus === "loading" && lines.length > 0 ? (
+                <p className="text-xs text-on-surface-variant mb-2">
+                  Updating totals with shipping and catalog prices…
+                </p>
+              ) : null}
+              {medusaPriceStatus === "error" && lines.length > 0 ? (
+                <p className="text-xs text-amber-800 mb-2" role="status">
+                  Live totals are unavailable. Figures below omit shipping and use your bag prices only. Refresh the page or try again.
+                </p>
+              ) : null}
+              {useMedusaBagTotals ? (
+                <>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-on-surface-variant">Subtotal</span>
+                    <span>
+                      {formatCheckoutMoney(
+                        medusaPricePreview.subtotal,
+                        displayCurrency,
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-on-surface-variant">Shipping</span>
+                    <span>
+                      {formatCheckoutMoney(
+                        medusaPricePreview.shippingTotal,
+                        displayCurrency,
+                      )}
+                    </span>
+                  </div>
+                  {medusaPricePreview.taxTotal > 0 ? (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-on-surface-variant">Tax</span>
+                      <span>
+                        {formatCheckoutMoney(
+                          medusaPricePreview.taxTotal,
+                          displayCurrency,
+                        )}
+                      </span>
+                    </div>
+                  ) : null}
+                  {medusaPricePreview.discountTotal > 0 ? (
+                    <div className="flex justify-between text-sm text-green-800">
+                      <span>Discount</span>
+                      <span>
+                        −
+                        {formatCheckoutMoney(
+                          medusaPricePreview.discountTotal,
+                          displayCurrency,
+                        )}
+                      </span>
+                    </div>
+                  ) : null}
+                  <div className="flex justify-between font-headline font-bold text-lg pt-2">
+                    <span>Total</span>
+                    <span>
+                      {formatCheckoutMoney(
+                        medusaPricePreview.total,
+                        displayCurrency,
+                      )}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-on-surface-variant">Subtotal</span>
+                    <span>
+                      {formatCheckoutMoney(localSubtotal, displayCurrency)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-on-surface-variant">
+                      VAT ({(PH_VAT_RATE * 100).toFixed(0)}%)
+                    </span>
+                    <span>
+                      {formatCheckoutMoney(localTax, displayCurrency)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between font-headline font-bold text-lg pt-2">
+                    <span>Total</span>
+                    <span>
+                      {formatCheckoutMoney(localTotal, displayCurrency)}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-on-surface-variant pt-1 leading-relaxed">
+                    Shipping is added when you continue; the total above is before delivery.
+                  </p>
+                </>
+              )}
             </div>
 
             {error && (
@@ -810,9 +1035,9 @@ export function CheckoutClient({
                   </p>
                   {pendingPayment.priceMismatch ? (
                     <p className="mt-2 text-xs text-amber-800" role="status">
-                      The amount above is what you will be charged. It may differ slightly from the
-                      bag subtotal here if tax or prices were updated. Use this figure as the final
-                      amount before you pay.
+                      The amount above is what the payment provider will charge. If it differs from the
+                      bag, the catalog or taxes changed between preview and continue. Use the amount
+                      due as final.
                     </p>
                   ) : null}
                 </div>
