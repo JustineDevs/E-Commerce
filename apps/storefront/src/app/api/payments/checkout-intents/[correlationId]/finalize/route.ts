@@ -64,7 +64,9 @@ export async function POST(
   }
 
   try {
-    const result = await finalizeMedusaCartFromServer(cartId);
+    const result = await finalizeMedusaCartFromServer(cartId, {
+      maxCompleteAttempts: 2,
+    });
 
     if (!result.ok) {
       if (sb) {
