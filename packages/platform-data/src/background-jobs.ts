@@ -14,6 +14,11 @@ export type BackgroundJob = {
   created_at?: string;
   started_at?: string;
   completed_at?: string;
+  attempts?: number;
+  next_run_at?: string | null;
+  locked_at?: string | null;
+  locked_by?: string | null;
+  last_error?: string | null;
 };
 
 export async function enqueueJob(
@@ -120,4 +125,64 @@ export async function getJob(
 
   if (error) return null;
   return data as BackgroundJob;
+}
+
+/**
+ * Claim one queued job for a worker (optimistic lock). Returns null if none or lost race.
+ */
+export async function claimNextRunnableJob(
+  supabase: SupabaseClient,
+  jobType: string,
+  workerId: string,
+): Promise<BackgroundJob | null> {
+  const now = new Date().toISOString();
+  const { data: candidates, error: qErr } = await supabase
+    .from("background_jobs")
+    .select("*")
+    .eq("job_type", jobType)
+    .eq("status", "queued")
+    .or(`next_run_at.is.null,next_run_at.lte.${now}`)
+    .order("created_at", { ascending: true })
+    .limit(1);
+
+  if (qErr || !candidates?.length) return null;
+  const row = candidates[0] as BackgroundJob;
+  const id = row.id!;
+  const attempts = (row.attempts ?? 0) + 1;
+
+  const { data: claimed, error: uErr } = await supabase
+    .from("background_jobs")
+    .update({
+      status: "running" as JobStatus,
+      locked_at: now,
+      locked_by: workerId,
+      started_at: row.started_at ?? now,
+      attempts,
+    })
+    .eq("id", id)
+    .eq("status", "queued")
+    .select("*")
+    .maybeSingle();
+
+  if (uErr || !claimed) return null;
+  return claimed as BackgroundJob;
+}
+
+export async function releaseJobFailure(
+  supabase: SupabaseClient,
+  jobId: string,
+  message: string,
+  scheduleRetryMs: number,
+): Promise<void> {
+  const next = new Date(Date.now() + Math.max(5_000, scheduleRetryMs)).toISOString();
+  await supabase
+    .from("background_jobs")
+    .update({
+      status: "queued" as JobStatus,
+      locked_at: null,
+      locked_by: null,
+      last_error: message.slice(0, 2000),
+      next_run_at: next,
+    })
+    .eq("id", jobId);
 }
