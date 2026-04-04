@@ -31,7 +31,8 @@ export type AdminApiErrorCode =
   | "MEDUSA_UNAVAILABLE"
   | "VALIDATION_ERROR"
   | "INSUFFICIENT_STOCK"
-  | "INVENTORY_CHECK_FAILED";
+  | "INVENTORY_CHECK_FAILED"
+  | "POS_POLICY_DENIED";
 
 /**
  * Standard error response for admin API routes.
