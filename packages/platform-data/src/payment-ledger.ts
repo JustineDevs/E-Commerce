@@ -24,6 +24,7 @@ export type PaymentAttemptRow = {
   webhook_last_event_id: string | null;
   webhook_last_status: string | null;
   finalize_attempts: number;
+  provider_payload?: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
   finalized_at: string | null;
@@ -127,6 +128,24 @@ export async function registerPaymentAttempt(
   return { correlationId, reused: false };
 }
 
+export async function findPaymentAttemptByMedusaOrderId(
+  supabase: SupabaseClient,
+  medusaOrderId: string,
+): Promise<PaymentAttemptRow | null> {
+  const { data, error } = await supabase
+    .from("payment_attempts")
+    .select("*")
+    .eq("medusa_order_id", medusaOrderId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    if (isMissingTableOrSchemaError(error)) return null;
+    throw error;
+  }
+  return (data as PaymentAttemptRow) ?? null;
+}
+
 export async function getPaymentAttemptByCorrelationId(
   supabase: SupabaseClient,
   correlationId: string,
@@ -158,6 +177,7 @@ export async function updatePaymentAttemptByCorrelationId(
       | "provider_payment_id"
       | "webhook_last_event_id"
       | "webhook_last_status"
+      | "provider_payload"
     >
   > & { finalized_at?: string | null },
 ): Promise<void> {
@@ -169,6 +189,32 @@ export async function updatePaymentAttemptByCorrelationId(
     })
     .eq("correlation_id", correlationId);
   if (error) throw error;
+}
+
+export async function mergePaymentAttemptProviderPayload(
+  supabase: SupabaseClient,
+  correlationId: string,
+  merge: Record<string, unknown>,
+): Promise<void> {
+  const row = await getPaymentAttemptByCorrelationId(supabase, correlationId);
+  if (!row) return;
+  const prev =
+    row.provider_payload && typeof row.provider_payload === "object"
+      ? (row.provider_payload as Record<string, unknown>)
+      : {};
+  await updatePaymentAttemptByCorrelationId(supabase, correlationId, {
+    provider_payload: { ...prev, ...merge },
+  });
+}
+
+export async function mergePaymentAttemptPayloadByMedusaOrderId(
+  supabase: SupabaseClient,
+  medusaOrderId: string,
+  merge: Record<string, unknown>,
+): Promise<void> {
+  const row = await findPaymentAttemptByMedusaOrderId(supabase, medusaOrderId);
+  if (!row) return;
+  await mergePaymentAttemptProviderPayload(supabase, row.correlation_id, merge);
 }
 
 export async function incrementFinalizeAttempts(
@@ -200,4 +246,39 @@ export async function listStuckPaymentAttempts(
     throw error;
   }
   return (data ?? []) as PaymentAttemptRow[];
+}
+
+/** Alias for reconciliation jobs and operator docs (stale = paid but no order id). */
+export const listStalePaymentAttempts = listStuckPaymentAttempts;
+
+export async function listRecentPaymentAttempts(
+  supabase: SupabaseClient,
+  limit: number,
+): Promise<PaymentAttemptRow[]> {
+  const { data, error } = await supabase
+    .from("payment_attempts")
+    .select("*")
+    .order("updated_at", { ascending: false })
+    .limit(Math.min(500, Math.max(1, limit)));
+  if (error) {
+    if (isMissingTableOrSchemaError(error)) return [];
+    throw error;
+  }
+  return (data ?? []) as PaymentAttemptRow[];
+}
+
+export async function countPaymentAttemptsByStatuses(
+  supabase: SupabaseClient,
+  statuses: string[],
+): Promise<number> {
+  if (statuses.length === 0) return 0;
+  const { count, error } = await supabase
+    .from("payment_attempts")
+    .select("*", { count: "exact", head: true })
+    .in("status", statuses);
+  if (error) {
+    if (isMissingTableOrSchemaError(error)) return 0;
+    throw error;
+  }
+  return count ?? 0;
 }
