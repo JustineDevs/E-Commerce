@@ -6,6 +6,7 @@ node_modules/
 .next/
 .turbo/
 .medusa/
+.cache/
 dist/
 out/
 build/
@@ -69,6 +70,8 @@ playwright/.cache/
 internal/docs/exclusive/
 .cursor/mcp.json
 .claude/
+.codex
+.omx/
 
 # Lockfile: pnpm only
 package-lock.json
