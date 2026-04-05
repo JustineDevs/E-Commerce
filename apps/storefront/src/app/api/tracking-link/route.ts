@@ -8,6 +8,7 @@ import {
   getRequestIp,
   rateLimitFixedWindow,
 } from "@/lib/storefront-api-rate-limit";
+import { trackingLinkRouteLogic } from "@/lib/tracking-link-route-logic";
 
 const WINDOW_MS = 60_000;
 const MAX_PER_WINDOW = 60;
@@ -15,12 +16,6 @@ const MAX_PER_WINDOW = 60;
 export async function POST(req: Request) {
   const ip = getRequestIp(req);
   const rl = await rateLimitFixedWindow(`tracking-link:${ip}`, MAX_PER_WINDOW, WINDOW_MS);
-  if (!rl.ok) {
-    return NextResponse.json(
-      { error: "Too many requests", retryAfter: rl.retryAfterSec },
-      { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } },
-    );
-  }
 
   let body: { cartId?: string };
   try {
@@ -32,24 +27,19 @@ export async function POST(req: Request) {
     );
   }
 
-  const cartId = typeof body?.cartId === "string" ? body.cartId.trim() : "";
-  if (!cartId || (!cartId.startsWith("cart_") && !cartId.startsWith("order_"))) {
-    return NextResponse.json(
-      { error: "cartId required (cart_xxx or order_xxx)" },
-      { status: 400 },
-    );
-  }
-
   const base =
     process.env.NEXT_PUBLIC_SITE_URL?.trim() || DEFAULT_PUBLIC_SITE_ORIGIN;
-  const url = buildTrackingUrl(base, cartId);
+  const result = trackingLinkRouteLogic({
+    cartId: typeof body?.cartId === "string" ? body.cartId : "",
+    rateLimited: !rl.ok,
+    retryAfterSec: !rl.ok ? rl.retryAfterSec : undefined,
+    buildTrackingUrl: (cartId) => buildTrackingUrl(base, cartId),
+  });
 
-  if (!url) {
-    return NextResponse.json(
-      { error: "Tracking links require TRACKING_HMAC_SECRET (not configured)" },
-      { status: 503 },
-    );
-  }
-
-  return NextResponse.json({ trackingPageUrl: url });
+  return NextResponse.json(result.body, {
+    status: result.status,
+    ...(result.status === 429 && typeof result.body.retryAfter === "number"
+      ? { headers: { "Retry-After": String(result.body.retryAfter) } }
+      : {}),
+  });
 }
