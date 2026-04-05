@@ -13,7 +13,7 @@
     "medusa"
   ],
   "scripts": {
-    "build": "medusa build",
+    "build": "node ./scripts/run-build.cjs",
     "seed": "medusa exec ./src/scripts/seed.ts",
     "seed:ph": "medusa exec ./src/scripts/seed-ph.ts",
     "seed:categories": "medusa exec ./src/scripts/ensure-product-categories.ts",
@@ -21,7 +21,7 @@
     "import:legacy-catalog": "medusa exec ./src/scripts/import-legacy-catalog-jsonl.ts",
     "import:legacy-inventory": "medusa exec ./src/scripts/import-legacy-inventory-jsonl.ts",
     "start": "medusa start",
-    "dev": "medusa develop",
+    "dev": "node ./scripts/run-dev.cjs",
     "test:integration:http": "node scripts/run-jest.cjs integration:http -- --silent=false --runInBand --forceExit",
     "test:integration:modules": "node scripts/run-jest.cjs integration:modules -- --silent=false --runInBand --forceExit",
     "test:unit": "node scripts/run-jest.cjs unit -- --silent --runInBand --forceExit",
@@ -51,7 +51,7 @@
     "@opentelemetry/exporter-zipkin": "^2.0.0",
     "@types/pg": "^8.11.10",
     "@medusajs/test-utils": "2.13.1",
-    "@swc/core": "^1.7.28",
+    "@swc/core": "1.15.18",
     "@swc/jest": "^0.2.36",
     "@types/jest": "^29.5.13",
     "@types/node": "^20.12.11",
@@ -68,6 +68,9 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "optionalDependencies": {
+    "@swc/core-win32-x64-msvc": "1.15.18"
   },
   "packageManager": "pnpm@9.14.2"
 }
