@@ -10,7 +10,7 @@
     "build": "node ../../scripts/clean-next-dir.cjs apps/storefront && next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "tsx --test src/lib/storefront-api-rate-limit.test.ts src/lib/medusa-money.test.ts src/lib/medusa-profile-address.test.ts src/lib/medusa-review-verification.test.ts src/lib/medusa-catalog-stock.test.ts",
+    "test": "tsx --test src/lib/storefront-api-rate-limit.test.ts src/lib/medusa-money.test.ts src/lib/medusa-profile-address.test.ts src/lib/medusa-review-verification.test.ts src/lib/medusa-catalog-stock.test.ts src/lib/payment-attempt-route-logic.test.ts src/lib/medusa-track-fetch.test.ts src/lib/tracking-link-route-logic.test.ts",
     "generate:icons": "python scripts/generate-favicons.py"
   },
   "dependencies": {
