@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Separator } from "@apparel-commerce/ui";
+import { CollapsibleInspectorColumn } from "./CollapsibleInspectorColumn";
 import { AdminPageTitleWithHelp } from "./AdminPageTitleWithHelp";
 
 export type AdminPageShellProps = {
@@ -22,6 +23,14 @@ export type AdminPageShellProps = {
   children: ReactNode;
   /** Right-side inspector (desktop column; mobile stacks below) */
   inspector?: ReactNode;
+  /**
+   * When set with `inspector`, wraps the inspector in a hide/show column with persisted preference.
+   */
+  inspectorCollapsible?: {
+    storageKey: string;
+    expandLabel?: string;
+    collapseLabel?: string;
+  };
   /** Sticky bottom strip: toast region, last audit line */
   footNote?: ReactNode;
   className?: string;
@@ -41,6 +50,7 @@ export function AdminPageShell({
   actions,
   children,
   inspector,
+  inspectorCollapsible,
   footNote,
   className = "",
 }: AdminPageShellProps) {
@@ -86,9 +96,19 @@ export function AdminPageShell({
         <div className="flex min-h-0 flex-1 flex-col gap-6 xl:flex-row">
           <div className="min-w-0 flex-1">{children}</div>
           {inspector ? (
-            <div className="w-full shrink-0 border-t border-outline-variant/15 pt-6 xl:w-96 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
-              {inspector}
-            </div>
+            inspectorCollapsible ? (
+              <CollapsibleInspectorColumn
+                storageKey={inspectorCollapsible.storageKey}
+                expandLabel={inspectorCollapsible.expandLabel}
+                collapseLabel={inspectorCollapsible.collapseLabel}
+              >
+                {inspector}
+              </CollapsibleInspectorColumn>
+            ) : (
+              <div className="w-full shrink-0 border-t border-outline-variant/15 pt-6 xl:w-96 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
+                {inspector}
+              </div>
+            )
           ) : null}
         </div>
       </div>
