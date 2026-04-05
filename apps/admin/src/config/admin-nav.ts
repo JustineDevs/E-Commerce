@@ -27,6 +27,12 @@ export const ADMIN_NAV_GROUPS: { label: string; items: readonly AdminNavItem[] }
         icon: "shopping_bag",
         permission: "catalog:read",
       },
+      {
+        href: "/admin/catalog/media",
+        label: "Catalog media",
+        icon: "perm_media",
+        permission: "catalog:read",
+      },
       { href: "/admin/inventory", label: "Inventory", icon: "inventory_2", permission: "inventory:read" },
       { href: "/admin/orders", label: "Orders", icon: "shopping_cart", permission: "orders:read" },
       {
