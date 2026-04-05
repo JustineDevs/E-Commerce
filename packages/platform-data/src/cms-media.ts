@@ -1,6 +1,131 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isMissingTableOrSchemaError } from "./supabase-errors";
 
+/** Avoid `node:crypto` so this module does not break Webpack when re-exported into client bundles (e.g. SDK). Node 20+ and browsers expose Web Crypto. */
+function randomUuid(): string {
+  return globalThis.crypto.randomUUID();
+}
+
+/** Tag on `cms_media` rows for files in the Supabase `catalog` storage bucket (product PDP assets). */
+export const CMS_MEDIA_TAG_CATALOG_PRODUCT = "catalog-product";
+
+export function cmsMediaRowIsCatalogProduct(row: CmsMediaRow): boolean {
+  return row.tags.includes(CMS_MEDIA_TAG_CATALOG_PRODUCT);
+}
+
+/** Normalize pasted URLs (e.g. protocol-relative) for stable `cms_media.public_url` matching. */
+export function normalizeCatalogMediaUrlForDb(url: string): string | null {
+  const t = url.trim();
+  if (!t) return null;
+  try {
+    if (t.startsWith("//")) {
+      return new URL(`https:${t}`).href;
+    }
+    return new URL(t).href;
+  } catch {
+    return null;
+  }
+}
+
+function isHttpOrHttpsUrl(normalized: string): boolean {
+  try {
+    const u = new URL(normalized);
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function guessCatalogMediaMimeFromUrl(url: string): string | null {
+  const path = (() => {
+    try {
+      return new URL(url).pathname.toLowerCase();
+    } catch {
+      return url.toLowerCase();
+    }
+  })();
+  if (/\.(jpe?g)(\?|$)/i.test(path)) return "image/jpeg";
+  if (/\.png(\?|$)/i.test(path)) return "image/png";
+  if (/\.gif(\?|$)/i.test(path)) return "image/gif";
+  if (/\.webp(\?|$)/i.test(path)) return "image/webp";
+  if (/\.avif(\?|$)/i.test(path)) return "image/avif";
+  if (/\.svg(\?|$)/i.test(path)) return "image/svg+xml";
+  if (/\.bmp(\?|$)/i.test(path)) return "image/bmp";
+  if (/\.(mp4|m4v)(\?|$)/i.test(path)) return "video/mp4";
+  if (/\.webm(\?|$)/i.test(path)) return "video/webm";
+  if (/\.(mov|qt)(\?|$)/i.test(path)) return "video/quicktime";
+  if (/\.ogg(\?|$)/i.test(path)) return "video/ogg";
+  return null;
+}
+
+function displayNameFromCatalogUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    const base = u.pathname.split("/").filter(Boolean).pop();
+    if (base && base.length <= 120) return base;
+    return u.hostname || "external";
+  } catch {
+    return "external";
+  }
+}
+
+export async function findCmsMediaCatalogProductByPublicUrl(
+  supabase: SupabaseClient,
+  publicUrl: string,
+): Promise<CmsMediaRow | null> {
+  const { data, error } = await supabase
+    .from("cms_media")
+    .select("*")
+    .eq("public_url", publicUrl)
+    .contains("tags", [CMS_MEDIA_TAG_CATALOG_PRODUCT])
+    .is("deleted_at", null)
+    .limit(1);
+  if (error) {
+    if (isMissingTableOrSchemaError(error)) return null;
+    console.error("[cms-media] findCatalogByPublicUrl", error.message);
+    return null;
+  }
+  const first = data?.[0];
+  if (!first) return null;
+  return mapRow(first as Record<string, unknown>);
+}
+
+/**
+ * Ensures each HTTP(S) media URL used on a catalog product has a matching `cms_media` row
+ * tagged `catalog-product`. Skips URLs already present; skips non-absolute URLs (e.g. site-relative paths).
+ * Uploads to Supabase Storage already inserted a row with the same `public_url` — those are skipped.
+ */
+export async function ensureExternalCatalogProductMediaRows(
+  supabase: SupabaseClient,
+  rawUrls: string[],
+): Promise<void> {
+  const dedup = new Set<string>();
+  for (const raw of rawUrls) {
+    const normalized = normalizeCatalogMediaUrlForDb(raw);
+    if (!normalized || !isHttpOrHttpsUrl(normalized)) continue;
+    if (dedup.has(normalized)) continue;
+    dedup.add(normalized);
+
+    const existing = await findCmsMediaCatalogProductByPublicUrl(supabase, normalized);
+    if (existing) continue;
+
+    const row = await insertCmsMedia(supabase, {
+      storage_path: `external/${randomUuid()}`,
+      public_url: normalized,
+      alt_text: null,
+      mime_type: guessCatalogMediaMimeFromUrl(normalized),
+      width: null,
+      height: null,
+      display_name: displayNameFromCatalogUrl(normalized),
+      byte_size: null,
+      tags: [CMS_MEDIA_TAG_CATALOG_PRODUCT],
+    });
+    if (!row) {
+      console.error("[cms-media] ensureExternalCatalogProductMediaRows insert failed", normalized);
+    }
+  }
+}
+
 export type CmsMediaRow = {
   id: string;
   storage_path: string;
