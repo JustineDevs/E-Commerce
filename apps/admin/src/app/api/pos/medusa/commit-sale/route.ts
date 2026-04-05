@@ -15,6 +15,7 @@ import {
   getMedusaRegionId,
   getMedusaSalesChannelId,
 } from "@/lib/medusa-pos";
+import { posCommitSaleRouteLogic } from "@/lib/pos-commit-sale-route-logic";
 import { requireStaffApiSession } from "@/lib/requireStaffSession";
 import { correlatedJson, correlatedError, tagResponse } from "@/lib/staff-api-response";
 
@@ -76,14 +77,6 @@ export async function POST(req: Request) {
   const adminSdk = getMedusaAdminSdk();
   const regionId = getMedusaRegionId();
   const salesChannelId = getMedusaSalesChannelId();
-  if (!adminSdk || !regionId || !salesChannelId) {
-    return correlatedError(
-      correlationId,
-      503,
-      "POS environment incomplete (MEDUSA_SECRET_API_KEY, MEDUSA_REGION_ID, MEDUSA_SALES_CHANNEL_ID)",
-      "MEDUSA_UNAVAILABLE",
-    );
-  }
 
   const idempotencyKey = req.headers.get("idempotency-key")?.trim();
   if (idempotencyKey) {
@@ -115,141 +108,106 @@ export async function POST(req: Request) {
     /** Supabase pos_shifts.id for register-grade reconciliation (metadata on Medusa order). */
     shiftId?: string;
   };
-  const items = body.items ?? [];
-  if (items.length === 0) {
-    if (idempotencyKey) inflight.delete(idempotencyKey);
-    return correlatedError(correlationId, 400, "No items", "BAD_REQUEST");
-  }
-
-  const offlineSaleId =
-    typeof body.offlineSaleId === "string" ? body.offlineSaleId.trim() : "";
-  if (offlineSaleId) {
-    const existing = await findOrderByPosOfflineId(offlineSaleId);
-    if (existing) {
-      const orderNumber =
-        existing.display_id != null
-          ? String(existing.display_id)
-          : existing.id;
-      logAdminApiEvent({
-        route: "POST /api/pos/medusa/commit-sale",
-        correlationId,
-        phase: "ok",
-        detail: { orderNumber, idempotent: true },
-      });
-      return correlatedJson(correlationId, { orderNumber, idempotent: true });
-    }
-  }
-
-  const stock = await assertPosCartStock(items);
-  if (!stock.ok) {
-    if (idempotencyKey) inflight.delete(idempotencyKey);
-    const status = stock.code === "INSUFFICIENT_STOCK" ? 409 : 502;
-    return correlatedError(correlationId, status, stock.message, stock.code);
-  }
-
-  const shiftId =
-    typeof body.shiftId === "string" ? body.shiftId.trim() : "";
-  let hasOpenShift = false;
-  if (shiftId) {
-    const sup = adminSupabaseOr503(correlationId);
-    if ("response" in sup) {
-      if (idempotencyKey) inflight.delete(idempotencyKey);
-      return tagResponse(sup.response, correlationId);
-    }
-    const row = await getShiftById(sup.client, shiftId);
-    hasOpenShift = row?.status === "open";
-  }
-
-  const posPolicy = evaluatePosSalePolicy({
-    stockVerified: true,
-    hasOpenShift,
-    shiftIdProvided: Boolean(shiftId),
-  });
-  if (!posPolicy.allowed) {
-    if (idempotencyKey) inflight.delete(idempotencyKey);
-    return correlatedError(
-      correlationId,
-      403,
-      posPolicy.violations.join("; ") || "POS policy denied",
-      "POS_POLICY_DENIED",
-    );
-  }
-
-  const draftMetadata: Record<string, unknown> = {};
-  if (offlineSaleId) draftMetadata.pos_offline_id = offlineSaleId;
-  if (shiftId) draftMetadata.pos_shift_id = shiftId;
 
   try {
-    const { draft_order } = await adminSdk.admin.draftOrder.create({
-      email: (body.email?.trim() || "pos@instore.local").slice(0, 320),
-      region_id: regionId,
-      sales_channel_id: salesChannelId,
-      items: items.map((i) => ({
-        variant_id: i.variantId,
-        quantity: Math.max(1, Math.floor(i.quantity)),
-      })),
-      ...(Object.keys(draftMetadata).length > 0
-        ? { metadata: draftMetadata }
-        : {}),
-    } as never);
-
-    if (!draft_order?.id) {
-      return correlatedError(
-        correlationId,
-        502,
-        "Draft order missing id from the store API",
-        "MEDUSA_UNAVAILABLE",
-      );
-    }
-
-    const { order } = await adminSdk.admin.draftOrder.convertToOrder(
-      draft_order.id,
-    );
-
-    if (order?.id && (offlineSaleId || shiftId)) {
-      const patch: Record<string, unknown> = {};
-      if (offlineSaleId) patch.pos_offline_id = offlineSaleId;
-      if (shiftId) patch.pos_shift_id = shiftId;
-      await patchMedusaOrderMetadata(order.id, patch);
-    }
-
-    const orderNumber =
-      order?.display_id != null ? String(order.display_id) : order?.id ?? "";
-    const orderId = order?.id != null ? String(order.id) : "";
-
-    if (idempotencyKey && orderNumber) {
-      rememberCompletedPosCommit(idempotencyKey, orderNumber);
-    }
-
-    const orderRaw = order as unknown as Record<string, unknown> | null | undefined;
-    const totalMinor = Math.round(Number(orderRaw?.total ?? 0));
+    const result = await posCommitSaleRouteLogic({
+      body,
+      correlationId,
+      idempotencyKey,
+      envReady: Boolean(adminSdk && regionId && salesChannelId),
+      completedReplayOrderNumber: null,
+      findExistingOrderByOfflineSaleId: async (offlineSaleId) => {
+        const existing = await findOrderByPosOfflineId(offlineSaleId);
+        if (!existing) {
+          return null;
+        }
+        return {
+          id: existing.id,
+          displayId:
+            existing.display_id != null ? String(existing.display_id) : existing.id,
+        };
+      },
+      assertStock: async (items) => assertPosCartStock(items),
+      loadShiftStatus: async (shiftId) => {
+        const sup = adminSupabaseOr503(correlationId);
+        if ("response" in sup) {
+          throw new Error("SUPABASE_UNAVAILABLE");
+        }
+        const row = await getShiftById(sup.client, shiftId);
+        return row?.status === "open" ? "open" : row ? "closed" : "missing";
+      },
+      evaluatePolicy: (policyInput) => evaluatePosSalePolicy(policyInput),
+      createDraftOrder: async (draftInput) => {
+        if (!adminSdk || !regionId || !salesChannelId) {
+          return {};
+        }
+        const { draft_order } = await adminSdk.admin.draftOrder.create({
+          email: draftInput.email,
+          region_id: regionId,
+          sales_channel_id: salesChannelId,
+          items: draftInput.items,
+          ...(draftInput.metadata ? { metadata: draftInput.metadata } : {}),
+        } as never);
+        return { id: draft_order?.id };
+      },
+      convertDraftToOrder: async (draftOrderId) => {
+        if (!adminSdk) {
+          return {};
+        }
+        const { order } = await adminSdk.admin.draftOrder.convertToOrder(draftOrderId);
+        const total = (order as { total?: unknown } | undefined)?.total;
+        return {
+          id: order?.id != null ? String(order.id) : undefined,
+          display_id: order?.display_id,
+          total: typeof total === "number" ? total : undefined,
+        };
+      },
+      patchOrderMetadata: async (orderId, metadata) => {
+        await patchMedusaOrderMetadata(orderId, metadata);
+      },
+      rememberCompletedReplay: (key, orderNumber) => {
+        rememberCompletedPosCommit(key, orderNumber);
+      },
+    });
 
     logAdminApiEvent({
       route: "POST /api/pos/medusa/commit-sale",
       correlationId,
-      phase: "ok",
-      detail: {
-        orderNumber,
-        pos_sale: {
-          order_id: orderId || orderNumber,
-          store_id: salesChannelId,
-          total_minor: Number.isFinite(totalMinor) ? totalMinor : 0,
-          payment_method: "pos_draft_converted",
-        },
-      },
+      phase: result.logPhase,
+      detail: result.logDetail,
     });
 
-    return correlatedJson(correlationId, { orderNumber, orderId: orderId || undefined });
+    if (result.logPhase === "error") {
+      return correlatedError(
+        correlationId,
+        result.status,
+        result.body.error,
+        result.body.code,
+      );
+    }
+
+    return correlatedJson(correlationId, result.body);
   } catch (e) {
     const msg =
-      e instanceof Error ? e.message : "Unable to complete POS sale";
+      e instanceof Error && e.message === "SUPABASE_UNAVAILABLE"
+        ? "Supabase admin connection is not configured"
+        : e instanceof Error
+          ? e.message
+          : "Unable to complete POS sale";
     logAdminApiEvent({
       route: "POST /api/pos/medusa/commit-sale",
       correlationId,
       phase: "error",
       detail: { message: msg },
     });
-    return correlatedError(correlationId, 502, msg, "INTERNAL_ERROR");
+    return correlatedError(
+      correlationId,
+      msg === "Supabase admin connection is not configured" ? 503 : 502,
+      msg,
+      msg === "Supabase admin connection is not configured"
+        ? "SUPABASE_NOT_CONFIGURED"
+        : "INTERNAL_ERROR",
+    );
   } finally {
     if (idempotencyKey) inflight.delete(idempotencyKey);
   }
