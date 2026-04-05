@@ -8,6 +8,7 @@ import {
 import { applyRateLimit, readCartIdFromCookie } from "@/lib/cart-api-helpers";
 import { logCheckoutCompletionEvent } from "@/lib/checkout-telemetry";
 import { finalizeMedusaCartFromServer } from "@/lib/finalize-medusa-cart-server";
+import { finalizeCheckoutIntentRouteLogic } from "@/lib/payment-attempt-route-logic";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 
 export const dynamic = "force-dynamic";
@@ -26,113 +27,34 @@ export async function POST(
   }
 
   const { correlationId } = await ctx.params;
-  if (!correlationId?.trim()) {
-    return NextResponse.json({ error: "Missing correlation id" }, { status: 400 });
-  }
-
   const cartId = await readCartIdFromCookie();
-  if (!cartId) {
-    logCheckoutCompletionEvent({
-      stage: "complete_medusa_cart",
-      outcome: "failure",
-      httpStatus: 400,
-      errorCode: "no_cart",
-      message: "No active cart",
-    });
-    return NextResponse.json({ error: "No active cart" }, { status: 400 });
-  }
-
-  const cartSuffix = cartId.length > 8 ? cartId.slice(-8) : cartId;
   const sb = createStorefrontServiceSupabase();
-
-  const row = sb
+  const row = sb && correlationId?.trim()
     ? await getPaymentAttemptByCorrelationId(sb, correlationId.trim())
     : null;
-  if (row && row.cart_id !== cartId) {
-    return NextResponse.json({ error: "Cart mismatch" }, { status: 403 });
-  }
 
-  if (sb && row) {
-    try {
-      await incrementFinalizeAttempts(sb, correlationId.trim());
-    } catch {
-      await updatePaymentAttemptByCorrelationId(sb, correlationId.trim(), {
-        status: "finalizing_order",
-        checkout_state: "finalizing_order",
-      });
-    }
-  }
-
-  try {
-    const result = await finalizeMedusaCartFromServer(cartId, {
-      maxCompleteAttempts: 2,
-    });
-
-    if (!result.ok) {
-      if (sb) {
-        await updatePaymentAttemptByCorrelationId(sb, correlationId.trim(), {
-          status: "paid_awaiting_order",
-          checkout_state: "awaiting_completion",
-          last_error: result.error.slice(0, 2000),
-        });
+  const result = await finalizeCheckoutIntentRouteLogic({
+    correlationId: correlationId ?? "",
+    cartId,
+    row,
+    incrementFinalizeAttempts: async (id) => {
+      if (!sb) {
+        throw new Error("Payment ledger is not configured");
       }
-      logCheckoutCompletionEvent({
-        stage: "complete_medusa_cart",
-        outcome: "failure",
-        httpStatus: result.status,
-        cartIdSuffix: cartSuffix,
-        attempts: result.attempts,
-        errorCode: "order_not_ready",
-        message: result.error.slice(0, 500),
-      });
-      return NextResponse.json(
-        { error: result.error },
-        { status: result.status },
-      );
-    }
+      return incrementFinalizeAttempts(sb, id);
+    },
+    updatePaymentAttempt: async (id, patch) => {
+      if (!sb) {
+        return;
+      }
+      await updatePaymentAttemptByCorrelationId(sb, id, patch);
+    },
+    finalizeMedusaCart: async (activeCartId) =>
+      finalizeMedusaCartFromServer(activeCartId, { maxCompleteAttempts: 2 }),
+    logEvent: (payload) =>
+      logCheckoutCompletionEvent(payload as Parameters<typeof logCheckoutCompletionEvent>[0]),
+    nowIso: () => new Date().toISOString(),
+  });
 
-    if (sb) {
-      await updatePaymentAttemptByCorrelationId(sb, correlationId.trim(), {
-        status: "completed",
-        checkout_state: "completed",
-        medusa_order_id: result.orderId,
-        order_id: result.orderId,
-        last_error: null,
-        finalized_at: new Date().toISOString(),
-      });
-    }
-
-    logCheckoutCompletionEvent({
-      stage: "complete_medusa_cart",
-      outcome: "success",
-      httpStatus: 200,
-      cartIdSuffix: cartSuffix,
-      orderId: result.orderId,
-      attempts: result.attempts,
-    });
-
-    return NextResponse.json({
-      ok: true,
-      orderId: result.orderId,
-      redirectUrl: result.redirectUrl,
-    });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "Complete failed";
-    if (sb) {
-      await updatePaymentAttemptByCorrelationId(sb, correlationId.trim(), {
-        last_error: msg.slice(0, 2000),
-        status: "needs_review",
-        checkout_state: "needs_review",
-      }).catch(() => {});
-    }
-    logCheckoutCompletionEvent({
-      stage: "complete_medusa_cart",
-      outcome: "failure",
-      httpStatus: 500,
-      cartIdSuffix: cartSuffix,
-      errorCode: "exception",
-      message: msg.slice(0, 500),
-    });
-    return NextResponse.json({ error: msg }, { status: 500 });
-  }
+  return NextResponse.json(result.body, { status: result.status });
 }
