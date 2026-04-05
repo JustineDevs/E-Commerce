@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /**
- * Kill processes on project dev ports (3000, 3001, 4000, 9000).
+ * Kill processes on project dev ports (3000, 3001, 4000, 9000, 17711).
+ * 17711 is the local POS terminal-agent (TERMINAL_AGENT_PORT).
  * Fallback when npx kill-port fails (e.g. on Windows with orphan Node processes).
  */
 const { execSync } = require("child_process");
-const ports = [3000, 3001, 4000, 9000];
+const ports = [3000, 3001, 4000, 9000, 17711];
 const isWin = process.platform === "win32";
 
 function killPortWindows(port) {
@@ -54,4 +55,4 @@ for (const port of ports) {
   }
 }
 
-console.log("Done. Ports 3000, 3001, 4000, 9000 should be free.");
+console.log("Done. Ports 3000, 3001, 4000, 9000, 17711 should be free.");
