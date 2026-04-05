@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { registerPaymentAttempt } from "@apparel-commerce/platform-data";
 
 import { applyRateLimit, readCartIdFromCookie } from "@/lib/cart-api-helpers";
+import { registerCheckoutIntentRouteLogic } from "@/lib/payment-attempt-route-logic";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 
 export const dynamic = "force-dynamic";
@@ -51,30 +52,22 @@ export async function POST(req: Request) {
       : "PHP";
 
   const sb = createStorefrontServiceSupabase();
-  if (!sb) {
-    return NextResponse.json(
-      { error: "Payment ledger is not configured" },
-      { status: 503 },
-    );
-  }
+  const result = await registerCheckoutIntentRouteLogic({
+    cartId,
+    provider,
+    amountMinor,
+    currencyCode,
+    medusaPaymentSessionId: body.medusaPaymentSessionId,
+    providerSessionId: body.providerSessionId,
+    idempotencyKey: body.idempotencyKey,
+    supabaseAvailable: Boolean(sb),
+    registerPaymentAttempt: async (input) => {
+      if (!sb) {
+        throw new Error("Payment ledger is not configured");
+      }
+      return registerPaymentAttempt(sb, input);
+    },
+  });
 
-  try {
-    const { correlationId, reused } = await registerPaymentAttempt(sb, {
-      cartId,
-      provider,
-      amountMinor,
-      currencyCode,
-      medusaPaymentSessionId: body.medusaPaymentSessionId,
-      providerSessionId: body.providerSessionId,
-      idempotencyKey: body.idempotencyKey,
-    });
-    return NextResponse.json({
-      correlationId,
-      cartId,
-      reused,
-    });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "Register failed";
-    return NextResponse.json({ error: msg }, { status: 500 });
-  }
+  return NextResponse.json(result.body, { status: result.status });
 }
