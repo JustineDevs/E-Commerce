@@ -6,7 +6,7 @@ import {
   PAYMENT_PROVIDER_LABELS,
   type PaymentProviderKey,
 } from "@/lib/medusa-checkout";
-import { clearCart, updateLineQuantity } from "@/lib/cart";
+import { updateLineQuantity } from "@/lib/cart";
 import { CheckoutTrustBadges } from "@/components/CheckoutTrustBadges";
 import { PaymentProviderLogo } from "@/components/PaymentProviderLogo";
 import dynamic from "next/dynamic";
@@ -69,6 +69,7 @@ export function CheckoutClient({
     useMedusaBagTotals,
     displayCurrency,
     handlePay,
+    completeEmbeddedPayment,
     continueToHostedCheckout,
     copyTrackingLink,
     phVatRate,
@@ -617,8 +618,7 @@ export function CheckoutClient({
                     clientSecret={embeddedData.stripeClientSecret}
                     returnUrl={embeddedData.trackingPageUrl}
                     onSuccess={() => {
-                      clearCart();
-                      window.location.href = embeddedData.trackingPageUrl;
+                      void completeEmbeddedPayment(embeddedData);
                     }}
                     onError={(msg) => setError(msg)}
                   />
@@ -639,8 +639,7 @@ export function CheckoutClient({
                   <PayPalEmbeddedCheckout
                     paypalOrderId={embeddedData.paypalOrderId}
                     onApprove={() => {
-                      clearCart();
-                      window.location.href = embeddedData.trackingPageUrl;
+                      void completeEmbeddedPayment(embeddedData);
                     }}
                     onError={(msg) => setError(msg)}
                   />
