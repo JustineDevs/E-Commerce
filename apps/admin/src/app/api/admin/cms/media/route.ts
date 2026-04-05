@@ -1,7 +1,12 @@
 import { NextRequest } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { staffSessionAllows } from "@apparel-commerce/database";
-import { insertCmsMedia, listCmsMedia, type ListCmsMediaOptions } from "@apparel-commerce/platform-data";
+import {
+  CMS_MEDIA_TAG_CATALOG_PRODUCT,
+  insertCmsMedia,
+  listCmsMedia,
+  type ListCmsMediaOptions,
+} from "@apparel-commerce/platform-data";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { authOptions } from "@/lib/auth";
 import { getCorrelationId } from "@/lib/request-correlation";
@@ -13,7 +18,11 @@ export async function GET(req: NextRequest) {
   if (!session?.user) {
     return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
   }
-  if (!staffSessionAllows(session, "content:read")) {
+  const canContentRead = staffSessionAllows(session, "content:read");
+  const canCatalogList =
+    staffSessionAllows(session, "catalog:read") ||
+    staffSessionAllows(session, "catalog:write");
+  if (!canContentRead && !canCatalogList) {
     return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
   }
   const sup = adminSupabaseOr503(cid);
@@ -26,6 +35,9 @@ export async function GET(req: NextRequest) {
     sort: (sp.get("sort") as ListCmsMediaOptions["sort"]) || "created_desc",
     tag: sp.get("tag") ?? undefined,
   };
+  if (!canContentRead && canCatalogList) {
+    opts.tag = CMS_MEDIA_TAG_CATALOG_PRODUCT;
+  }
   const data = await listCmsMedia(sup.client, opts);
   return correlatedJson(cid, { data });
 }
