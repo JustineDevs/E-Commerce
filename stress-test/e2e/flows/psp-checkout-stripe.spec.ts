@@ -9,6 +9,10 @@ import {
   expectOrderConfirmation,
 } from "../helpers/checkout";
 
+function shouldFailOnMissingPrereq(): boolean {
+  return process.env.CI_STRICT_E2E === "1" || process.env.CI === "true";
+}
+
 /**
  * Stripe checkout flow E2E test.
  * Requires E2E_STRIPE_API_KEY env var with a Stripe test-mode key.
@@ -26,6 +30,9 @@ test.describe("Stripe checkout flow", () => {
 
     const selected = await selectPaymentProvider(page, "stripe");
     if (!selected) {
+      if (shouldFailOnMissingPrereq()) {
+        throw new Error("Stripe payment option is not visible during strict E2E validation.");
+      }
       test.skip(true, "Stripe payment option not visible on checkout page");
       return;
     }
@@ -52,6 +59,9 @@ test.describe("Stripe checkout flow", () => {
 
     const selected = await selectPaymentProvider(page, "stripe");
     if (!selected) {
+      if (shouldFailOnMissingPrereq()) {
+        throw new Error("Stripe payment option is not visible during strict E2E validation.");
+      }
       test.skip(true, "Stripe payment option not visible on checkout page");
       return;
     }
