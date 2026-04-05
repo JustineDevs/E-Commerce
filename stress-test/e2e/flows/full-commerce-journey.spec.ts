@@ -2,6 +2,10 @@ import { test, expect } from "@playwright/test";
 
 import { expectCheckoutShellVisible, gotoFirstCatalogPdp } from "../helpers/storefront";
 
+function shouldFailOnMissingPrereq(): boolean {
+  return process.env.CI_STRICT_E2E === "1" || process.env.CI === "true";
+}
+
 /**
  * End-to-end commerce paths (guest): SOP, catalog, PDP, bag affordance, checkout shell.
  * Payment capture and PSP redirects stay out of scope here; use staging QA for providers.
@@ -17,6 +21,11 @@ test.describe("Full commerce journey (guest)", () => {
   test("shop to first PDP and add-to-bag when catalog exists", async ({ page }) => {
     const slug = await gotoFirstCatalogPdp(page);
     if (!slug) {
+      if (shouldFailOnMissingPrereq()) {
+        throw new Error(
+          "No catalog products available for the full-commerce journey. Run pnpm e2e:prep:medusa before CI validation.",
+        );
+      }
       test.skip(
         true,
         "No catalog products. Run: node scripts/e2e-prep-medusa.mjs (Medusa must be stopped or DB lock OK).",
