@@ -43,6 +43,6 @@ pnpm run dev
 This runs **`pnpm kill-ports`** then **`turbo dev`**, which starts **every workspace that defines a `dev` script** in parallel (storefront, admin, Medusa, API, terminal-agent, and any other package with `dev`). Treat it as the default way to run the **full local application stack** for integration work.
 
 - **Terminal agent URL:** `http://127.0.0.1:17711` (receipt print, open drawer, `/health`, `/status`). Configure via `.env` / `.env.example` (`TERMINAL_AGENT_PORT`, `NEXT_PUBLIC_TERMINAL_AGENT_*`, device name, Supabase sync for `pos_devices` when used).
-- Other common dev ports (see `scripts/kill-project-ports.js` for what gets cleared before dev): **3000**, **3001**, **4000**, **9000**. Port **17711** is not in that kill list; stop the agent via the turbo process or manually if needed.
+- Other common dev ports (see `scripts/kill-project-ports.js` for what gets cleared before dev): **3000**, **3001**, **4000**, **9000**, **17711** (terminal-agent).
 
 If you only need one app, use filters (e.g. `pnpm --filter @apparel-commerce/terminal-agent dev`) instead of the root command.
