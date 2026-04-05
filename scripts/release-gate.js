@@ -5,10 +5,14 @@
  * Exit 0 = all gates pass. Exit 1 = at least one gate failed.
  *
  * Gates:
- *  1. Runtime (Node 20 required; lint, tests)
- *  2. Security (security check, audit triage)
- *  3. Data (database/platform tests)
- *  4. E2E (with --include-e2e: Playwright starts all 4 apps + runs stress-test/e2e: smoke, flows, dogfood)
+ *  1. Static / policy / security blockers
+ *  2. Unit / route-logic / shared state-transition tests
+ *  3. Browser business-proof suites (only with --include-e2e)
+ *
+ * Truth contract:
+ *  - `release-gate` proves static and logic-level regression resistance only.
+ *  - `release-gate:full` adds browser suites, but only for the explicit files selected by CI.
+ *  - Provider sandbox connectivity, screenshots, and advisory jobs are separate and must not be confused with paid-order truth.
  *
  * Optional DB prep: `pnpm e2e:prep:medusa` skips Medusa seed when the store API already has products; `pnpm e2e:ensure-staff` no-ops if the staff user already exists.
  * For admin E2E credentials (local dev): root .env ADMIN_ALLOWED_EMAILS (first email) + NEXTAUTH_SECRET; run `pnpm e2e:ensure-staff`.
@@ -103,7 +107,8 @@ function main() {
     );
   }
   emitLine("");
-  emitLine("🚦 Release gate — Same-Day Release Board (automatable checks)");
+  emitLine("🚦 Release gate — blocking validation only");
+  emitLine("Matrix: docs/validation-truth-matrix.md");
 
   const checks = [
     { name: "Lint", cmd: ["pnpm", "lint"] },
@@ -148,7 +153,7 @@ function main() {
   } else {
     emitLine("");
     emitLine(
-      "⏭️  E2E skipped. For full proof: pnpm release-gate:full (starts all 4 apps + E2E).",
+      "⏭️  Browser business-proof skipped. `pnpm release-gate` does not claim hosted payment or order-truth proof.",
     );
   }
 
@@ -162,11 +167,11 @@ function main() {
     emitLine("🛑 Release gate FAILED. Do not ship.");
   } else if (includeE2e) {
     emitLine("");
-    emitLine("✅ Release gate passed (full: automated + boot + E2E).");
+    emitLine("✅ Release gate passed (static + logic + selected browser business-proof suites).");
   } else {
     emitLine("");
     emitLine(
-      "✅ Release gate passed. Run pnpm release-gate:full for boot + E2E before ship.",
+      "✅ Release gate passed for static + logic blockers only. Run pnpm release-gate:full for browser business-proof before ship.",
     );
   }
 
