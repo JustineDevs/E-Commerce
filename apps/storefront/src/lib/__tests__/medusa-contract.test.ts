@@ -1,12 +1,21 @@
-import { describe, it, assert } from "node:test";
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 
 describe("Storefront BFF contract tests", () => {
   const MEDUSA_URL = process.env.MEDUSA_BACKEND_URL || "http://localhost:9000";
+  const strict = process.env.STRICT_CONTRACT_TESTS === "1" || process.env.CI === "true";
+
+  function failOrSkip(message: string): void {
+    if (strict) {
+      assert.fail(message);
+    }
+    assert.ok(true, message);
+  }
 
   it("GET /store/products returns expected shape", async () => {
     const res = await fetch(`${MEDUSA_URL}/store/products?limit=1`);
     if (!res.ok) {
-      assert.ok(true, "Medusa not reachable, skipping contract test");
+      failOrSkip("Medusa not reachable for products contract test");
       return;
     }
     const json = (await res.json()) as Record<string, unknown>;
@@ -22,7 +31,7 @@ describe("Storefront BFF contract tests", () => {
   it("GET /store/regions returns regions with currency", async () => {
     const res = await fetch(`${MEDUSA_URL}/store/regions`);
     if (!res.ok) {
-      assert.ok(true, "Medusa not reachable, skipping contract test");
+      failOrSkip("Medusa not reachable for regions contract test");
       return;
     }
     const json = (await res.json()) as Record<string, unknown>;
@@ -37,7 +46,7 @@ describe("Storefront BFF contract tests", () => {
   it("GET /store/collections returns expected shape", async () => {
     const res = await fetch(`${MEDUSA_URL}/store/collections?limit=5`);
     if (!res.ok) {
-      assert.ok(true, "Medusa not reachable, skipping contract test");
+      failOrSkip("Medusa not reachable for collections contract test");
       return;
     }
     const json = (await res.json()) as Record<string, unknown>;
@@ -54,7 +63,7 @@ describe("Storefront BFF contract tests", () => {
       body: JSON.stringify({}),
     });
     if (!res.ok) {
-      assert.ok(true, "Medusa not reachable, skipping contract test");
+      failOrSkip("Medusa not reachable for cart contract test");
       return;
     }
     const json = (await res.json()) as Record<string, unknown>;
