@@ -12,6 +12,10 @@ export { PermissionGate } from "./PermissionGate";
 export { ValidationPanel } from "./ValidationPanel";
 export { UnsavedChangesGuard } from "./UnsavedChangesGuard";
 export { AuditTimeline } from "./AuditTimeline";
+export {
+  CollapsibleInspectorColumn,
+  type CollapsibleInspectorColumnProps,
+} from "./CollapsibleInspectorColumn";
 export { AdminBreadcrumbs } from "./AdminBreadcrumbs";
 export {
   AdminToastProvider,
