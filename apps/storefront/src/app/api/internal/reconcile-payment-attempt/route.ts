@@ -5,6 +5,7 @@ import {
 } from "@apparel-commerce/platform-data";
 
 import { finalizeMedusaCartFromServer } from "@/lib/finalize-medusa-cart-server";
+import { internalReconcilePaymentAttemptRouteLogic } from "@/lib/payment-attempt-route-logic";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 
 export const dynamic = "force-dynamic";
@@ -16,9 +17,6 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   const secret = process.env.STOREFRONT_INTERNAL_RECONCILE_SECRET?.trim();
   const header = req.headers.get("x-internal-secret")?.trim();
-  if (!secret || header !== secret) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
 
   let correlationId = "";
   try {
@@ -30,45 +28,24 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  if (!correlationId) {
-    return NextResponse.json({ error: "correlationId required" }, { status: 400 });
-  }
-
   const sb = createStorefrontServiceSupabase();
-  if (!sb) {
-    return NextResponse.json({ error: "Supabase not configured" }, { status: 503 });
-  }
-
-  const row = await getPaymentAttemptByCorrelationId(sb, correlationId);
-  if (!row) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  const result = await finalizeMedusaCartFromServer(row.cart_id, {
-    maxCompleteAttempts: 12,
+  const row = sb && correlationId ? await getPaymentAttemptByCorrelationId(sb, correlationId) : null;
+  const result = await internalReconcilePaymentAttemptRouteLogic({
+    configuredSecret: secret ?? "",
+    providedSecret: header ?? "",
+    correlationId,
+    row,
+    supabaseAvailable: Boolean(sb),
+    finalizeMedusaCart: async (cartId) =>
+      finalizeMedusaCartFromServer(cartId, { maxCompleteAttempts: 12 }),
+    updatePaymentAttempt: async (id, patch) => {
+      if (!sb) {
+        return;
+      }
+      await updatePaymentAttemptByCorrelationId(sb, id, patch).catch(() => {});
+    },
+    nowIso: () => new Date().toISOString(),
   });
 
-  if (!result.ok) {
-    await updatePaymentAttemptByCorrelationId(sb, correlationId, {
-      status: "paid_awaiting_order",
-      checkout_state: "awaiting_completion",
-      last_error: result.error.slice(0, 2000),
-    }).catch(() => {});
-    return NextResponse.json({ ok: false, error: result.error }, { status: result.status });
-  }
-
-  await updatePaymentAttemptByCorrelationId(sb, correlationId, {
-    status: "completed",
-    checkout_state: "completed",
-    medusa_order_id: result.orderId,
-    order_id: result.orderId,
-    last_error: null,
-    finalized_at: new Date().toISOString(),
-  });
-
-  return NextResponse.json({
-    ok: true,
-    orderId: result.orderId,
-    redirectUrl: result.redirectUrl,
-  });
+  return NextResponse.json(result.body, { status: result.status });
 }
