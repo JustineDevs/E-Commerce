@@ -294,12 +294,17 @@ export {
 } from "./cms-category";
 
 export {
-  listCmsMedia,
-  insertCmsMedia,
-  getCmsMediaById,
-  updateCmsMedia,
-  softDeleteCmsMedia,
+  CMS_MEDIA_TAG_CATALOG_PRODUCT,
+  cmsMediaRowIsCatalogProduct,
+  ensureExternalCatalogProductMediaRows,
+  findCmsMediaCatalogProductByPublicUrl,
   findCmsMediaReferences,
+  getCmsMediaById,
+  insertCmsMedia,
+  listCmsMedia,
+  normalizeCatalogMediaUrlForDb,
+  softDeleteCmsMedia,
+  updateCmsMedia,
   type CmsMediaRow,
   type ListCmsMediaOptions,
   type CmsMediaReferenceHit,
