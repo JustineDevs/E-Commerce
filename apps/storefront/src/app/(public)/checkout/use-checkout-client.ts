@@ -39,9 +39,12 @@ export type CheckoutEmbeddedData = {
   trackingPageUrl: string;
   confirmedTotal: number;
   currencyCode: string;
+  correlationId: string;
 };
 
 type ProfileGate = "idle" | "loading" | "complete" | "incomplete" | "error";
+const FINALIZE_POLL_MS = 2_000;
+const FINALIZE_POLL_MAX = 20;
 
 export function useCheckoutClient({
   initialResumeCartId,
@@ -412,8 +415,39 @@ export function useCheckoutClient({
           : undefined;
       const useStripeElement = paymentMethod === "STRIPE" && Boolean(stripeClientSecret);
       const usePayPalElement = paymentMethod === "PAYPAL" && Boolean(paypalOrderId);
+      const providerKey = paymentMethod.toLowerCase();
+      const amountMinor = Math.round(
+        confirmedTotal * minorUnitDivisor(currencyCode),
+      );
+      let checkoutCorrelationId: string | undefined;
+      try {
+        const regRes = await fetch("/api/payments/checkout-intents", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            provider: providerKey,
+            amountMinor,
+            currencyCode,
+            providerSessionId: paypalOrderId,
+          }),
+        });
+        const regJson = (await regRes.json().catch(() => ({}))) as {
+          correlationId?: string;
+        };
+        if (regRes.ok && typeof regJson.correlationId === "string") {
+          checkoutCorrelationId = regJson.correlationId;
+        }
+      } catch {
+        checkoutCorrelationId = undefined;
+      }
 
       if (useStripeElement || usePayPalElement) {
+        if (!checkoutCorrelationId) {
+          throw new Error(
+            "Could not register a durable payment attempt for this checkout. Try again before entering payment details.",
+          );
+        }
         setEmbeddedData({
           provider: useStripeElement ? "STRIPE" : "PAYPAL",
           stripeClientSecret,
@@ -422,6 +456,7 @@ export function useCheckoutClient({
           trackingPageUrl,
           confirmedTotal,
           currencyCode,
+          correlationId: checkoutCorrelationId,
         });
         setCopyDone(false);
       } else {
@@ -432,32 +467,6 @@ export function useCheckoutClient({
           Number.isFinite(confirmedTotal) &&
           Number.isFinite(comparableBagTotal) &&
           Math.abs(confirmedTotal - comparableBagTotal) > tol;
-
-        const providerKey = paymentMethod.toLowerCase();
-        const amountMinor = Math.round(
-          confirmedTotal * minorUnitDivisor(currencyCode),
-        );
-        let checkoutCorrelationId: string | undefined;
-        try {
-          const regRes = await fetch("/api/payments/checkout-intents", {
-            method: "POST",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              provider: providerKey,
-              amountMinor,
-              currencyCode,
-            }),
-          });
-          const regJson = (await regRes.json().catch(() => ({}))) as {
-            correlationId?: string;
-          };
-          if (regRes.ok && typeof regJson.correlationId === "string") {
-            checkoutCorrelationId = regJson.correlationId;
-          }
-        } catch {
-          /* Ledger is optional; hosted checkout still works without it. */
-        }
 
         setPendingPayment({
           checkoutUrl,
@@ -492,6 +501,77 @@ export function useCheckoutClient({
     }
     clearCart();
     window.location.href = pendingPayment.checkoutUrl;
+  }
+
+  async function completeEmbeddedPayment(active: CheckoutEmbeddedData): Promise<void> {
+    setLoading(true);
+    setError(null);
+    try {
+      const finalizeRes = await fetch(
+        `/api/payments/checkout-intents/${encodeURIComponent(active.correlationId)}/finalize`,
+        {
+          method: "POST",
+          credentials: "include",
+        },
+      );
+      const finalizeJson = (await finalizeRes.json().catch(() => ({}))) as {
+        error?: string;
+        redirectUrl?: string;
+      };
+      if (
+        finalizeRes.ok &&
+        typeof finalizeJson.redirectUrl === "string" &&
+        finalizeJson.redirectUrl.length > 0
+      ) {
+        clearCart();
+        window.location.href = finalizeJson.redirectUrl;
+        return;
+      }
+
+      for (let attempt = 0; attempt < FINALIZE_POLL_MAX; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, FINALIZE_POLL_MS));
+        const statusRes = await fetch(
+          `/api/payments/checkout-intents/${encodeURIComponent(active.correlationId)}`,
+          { credentials: "include" },
+        );
+        const statusJson = (await statusRes.json().catch(() => ({}))) as {
+          status?: string;
+          medusaOrderId?: string | null;
+          lastError?: string | null;
+        };
+        if (
+          statusRes.ok &&
+          statusJson.status === "completed" &&
+          typeof statusJson.medusaOrderId === "string" &&
+          statusJson.medusaOrderId.length > 0
+        ) {
+          clearCart();
+          window.location.href = `/track/${encodeURIComponent(statusJson.medusaOrderId)}`;
+          return;
+        }
+        if (
+          statusRes.ok &&
+          statusJson.status === "needs_review" &&
+          typeof statusJson.lastError === "string" &&
+          statusJson.lastError.length > 0
+        ) {
+          throw new Error(statusJson.lastError);
+        }
+      }
+
+      throw new Error(
+        finalizeJson.error ??
+          "Payment was accepted, but order finalization is still pending. Use your tracking link to resume safely.",
+      );
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Payment completed, but order finalization could not be confirmed yet.",
+      );
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function copyTrackingLink() {
@@ -538,6 +618,7 @@ export function useCheckoutClient({
     useMedusaBagTotals,
     displayCurrency,
     handlePay,
+    completeEmbeddedPayment,
     continueToHostedCheckout,
     copyTrackingLink,
     phVatRate: PH_VAT_RATE,
