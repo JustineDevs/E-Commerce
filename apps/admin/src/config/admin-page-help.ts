@@ -31,6 +31,11 @@ export const ADMIN_PAGE_HELP: Record<string, AdminPageHelpEntry> = {
     usage:
       "Use New product to start a draft. Edit a product to adjust options and the fields this console allows.",
   },
+  "/admin/catalog/media": {
+    purpose: "Shared files for product images and videos stored in the catalog bucket.",
+    usage:
+      "Upload here for stable CDN URLs, then paste or pick those URLs on a product. Website-only content still lives under Content, Media library.",
+  },
   "/admin/catalog/new": {
     purpose: "Create a new product record before all options and publishing are finished.",
     usage:
