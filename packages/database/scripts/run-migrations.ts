@@ -46,6 +46,9 @@ const MIGRATION_FILES = [
   "020_storefront_profiles_product_qa.sql",
   "021_cms_content_navigation_expansion.sql",
   "022_cms_sprint_extensions.sql",
+  "023_payment_attempts_and_webhook_inbox.sql",
+  "024_payment_ops_audit_outbox_job_columns.sql",
+  "025_catalog_storage_bucket.sql",
   "enable_rls.sql",
   "rls_deny_anon_sensitive.sql",
 ] as const;
