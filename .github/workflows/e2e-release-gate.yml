@@ -11,9 +11,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  e2e-critical-paths:
+  commerce-browser-truth:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -24,15 +24,23 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
-      - name: Build storefront
-        run: pnpm --filter @apparel-commerce/storefront build
-        env:
-          NEXT_PUBLIC_MEDUSA_BACKEND_URL: http://localhost:9000
-      - name: Run critical path E2E tests
-        run: npx playwright test --project=chromium --grep="@critical"
+      - name: Prepare Medusa E2E data
+        run: pnpm e2e:prep:medusa
         env:
           MEDUSA_BACKEND_URL: http://localhost:9000
+          NEXT_PUBLIC_MEDUSA_URL: http://localhost:9000
+      - name: Run browser truth suites
+        run: >
+          npx playwright test --project=chromium
+          stress-test/e2e/flows/full-commerce-journey.spec.ts
+          stress-test/e2e/flows/psp-checkout-cod.spec.ts
+          stress-test/e2e/smoke/storefront-api-security.spec.ts
+          stress-test/e2e/smoke/admin-access.spec.ts
+        env:
+          MEDUSA_BACKEND_URL: http://localhost:9000
+          NEXT_PUBLIC_MEDUSA_URL: http://localhost:9000
           E2E_BASE_URL: http://localhost:3000
+          CI_STRICT_E2E: "1"
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
@@ -55,7 +63,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Run contract tests
-        run: |
-          node --import tsx/esm --test apps/storefront/src/lib/__tests__/medusa-contract.test.ts || true
+        run: node --import tsx/esm --test apps/storefront/src/lib/__tests__/medusa-contract.test.ts
         env:
           MEDUSA_BACKEND_URL: http://localhost:9000
+          STRICT_CONTRACT_TESTS: "1"
