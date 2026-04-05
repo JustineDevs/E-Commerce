@@ -18,7 +18,7 @@ type TrackPayload = {
   }>;
 };
 
-function orderTrackStatusFromMedusa(order: Record<string, unknown>): string {
+export function orderTrackStatusFromMedusa(order: Record<string, unknown>): string {
   const meta = (order.metadata ?? {}) as Record<string, unknown>;
   const after =
     typeof meta.aftership_status === "string" ? meta.aftership_status : "";
