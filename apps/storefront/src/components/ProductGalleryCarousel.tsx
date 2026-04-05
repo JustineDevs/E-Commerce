@@ -3,11 +3,14 @@
 import type { ProductGallerySlide } from "@apparel-commerce/types";
 import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
-import { isDirectVideoUrl, youtubeEmbedUrl } from "@/lib/product-media";
+import {
+  isDirectVideoUrl,
+  youtubeEmbedUrlAutoplay,
+} from "@/lib/product-media";
 import { ProductImageZoom } from "./ProductImageZoom";
 
 function VideoSlide({ url, title }: { url: string; title: string }) {
-  const yt = youtubeEmbedUrl(url);
+  const yt = youtubeEmbedUrlAutoplay(url);
   if (yt) {
     return (
       <div className="relative h-full min-h-[inherit] w-full bg-black">
@@ -22,7 +25,17 @@ function VideoSlide({ url, title }: { url: string; title: string }) {
     );
   }
   if (isDirectVideoUrl(url)) {
-    return <video controls className="h-full w-full object-contain" src={url} />;
+    return (
+      <video
+        controls
+        autoPlay
+        muted
+        playsInline
+        loop
+        className="h-full w-full object-contain"
+        src={url}
+      />
+    );
   }
   return (
     <div className="flex h-full min-h-[280px] flex-col items-center justify-center gap-3 bg-surface-container-high p-6 text-center">
@@ -95,7 +108,7 @@ export function ProductGalleryCarousel({
               priority={safe === 0}
             />
           ) : slide?.kind === "video" ? (
-            <VideoSlide url={slide.url} title={productName} />
+            <VideoSlide key={slide.url} url={slide.url} title={productName} />
           ) : null}
         </div>
         {count > 1 ? (
