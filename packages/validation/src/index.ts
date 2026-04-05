@@ -15,43 +15,63 @@ export {
 
 // Shared validation schemas
 
+const PHILIPPINES_MOBILE_PHONE_ERROR =
+  "Use a Philippine mobile (+63 or 09XXXXXXXXX).";
+
+function buildOptionalIntegerQuerySchema(
+  minimum: number,
+  maximum: number,
+): z.ZodOptional<z.ZodPipeline<z.ZodEffects<z.ZodNumber, number, unknown>, z.ZodNumber>> {
+  return z.coerce
+    .number()
+    .transform((value) => Math.floor(value))
+    .pipe(z.number().int().min(minimum).max(maximum))
+    .optional();
+}
+
+function buildOptionalNonNegativeNumberQuerySchema(): z.ZodEffects<
+  z.ZodOptional<z.ZodNumber>,
+  number | undefined,
+  unknown
+> {
+  return z.coerce
+    .number()
+    .optional()
+    .transform((value) =>
+      value != null && Number.isFinite(value) && value >= 0 ? value : undefined,
+    );
+}
+
+function preprocessProductSearchQuery(value: unknown): string | undefined {
+  if (value == null || value === "") {
+    return undefined;
+  }
+
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (typeof raw !== "string") {
+    return undefined;
+  }
+
+  const trimmed = raw.trim();
+  return trimmed.length === 0 ? undefined : trimmed.slice(0, 80);
+}
+
 export const productListSortSchema = z.enum(["newest", "name_asc", "price_asc", "price_desc"]);
 
 export const productListQuerySchema = z.object({
-  limit: z.coerce
-    .number()
-    .transform((n) => Math.floor(n))
-    .pipe(z.number().int().min(1).max(100))
-    .optional(),
-  offset: z.coerce
-    .number()
-    .transform((n) => Math.floor(n))
-    .pipe(z.number().int().min(0).max(50_000))
-    .optional(),
+  limit: buildOptionalIntegerQuerySchema(1, 100),
+  offset: buildOptionalIntegerQuerySchema(0, 50_000),
   category: z.string().trim().min(1).max(120).optional(),
   size: z.string().trim().min(1).max(40).optional(),
   color: z.string().trim().min(1).max(80).optional(),
   brand: z.string().trim().min(1).max(120).optional(),
-  minPrice: z.coerce
-    .number()
-    .optional()
-    .transform((n) =>
-      n != null && Number.isFinite(n) && n >= 0 ? n : undefined,
-    ),
-  maxPrice: z.coerce
-    .number()
-    .optional()
-    .transform((n) =>
-      n != null && Number.isFinite(n) && n >= 0 ? n : undefined,
-    ),
+  minPrice: buildOptionalNonNegativeNumberQuerySchema(),
+  maxPrice: buildOptionalNonNegativeNumberQuerySchema(),
   /** Search product name or slug (ilike). */
-  q: z.preprocess((val) => {
-    if (val == null || val === "") return undefined;
-    const raw = Array.isArray(val) ? val[0] : val;
-    if (typeof raw !== "string") return undefined;
-    const t = raw.trim();
-    return t.length === 0 ? undefined : t.slice(0, 80);
-  }, z.string().min(1).max(80).optional()),
+  q: z.preprocess(
+    preprocessProductSearchQuery,
+    z.string().min(1).max(80).optional(),
+  ),
   sort: productListSortSchema.optional(),
 });
 
@@ -81,8 +101,8 @@ export const SHOP_PRODUCT_PAGE_SIZE = 20;
 
 /** Philippine mobile: +639XXXXXXXXX, 639XXXXXXXXX, 09XXXXXXXXX, or 9XXXXXXXXX (10 digits after 9). */
 export function isPhilippinesMobilePhone(raw: string): boolean {
-  const t = raw.replace(/[\s-]/g, "");
-  return /^(\+639|639|09|9)\d{9}$/.test(t);
+  const normalized = raw.replace(/[\s-]/g, "");
+  return /^(\+639|639|09|9)\d{9}$/.test(normalized);
 }
 
 export const storefrontShippingAddressSchema = z.object({
@@ -95,7 +115,7 @@ export const storefrontShippingAddressSchema = z.object({
     .min(1)
     .max(40)
     .refine((v) => isPhilippinesMobilePhone(v), {
-      message: "Use a Philippine mobile (+63 or 09XXXXXXXXX).",
+      message: PHILIPPINES_MOBILE_PHONE_ERROR,
     }),
   line1: z.string().trim().min(1).max(200),
   line2: z.string().trim().max(200).optional(),
@@ -125,7 +145,7 @@ export const storefrontCustomerProfilePatchSchema = z
     if (ph && !isPhilippinesMobilePhone(ph)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Use a Philippine mobile (+63 or 09XXXXXXXXX).",
+        message: PHILIPPINES_MOBILE_PHONE_ERROR,
         path: ["phone"],
       });
     }
