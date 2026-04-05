@@ -20,6 +20,36 @@ export function youtubeEmbedUrl(url: string): string | null {
   return null;
 }
 
+/**
+ * Same as youtubeEmbedUrl, with storefront-friendly autoplay params (muted required by browsers).
+ */
+export function youtubeEmbedUrlAutoplay(url: string): string | null {
+  const base = youtubeEmbedUrl(url);
+  if (!base) return null;
+  try {
+    const u = new URL(base);
+    u.searchParams.set("autoplay", "1");
+    u.searchParams.set("mute", "1");
+    u.searchParams.set("playsinline", "1");
+    u.searchParams.set("rel", "0");
+    return u.toString();
+  } catch {
+    return `${base}${base.includes("?") ? "&" : "?"}autoplay=1&mute=1&playsinline=1&rel=0`;
+  }
+}
+
 export function isDirectVideoUrl(url: string): boolean {
-  return /\.(mp4|webm)(\?|$)/i.test(url);
+  if (/\.(mp4|webm|mov|m4v|ogg)(\?|$)/i.test(url)) return true;
+  try {
+    const u = new URL(url);
+    if (
+      u.pathname.includes("/storage/v1/object/public/") &&
+      /\/(catalog|cms)\//.test(u.pathname)
+    ) {
+      return /\.(mp4|webm|mov|m4v|ogg)(\?|$)/i.test(u.pathname);
+    }
+  } catch {
+    return false;
+  }
+  return false;
 }
