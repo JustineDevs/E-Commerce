@@ -5,9 +5,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  isPhilippinesMobilePhone,
   productListQuerySchema,
   productListSortSchema,
   orderStatusSchema,
+  storefrontCustomerProfilePatchSchema,
+  storefrontShippingAddressSchema,
 } from "./index";
 
 // --- productListQuerySchema ---
@@ -133,6 +136,30 @@ test("productListQuerySchema: color max 80 chars", () => {
   assert.equal(r.success, false);
 });
 
+test("productListQuerySchema: keeps finite non-negative prices", () => {
+  const r = productListQuerySchema.safeParse({
+    minPrice: "120.5",
+    maxPrice: 999,
+  });
+  assert.equal(r.success, true);
+  if (r.success) {
+    assert.equal(r.data.minPrice, 120.5);
+    assert.equal(r.data.maxPrice, 999);
+  }
+});
+
+test("productListQuerySchema: drops invalid prices", () => {
+  const r = productListQuerySchema.safeParse({
+    minPrice: -1,
+    maxPrice: "not-a-number",
+  });
+  assert.equal(r.success, true);
+  if (r.success) {
+    assert.equal(r.data.minPrice, undefined);
+    assert.equal(r.data.maxPrice, undefined);
+  }
+});
+
 test("productListQuerySchema: limit float coerced to int", () => {
   const r = productListQuerySchema.safeParse({ limit: "10.7" });
   assert.equal(r.success, true);
@@ -192,4 +219,33 @@ test("orderStatusSchema: rejects invalid statuses", () => {
     const r = orderStatusSchema.safeParse(v);
     assert.equal(r.success, false, `value=${JSON.stringify(v)} should fail`);
   }
+});
+
+test("isPhilippinesMobilePhone: accepts supported local formats", () => {
+  const valid = ["+639123456789", "639123456789", "09123456789", "9123456789"];
+  for (const value of valid) {
+    assert.equal(isPhilippinesMobilePhone(value), true, `${value} should pass`);
+  }
+});
+
+test("isPhilippinesMobilePhone: ignores spaces and dashes", () => {
+  assert.equal(isPhilippinesMobilePhone("+63 912-345-6789"), true);
+});
+
+test("storefrontShippingAddressSchema: rejects non-PH mobile numbers", () => {
+  const r = storefrontShippingAddressSchema.safeParse({
+    fullName: "Test User",
+    phone: "+15551234567",
+    line1: "123 Example Street",
+    city: "Makati",
+    province: "Metro Manila",
+  });
+  assert.equal(r.success, false);
+});
+
+test("storefrontCustomerProfilePatchSchema: rejects invalid phone patch", () => {
+  const r = storefrontCustomerProfilePatchSchema.safeParse({
+    phone: "12345",
+  });
+  assert.equal(r.success, false);
 });
