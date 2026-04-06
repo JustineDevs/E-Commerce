@@ -1,7 +1,8 @@
 /** @type {import('next').NextConfig} */
 const path = require("path");
-// Load root .env so NEXTAUTH_* and GOOGLE_* are available (storefront has no local .env)
-require("dotenv").config({ path: path.join(__dirname, "../../.env") });
+const { loadMonorepoRootEnv } = require("../../scripts/load-monorepo-root-env.cjs");
+// Repo-root `.env` + `.env.local` (e.g. MEDUSA_SECRET_API_KEY for checkout totals preview)
+loadMonorepoRootEnv(__dirname);
 
 function imageRemotePatterns() {
   const raw = process.env.NEXT_PUBLIC_IMAGE_HOSTNAMES ?? "*.supabase.co,**.supabase.co";
@@ -40,8 +41,6 @@ const securityHeaders = [
 
 const nextConfig = {
   poweredByHeader: false,
-  /** Load `.env*` from monorepo root only (no `apps/storefront/.env.local`). */
-  envDir: path.join(__dirname, "../.."),
   outputFileTracingRoot: path.join(__dirname, "../.."),
   transpilePackages: [
     "@apparel-commerce/types",
