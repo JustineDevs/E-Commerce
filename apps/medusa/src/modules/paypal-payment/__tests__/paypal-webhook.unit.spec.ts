@@ -1,6 +1,23 @@
+import { MedusaError, PaymentActions } from "@medusajs/framework/utils";
+
+import PayPalPaymentProviderService from "../service";
 import {
   buildPayPalWebhookDedupId,
+  claimPayPalWebhookDedup,
 } from "../../../lib/paypal-webhook-dedup";
+import { verifyPayPalWebhookSignature } from "../../../lib/paypal-sdk-client";
+
+jest.mock("../../../lib/paypal-webhook-dedup", () => ({
+  buildPayPalWebhookDedupId: jest.fn((body: { event_type?: string; id?: string }) =>
+    body.id ? `paypal:${body.event_type ?? "unknown"}:${body.id}` : null,
+  ),
+  claimPayPalWebhookDedup: jest.fn(),
+}));
+
+jest.mock("../../../lib/paypal-sdk-client", () => ({
+  capturePayPalOrder: jest.fn(),
+  verifyPayPalWebhookSignature: jest.fn(),
+}));
 
 describe("PayPal webhook signature verification gate", () => {
   const originalEnv = process.env;
@@ -113,5 +130,105 @@ describe("PayPal webhook body parsing", () => {
     });
     expect(result.sessionId).toBe("sess_abc123");
     expect(result.amountMinor).toBe(0);
+  });
+});
+
+describe("PayPal webhook service", () => {
+  const originalEnv = process.env;
+
+  function createService() {
+    return new PayPalPaymentProviderService(
+      {},
+      {
+        clientId: "client-id",
+        clientSecret: "client-secret",
+        environment: "sandbox",
+      },
+    );
+  }
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    process.env = { ...originalEnv, NODE_ENV: "test", PAYPAL_WEBHOOK_ID: "wh_test" };
+    (verifyPayPalWebhookSignature as jest.Mock).mockResolvedValue(true);
+  });
+
+  afterAll(() => {
+    process.env = originalEnv;
+  });
+
+  it("accepts signed PAYMENT.CAPTURE.COMPLETED deliveries", async () => {
+    const service = createService();
+    (claimPayPalWebhookDedup as jest.Mock).mockResolvedValue(true);
+
+    const result = await service.getWebhookActionAndData({
+      data: {},
+      rawData: JSON.stringify({
+        id: "WH-1234",
+        event_type: "PAYMENT.CAPTURE.COMPLETED",
+        resource: {
+          custom_id: "medusa_ps_123",
+          amount: { value: "150.00", currency_code: "PHP" },
+        },
+      }),
+      headers: {},
+    });
+
+    expect(result).toEqual({
+      action: PaymentActions.SUCCESSFUL,
+      data: { session_id: "medusa_ps_123", amount: 15000 },
+    });
+  });
+
+  it("rejects invalid signatures", async () => {
+    const service = createService();
+    (verifyPayPalWebhookSignature as jest.Mock).mockResolvedValue(false);
+
+    await expect(
+      service.getWebhookActionAndData({
+        data: {},
+        rawData: "{}",
+        headers: {},
+      }),
+    ).rejects.toThrow(MedusaError);
+  });
+
+  it("returns not supported for duplicate deliveries", async () => {
+    const service = createService();
+    (claimPayPalWebhookDedup as jest.Mock).mockResolvedValue(false);
+
+    const result = await service.getWebhookActionAndData({
+      data: {},
+      rawData: JSON.stringify({
+        id: "WH-dup",
+        event_type: "PAYMENT.CAPTURE.COMPLETED",
+        resource: {
+          custom_id: "medusa_ps_dup",
+          amount: { value: "20.00", currency_code: "PHP" },
+        },
+      }),
+      headers: {},
+    });
+
+    expect(result).toEqual({ action: PaymentActions.NOT_SUPPORTED });
+  });
+
+  it("ignores supported events without session correlation", async () => {
+    const service = createService();
+    (claimPayPalWebhookDedup as jest.Mock).mockResolvedValue(true);
+
+    const result = await service.getWebhookActionAndData({
+      data: {},
+      rawData: JSON.stringify({
+        id: "WH-no-session",
+        event_type: "PAYMENT.CAPTURE.COMPLETED",
+        resource: {
+          amount: { value: "20.00", currency_code: "PHP" },
+        },
+      }),
+      headers: {},
+    });
+
+    expect(result).toEqual({ action: PaymentActions.NOT_SUPPORTED });
   });
 });
