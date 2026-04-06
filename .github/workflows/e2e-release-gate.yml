@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  commerce-browser-truth:
+  commerce-browser-suites:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -29,13 +29,8 @@ jobs:
         env:
           MEDUSA_BACKEND_URL: http://localhost:9000
           NEXT_PUBLIC_MEDUSA_URL: http://localhost:9000
-      - name: Run browser truth suites
-        run: >
-          npx playwright test --project=chromium
-          stress-test/e2e/flows/full-commerce-journey.spec.ts
-          stress-test/e2e/flows/psp-checkout-cod.spec.ts
-          stress-test/e2e/smoke/storefront-api-security.spec.ts
-          stress-test/e2e/smoke/admin-access.spec.ts
+      - name: Run explicit critical browser suites
+        run: pnpm test:e2e:critical --project=chromium
         env:
           MEDUSA_BACKEND_URL: http://localhost:9000
           NEXT_PUBLIC_MEDUSA_URL: http://localhost:9000
