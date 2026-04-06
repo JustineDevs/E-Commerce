@@ -14,7 +14,7 @@ function shouldFailOnMissingPrereq(): boolean {
 
 /**
  * COD (Cash on Delivery) checkout flow E2E test.
- * COD is always configured and requires no external credentials.
+ * This must prove server-owned order placement, not only button clicks.
  */
 test.describe("COD checkout flow", () => {
   test("complete checkout with Cash on Delivery", async ({ page }) => {
@@ -33,5 +33,12 @@ test.describe("COD checkout flow", () => {
 
     await clickPayButton(page);
     await expectOrderConfirmation(page);
+    await expect(page).toHaveURL(/\/track\/order_/i, { timeout: 60_000 });
+    await expect(page.getByRole("heading", { name: /order/i })).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(page.getByText(/status:\s*pending payment/i)).toBeVisible({
+      timeout: 30_000,
+    });
   });
 });
