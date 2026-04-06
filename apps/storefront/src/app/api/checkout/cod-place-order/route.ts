@@ -7,8 +7,8 @@ import {
 
 import { applyRateLimit, readCartIdFromCookie } from "@/lib/cart-api-helpers";
 import { logCheckoutCompletionEvent } from "@/lib/checkout-telemetry";
+import { handleCodPlaceOrderRequest } from "@/lib/cod-place-order-route-handler";
 import { finalizeMedusaCartFromServer } from "@/lib/finalize-medusa-cart-server";
-import { codPlaceOrderRouteLogic } from "@/lib/payment-attempt-route-logic";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 
 export const dynamic = "force-dynamic";
@@ -17,29 +17,13 @@ export const dynamic = "force-dynamic";
  * Server-owned COD order placement: browser must not call Medusa `cart.complete` directly.
  */
 export async function POST(req: Request) {
-  const rl = await applyRateLimit(req, "cod-place-order", 30, 60_000);
-  if (!rl.ok) {
-    return rl.response;
-  }
-
-  const cartId = await readCartIdFromCookie();
-
-  let correlationId = "";
-  try {
-    const body = (await req.json()) as { correlationId?: string };
-    if (typeof body.correlationId === "string" && body.correlationId.trim()) {
-      correlationId = body.correlationId.trim();
-    }
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
-
   const sb = createStorefrontServiceSupabase();
-  const row = sb ? await getPaymentAttemptByCorrelationId(sb, correlationId) : null;
-  const result = await codPlaceOrderRouteLogic({
-    correlationId,
-    cartId,
-    row,
+  return handleCodPlaceOrderRequest(req, {
+    applyRateLimit: async (request) =>
+      applyRateLimit(request, "cod-place-order", 30, 60_000),
+    readCartIdFromCookie,
+    getPaymentAttemptRow: async (id) =>
+      sb ? getPaymentAttemptByCorrelationId(sb, id) : null,
     incrementFinalizeAttempts: async (id) => {
       if (!sb) {
         throw new Error("Payment ledger is not configured");
@@ -58,6 +42,4 @@ export async function POST(req: Request) {
       logCheckoutCompletionEvent(payload as Parameters<typeof logCheckoutCompletionEvent>[0]),
     nowIso: () => new Date().toISOString(),
   });
-
-  return NextResponse.json(result.body, { status: result.status });
 }
