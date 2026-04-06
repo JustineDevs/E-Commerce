@@ -36,6 +36,7 @@
     "test:http-flow:with-webservers": "node scripts/run-e2e.js flows/http-flow-matrix.spec.ts",
     "stress-test:checkout-providers": "node scripts/stress-checkout-providers.mjs",
     "test:e2e": "node scripts/run-e2e.js",
+    "test:e2e:critical": "node scripts/run-e2e.js stress-test/e2e/flows/full-commerce-journey.spec.ts stress-test/e2e/flows/psp-checkout-cod.spec.ts stress-test/e2e/smoke/storefront-api-security.spec.ts stress-test/e2e/smoke/admin-access.spec.ts",
     "test:e2e:ui": "node scripts/run-e2e.js --ui",
     "dogfood:screenshots": "node scripts/run-e2e.js dogfood --project=chromium",
     "predeploy": "pnpm install && pnpm run build"
