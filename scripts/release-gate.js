@@ -7,11 +7,11 @@
  * Gates:
  *  1. Static / policy / security blockers
  *  2. Unit / route-logic / shared state-transition tests
- *  3. Browser business-proof suites (only with --include-e2e)
+ *  3. Explicit critical browser suites (only with --include-e2e)
  *
  * Truth contract:
  *  - `release-gate` proves static and logic-level regression resistance only.
- *  - `release-gate:full` adds browser suites, but only for the explicit files selected by CI.
+ *  - `release-gate:full` adds the explicit browser suites in `pnpm test:e2e:critical`.
  *  - Provider sandbox connectivity, screenshots, and advisory jobs are separate and must not be confused with paid-order truth.
  *
  * Optional DB prep: `pnpm e2e:prep:medusa` skips Medusa seed when the store API already has products; `pnpm e2e:ensure-staff` no-ops if the staff user already exists.
@@ -145,15 +145,15 @@ function main() {
   }
 
   if (includeE2e) {
-    const code = run("E2E (Playwright)", ["node", "scripts/run-e2e.js"]);
+    const code = run("Critical E2E (Playwright)", ["pnpm", "test:e2e:critical"]);
     if (code !== 0) {
-      emitLine("❌ E2E failed");
+      emitLine("❌ Critical E2E failed");
       failed = true;
     }
   } else {
     emitLine("");
     emitLine(
-      "⏭️  Browser business-proof skipped. `pnpm release-gate` does not claim hosted payment or order-truth proof.",
+      "⏭️  Critical browser suites skipped. `pnpm release-gate` does not claim hosted payment or order-truth proof.",
     );
   }
 
