@@ -1,4 +1,4 @@
-import { getMedusaStoreBaseUrl } from "@apparel-commerce/sdk";
+import { getMedusaSecretApiKey, getMedusaStoreBaseUrl } from "@apparel-commerce/sdk";
 
 /**
  * Medusa Admin API (server-only). Same Basic auth as admin app.
@@ -9,22 +9,16 @@ function secretApiKeyBasicAuthorization(secret: string): string {
   return `Basic ${b64}`;
 }
 
-function getMedusaSecretKey(): string | undefined {
-  return (
-    process.env.MEDUSA_SECRET_API_KEY?.trim() ||
-    process.env.MEDUSA_ADMIN_API_SECRET?.trim() ||
-    undefined
-  );
-}
-
 export async function medusaAdminFetch(
   path: string,
   init?: RequestInit,
 ): Promise<Response> {
   const base = getMedusaStoreBaseUrl().replace(/\/$/, "");
-  const secret = getMedusaSecretKey();
+  const secret = getMedusaSecretApiKey();
   if (!secret) {
-    throw new Error("MEDUSA_SECRET_API_KEY is not set");
+    throw new Error(
+      "MEDUSA_SECRET_API_KEY is not set (add it to the repo root .env or .env.local, from Medusa Admin → Settings → Secret API keys)",
+    );
   }
   const url = path.startsWith("http")
     ? path
