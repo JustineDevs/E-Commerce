@@ -7,8 +7,8 @@ import {
 
 import { applyRateLimit, readCartIdFromCookie } from "@/lib/cart-api-helpers";
 import { logCheckoutCompletionEvent } from "@/lib/checkout-telemetry";
+import { handleFinalizeCheckoutIntentRequest } from "@/lib/finalize-checkout-intent-route-handler";
 import { finalizeMedusaCartFromServer } from "@/lib/finalize-medusa-cart-server";
-import { finalizeCheckoutIntentRouteLogic } from "@/lib/payment-attempt-route-logic";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 
 export const dynamic = "force-dynamic";
@@ -21,22 +21,14 @@ export async function POST(
   req: Request,
   ctx: { params: Promise<{ correlationId: string }> },
 ) {
-  const rl = await applyRateLimit(req, "checkout-intents-finalize", 40, 60_000);
-  if (!rl.ok) {
-    return rl.response;
-  }
-
   const { correlationId } = await ctx.params;
-  const cartId = await readCartIdFromCookie();
   const sb = createStorefrontServiceSupabase();
-  const row = sb && correlationId?.trim()
-    ? await getPaymentAttemptByCorrelationId(sb, correlationId.trim())
-    : null;
-
-  const result = await finalizeCheckoutIntentRouteLogic({
-    correlationId: correlationId ?? "",
-    cartId,
-    row,
+  return handleFinalizeCheckoutIntentRequest(req, correlationId ?? "", {
+    applyRateLimit: async (request) =>
+      applyRateLimit(request, "checkout-intents-finalize", 40, 60_000),
+    readCartIdFromCookie,
+    getPaymentAttemptRow: async (id) =>
+      sb ? getPaymentAttemptByCorrelationId(sb, id) : null,
     incrementFinalizeAttempts: async (id) => {
       if (!sb) {
         throw new Error("Payment ledger is not configured");
@@ -55,6 +47,4 @@ export async function POST(
       logCheckoutCompletionEvent(payload as Parameters<typeof logCheckoutCompletionEvent>[0]),
     nowIso: () => new Date().toISOString(),
   });
-
-  return NextResponse.json(result.body, { status: result.status });
 }
