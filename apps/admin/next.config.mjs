@@ -1,11 +1,11 @@
+import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import dotenv from "dotenv";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-// Load root .env (same file as other apps). Next also loads env from envDir (repo root).
-dotenv.config({ path: path.join(__dirname, "../../.env") });
+const require = createRequire(import.meta.url);
+const { loadMonorepoRootEnv } = require("../../scripts/load-monorepo-root-env.cjs");
+loadMonorepoRootEnv(__dirname);
 
 function imageRemotePatterns() {
   const raw =
@@ -36,8 +36,6 @@ function imageRemotePatterns() {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
-  /** Load `.env*` from monorepo root only (no `apps/admin/.env.local`). */
-  envDir: path.join(__dirname, "../.."),
   outputFileTracingRoot: path.join(__dirname, "../.."),
   serverExternalPackages: [],
   experimental: {
