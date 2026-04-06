@@ -1,4 +1,15 @@
 import crypto from "crypto";
+import { MedusaError, PaymentActions } from "@medusajs/framework/utils";
+
+import MayaPaymentProviderService from "../service";
+import { claimMayaWebhookDedup } from "../../../lib/maya-webhook-dedup";
+
+jest.mock("../../../lib/maya-webhook-dedup", () => ({
+  buildMayaWebhookDedupId: jest.fn((body: { requestReferenceNumber?: string }) =>
+    body.requestReferenceNumber ? `maya:${body.requestReferenceNumber}` : null,
+  ),
+  claimMayaWebhookDedup: jest.fn(),
+}));
 
 function verifyMayaSignature(
   rawBody: string,
@@ -63,5 +74,98 @@ describe("Maya webhook signature verification", () => {
   it("rejects a signature with different length", () => {
     const body = JSON.stringify({ id: "inv_001" });
     expect(verifyMayaSignature(body, "abcdef", secret)).toBe(false);
+  });
+});
+
+describe("Maya webhook service", () => {
+  function createService() {
+    return new MayaPaymentProviderService(
+      {},
+      {
+        secretKey: "maya-secret",
+        webhookSecret: "test-maya-webhook-secret-2024",
+        publicBaseUrl: "http://localhost:3000",
+      },
+    );
+  }
+
+  function payload(overrides?: Record<string, unknown>): string {
+    return JSON.stringify({
+      paymentStatus: "PAYMENT_SUCCESS",
+      requestReferenceNumber: "medusa_ps:sess_abc123",
+      totalAmount: { value: "100.50" },
+      ...overrides,
+    });
+  }
+
+  function signature(body: string): string {
+    return crypto
+      .createHmac("sha256", "test-maya-webhook-secret-2024")
+      .update(body)
+      .digest("hex");
+  }
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+  });
+
+  it("accepts valid PAYMENT_SUCCESS webhooks", async () => {
+    const service = createService();
+    const body = payload();
+    (claimMayaWebhookDedup as jest.Mock).mockResolvedValue(true);
+
+    const result = await service.getWebhookActionAndData({
+      data: {},
+      rawData: body,
+      headers: { "x-maya-signature": signature(body) },
+    });
+
+    expect(result).toEqual({
+      action: PaymentActions.SUCCESSFUL,
+      data: { session_id: "sess_abc123", amount: 10050 },
+    });
+  });
+
+  it("rejects invalid signatures", async () => {
+    const service = createService();
+
+    await expect(
+      service.getWebhookActionAndData({
+        data: {},
+        rawData: payload(),
+        headers: { "x-maya-signature": "bad" },
+      }),
+    ).rejects.toThrow(MedusaError);
+  });
+
+  it("returns the same success shape for duplicate deliveries", async () => {
+    const service = createService();
+    const body = payload();
+    (claimMayaWebhookDedup as jest.Mock).mockResolvedValue(false);
+
+    const result = await service.getWebhookActionAndData({
+      data: {},
+      rawData: body,
+      headers: { "x-maya-signature": signature(body) },
+    });
+
+    expect(result).toEqual({
+      action: PaymentActions.SUCCESSFUL,
+      data: { session_id: "sess_abc123", amount: 10050 },
+    });
+  });
+
+  it("ignores successful events without request reference correlation", async () => {
+    const service = createService();
+    const body = payload({ requestReferenceNumber: "maya-ref-only" });
+    (claimMayaWebhookDedup as jest.Mock).mockResolvedValue(true);
+
+    const result = await service.getWebhookActionAndData({
+      data: {},
+      rawData: body,
+      headers: { "x-maya-signature": signature(body) },
+    });
+
+    expect(result).toEqual({ action: PaymentActions.NOT_SUPPORTED });
   });
 });
