@@ -68,3 +68,14 @@ test("orderTrackStatusFromMedusa returns paid when payment captured but fulfillm
     "paid",
   );
 });
+
+test("orderTrackStatusFromMedusa treats partially captured orders as paid progress", () => {
+  assert.equal(
+    orderTrackStatusFromMedusa({
+      payment_status: "partially_captured",
+      fulfillment_status: "not_fulfilled",
+      metadata: {},
+    }),
+    "paid",
+  );
+});
