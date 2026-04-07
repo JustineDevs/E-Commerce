@@ -1,6 +1,7 @@
 "use client";
 
 import { staffHasPermission, type CmsAnnouncementRow } from "@apparel-commerce/platform-data";
+import { sanitizeCmsHtml } from "@apparel-commerce/validation";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -184,7 +185,9 @@ export function CmsAnnouncementEditor() {
                 {editing.bodyFormat === "html" ? (
                   <span
                     className="font-body inline-block max-w-full [&_a]:underline"
-                    dangerouslySetInnerHTML={{ __html: editing.body || "…" }}
+                    dangerouslySetInnerHTML={{
+                      __html: sanitizeCmsHtml(editing.body || "…"),
+                    }}
                   />
                 ) : (
                   <span className="font-body">{editing.body || "…"}</span>
