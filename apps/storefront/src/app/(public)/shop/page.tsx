@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { loadCmsCategoryContentPublic } from "@apparel-commerce/platform-data";
 import {
   productListQuerySchema,
+  sanitizeCmsHtml,
   SHOP_PRODUCT_PAGE_SIZE,
 } from "@apparel-commerce/validation";
 import { CatalogProductCard } from "@/components/CatalogProductCard";
@@ -184,7 +185,9 @@ export default async function ShopPage({
           {cmsCategory?.intro_html?.trim() ? (
             <div
               className="mt-4 max-w-xl font-body text-base leading-relaxed text-on-surface-variant md:text-lg"
-              dangerouslySetInnerHTML={{ __html: cmsCategory.intro_html }}
+              dangerouslySetInnerHTML={{
+                __html: sanitizeCmsHtml(String(cmsCategory.intro_html)),
+              }}
             />
           ) : (
             <p className="mt-4 max-w-xl font-body text-base leading-relaxed text-on-surface-variant md:text-lg">
