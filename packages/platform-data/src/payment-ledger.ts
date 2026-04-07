@@ -24,6 +24,12 @@ export type PaymentAttemptRow = {
   webhook_last_event_id: string | null;
   webhook_last_status: string | null;
   finalize_attempts: number;
+  quote_fingerprint: string | null;
+  /** Increments when quote fingerprint changes on this row (PRD). */
+  quote_version: number | null;
+  stale_reason: string | null;
+  invalidated_at: string | null;
+  invalidated_by: string | null;
   provider_payload?: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
@@ -73,10 +79,117 @@ export type RegisterPaymentAttemptInput = {
   provider: string;
   amountMinor: number;
   currencyCode: string;
+  quoteFingerprint?: string;
+  variantIds?: string[];
+  productIds?: string[];
   medusaPaymentSessionId?: string;
   providerSessionId?: string;
   idempotencyKey?: string;
 };
+
+function normalizeQuoteFingerprint(value: string | null | undefined): string {
+  return value?.trim() ?? "";
+}
+
+/**
+ * When patching `quote_fingerprint` on an existing row, bump `quote_version` if the
+ * normalized fingerprint value changes. Returns undefined when unchanged or when the
+ * caller should not auto-bump (same fingerprint).
+ */
+export function computeNextQuoteVersionForFingerprintPatch(
+  currentFingerprint: string | null | undefined,
+  nextFingerprint: string | null | undefined,
+  currentVersion: number | null | undefined,
+): number | undefined {
+  const oldFp = normalizeQuoteFingerprint(currentFingerprint);
+  const newFp = normalizeQuoteFingerprint(nextFingerprint);
+  if (oldFp === newFp) return undefined;
+  return (currentVersion ?? 1) + 1;
+}
+
+/** Daily counts of rows with `invalidated_at` set (stale-session / catalog invalidation). */
+export async function fetchPaymentAttemptInvalidationDayBuckets(
+  supabase: SupabaseClient,
+  days: number,
+): Promise<{ day: string; count: number }[]> {
+  const since = new Date();
+  since.setUTCDate(since.getUTCDate() - Math.max(1, Math.min(90, days)));
+  const { data, error } = await supabase
+    .from("payment_attempts")
+    .select("invalidated_at")
+    .not("invalidated_at", "is", null)
+    .gte("invalidated_at", since.toISOString());
+  if (error) {
+    if (isMissingTableOrSchemaError(error)) return [];
+    throw error;
+  }
+  const buckets = new Map<string, number>();
+  for (const row of data ?? []) {
+    const raw = (row as { invalidated_at?: string | null }).invalidated_at;
+    const d = typeof raw === "string" ? raw.slice(0, 10) : "";
+    if (!d) continue;
+    buckets.set(d, (buckets.get(d) ?? 0) + 1);
+  }
+  return [...buckets.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([day, count]) => ({ day, count }));
+}
+
+function sortedDistinctStrings(values: string[] | undefined): string[] {
+  return [...new Set((values ?? []).map((value) => value.trim()).filter(Boolean))].sort();
+}
+
+function buildQuoteProviderPayload(input: RegisterPaymentAttemptInput): Record<string, unknown> {
+  return {
+    quote: {
+      fingerprint: normalizeQuoteFingerprint(input.quoteFingerprint) || null,
+      variant_ids: sortedDistinctStrings(input.variantIds),
+      product_ids: sortedDistinctStrings(input.productIds),
+    },
+  };
+}
+
+export function shouldReusePaymentAttempt(
+  existing: Pick<PaymentAttemptRow, "quote_fingerprint"> | null,
+  input: Pick<RegisterPaymentAttemptInput, "quoteFingerprint">,
+): boolean {
+  if (!existing) return false;
+  const existingFingerprint = normalizeQuoteFingerprint(existing.quote_fingerprint);
+  const nextFingerprint = normalizeQuoteFingerprint(input.quoteFingerprint);
+  return existingFingerprint.length > 0 && existingFingerprint === nextFingerprint;
+}
+
+export function paymentAttemptMatchesCatalogMutation(
+  row: Pick<PaymentAttemptRow, "provider_payload">,
+  input: { variantIds?: string[]; productIds?: string[] },
+): boolean {
+  const payload =
+    row.provider_payload && typeof row.provider_payload === "object"
+      ? (row.provider_payload as Record<string, unknown>)
+      : {};
+  const quote =
+    payload.quote && typeof payload.quote === "object"
+      ? (payload.quote as Record<string, unknown>)
+      : {};
+  const rowVariantIds = new Set(
+    Array.isArray(quote.variant_ids)
+      ? quote.variant_ids
+          .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+          .map((value) => value.trim())
+      : [],
+  );
+  const rowProductIds = new Set(
+    Array.isArray(quote.product_ids)
+      ? quote.product_ids
+          .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+          .map((value) => value.trim())
+      : [],
+  );
+
+  const variantMatch = (input.variantIds ?? []).some((variantId) => rowVariantIds.has(variantId.trim()));
+  const productMatch = (input.productIds ?? []).some((productId) => rowProductIds.has(productId.trim()));
+  return variantMatch || productMatch;
+}
 
 export async function registerPaymentAttempt(
   supabase: SupabaseClient,
@@ -88,29 +201,59 @@ export async function registerPaymentAttempt(
     input.provider,
   );
   if (existing) {
+    const nextQuotePayload = buildQuoteProviderPayload(input);
+      if (shouldReusePaymentAttempt(existing, input)) {
+      const patch: Record<string, unknown> = {
+        updated_at: new Date().toISOString(),
+        amount_minor: input.amountMinor,
+        currency: input.currencyCode.toLowerCase(),
+        quote_fingerprint: normalizeQuoteFingerprint(input.quoteFingerprint) || null,
+        quote_version: existing.quote_version ?? 1,
+        stale_reason: null,
+        invalidated_at: null,
+        invalidated_by: null,
+        provider_payload: {
+          ...(existing.provider_payload && typeof existing.provider_payload === "object"
+            ? existing.provider_payload
+            : {}),
+          ...nextQuotePayload,
+        },
+      };
+      if (input.medusaPaymentSessionId) {
+        patch.medusa_payment_session_id = input.medusaPaymentSessionId;
+      }
+      if (input.providerSessionId) {
+        patch.provider_session_id = input.providerSessionId;
+      }
+      if (input.idempotencyKey) {
+        patch.idempotency_key = input.idempotencyKey;
+      }
+      const { error } = await supabase
+        .from("payment_attempts")
+        .update(patch)
+        .eq("id", existing.id);
+      if (error) throw error;
+      return { correlationId: existing.correlation_id, reused: true };
+    }
+
     const patch: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
-      amount_minor: input.amountMinor,
-      currency: input.currencyCode.toLowerCase(),
+      status: "expired",
+      checkout_state: "needs_review",
+      stale_reason: "quote_changed",
+      invalidated_at: new Date().toISOString(),
+      invalidated_by: "quote_fingerprint",
+      last_error: "Your checkout total changed. Review the updated order before paying.",
     };
-    if (input.medusaPaymentSessionId) {
-      patch.medusa_payment_session_id = input.medusaPaymentSessionId;
-    }
-    if (input.providerSessionId) {
-      patch.provider_session_id = input.providerSessionId;
-    }
-    if (input.idempotencyKey) {
-      patch.idempotency_key = input.idempotencyKey;
-    }
     const { error } = await supabase
       .from("payment_attempts")
       .update(patch)
       .eq("id", existing.id);
     if (error) throw error;
-    return { correlationId: existing.correlation_id, reused: true };
   }
 
   const correlationId = randomUUID();
+  const quotePayload = buildQuoteProviderPayload(input);
   const { error } = await supabase.from("payment_attempts").insert({
     correlation_id: correlationId,
     cart_id: input.cartId,
@@ -119,9 +262,12 @@ export async function registerPaymentAttempt(
     checkout_state: "awaiting_provider",
     amount_minor: input.amountMinor,
     currency: input.currencyCode.toLowerCase(),
+    quote_fingerprint: normalizeQuoteFingerprint(input.quoteFingerprint) || null,
+    quote_version: 1,
     medusa_payment_session_id: input.medusaPaymentSessionId ?? null,
     provider_session_id: input.providerSessionId ?? null,
     idempotency_key: input.idempotencyKey ?? null,
+    provider_payload: quotePayload,
     updated_at: new Date().toISOString(),
   });
   if (error) throw error;
@@ -177,14 +323,33 @@ export async function updatePaymentAttemptByCorrelationId(
       | "provider_payment_id"
       | "webhook_last_event_id"
       | "webhook_last_status"
+      | "quote_fingerprint"
+      | "quote_version"
+      | "stale_reason"
+      | "invalidated_at"
+      | "invalidated_by"
       | "provider_payload"
     >
   > & { finalized_at?: string | null },
 ): Promise<void> {
+  let merged: Record<string, unknown> = { ...patch };
+  if (patch.quote_fingerprint !== undefined && patch.quote_version === undefined) {
+    const row = await getPaymentAttemptByCorrelationId(supabase, correlationId);
+    if (row) {
+      const bump = computeNextQuoteVersionForFingerprintPatch(
+        row.quote_fingerprint,
+        patch.quote_fingerprint,
+        row.quote_version,
+      );
+      if (bump !== undefined) {
+        merged = { ...merged, quote_version: bump };
+      }
+    }
+  }
   const { error } = await supabase
     .from("payment_attempts")
     .update({
-      ...patch,
+      ...merged,
       updated_at: new Date().toISOString(),
     })
     .eq("correlation_id", correlationId);
@@ -228,6 +393,23 @@ export async function incrementFinalizeAttempts(
     checkout_state: "finalizing_order",
     status: "finalizing_order",
   });
+}
+
+export async function listOpenPaymentAttempts(
+  supabase: SupabaseClient,
+  limit: number,
+): Promise<PaymentAttemptRow[]> {
+  const { data, error } = await supabase
+    .from("payment_attempts")
+    .select("*")
+    .in("status", [...OPEN_STATUSES])
+    .order("updated_at", { ascending: false })
+    .limit(Math.min(500, Math.max(1, limit)));
+  if (error) {
+    if (isMissingTableOrSchemaError(error)) return [];
+    throw error;
+  }
+  return (data ?? []) as PaymentAttemptRow[];
 }
 
 export async function listStuckPaymentAttempts(
