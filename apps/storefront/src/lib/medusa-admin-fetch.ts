@@ -1,4 +1,4 @@
-import { getMedusaSecretApiKey, getMedusaStoreBaseUrl } from "@apparel-commerce/sdk";
+import { getMedusaSecretApiKey, getMedusaStoreBaseUrl } from "./storefront-medusa-env";
 
 /**
  * Medusa Admin API (server-only). Same Basic auth as admin app.
