@@ -73,7 +73,17 @@ const mayaProvider =
           options: {
             secretKey: process.env.MAYA_SECRET_KEY!,
             webhookSecret: process.env.MAYA_WEBHOOK_SECRET!,
-            sandbox: process.env.MAYA_SANDBOX === "true",
+            /**
+             * Sandbox vs production PayMaya hosts. Unset in dev often meant "production"
+             * API with sandbox keys (401). Prefer sandbox when NODE_ENV is not production
+             * unless MAYA_SANDBOX=false.
+             */
+            sandbox:
+              process.env.MAYA_SANDBOX === "true"
+                ? true
+                : process.env.MAYA_SANDBOX === "false"
+                  ? false
+                  : process.env.NODE_ENV !== "production",
           },
         },
       ]
