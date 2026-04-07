@@ -71,3 +71,60 @@ export function parseOptionalVariantStocks(
   }
   return { ok: true, value: out };
 }
+
+export type ParsedMatrixCellStockRow = {
+  sizeLabel: string;
+  colorLabel: string;
+  quantity: number;
+};
+
+/**
+ * Per size/color stock for matrix products (resolved to variant ids on the server after sync).
+ */
+export function parseOptionalMatrixCellStocks(
+  body: Record<string, unknown>,
+):
+  | { ok: true; value: ParsedMatrixCellStockRow[] | undefined }
+  | { ok: false; error: string } {
+  if (!("matrixCellStocks" in body)) return { ok: true, value: undefined };
+  const raw = body.matrixCellStocks;
+  if (raw === undefined || raw === null) return { ok: true, value: undefined };
+  if (!Array.isArray(raw)) {
+    return { ok: false, error: "matrixCellStocks must be an array." };
+  }
+  const out: ParsedMatrixCellStockRow[] = [];
+  for (let i = 0; i < raw.length; i++) {
+    const item = raw[i];
+    if (!item || typeof item !== "object") {
+      return { ok: false, error: `Invalid matrixCellStocks entry at index ${i}.` };
+    }
+    const o = item as Record<string, unknown>;
+    const sizeLabel =
+      typeof o.sizeLabel === "string" ? o.sizeLabel.trim() : "";
+    const colorLabel =
+      typeof o.colorLabel === "string" ? o.colorLabel.trim() : "";
+    if (!sizeLabel || !colorLabel) {
+      return {
+        ok: false,
+        error: `matrixCellStocks[${i}]: sizeLabel and colorLabel are required.`,
+      };
+    }
+    const qRaw = o.quantity;
+    const n =
+      typeof qRaw === "number" ? qRaw : Number(String(qRaw ?? "").trim());
+    if (!Number.isFinite(n) || n < 0) {
+      return {
+        ok: false,
+        error: `matrixCellStocks[${i}]: quantity must be a non-negative whole number.`,
+      };
+    }
+    if (!Number.isInteger(n)) {
+      return {
+        ok: false,
+        error: `matrixCellStocks[${i}]: quantity must be a whole number.`,
+      };
+    }
+    out.push({ sizeLabel, colorLabel, quantity: n });
+  }
+  return { ok: true, value: out };
+}
