@@ -2,6 +2,11 @@ export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") {
     return;
   }
+  const { ensureStorefrontRuntimeEnvLoaded } = await import(
+    "./src/lib/storefront-runtime-env"
+  );
+  ensureStorefrontRuntimeEnvLoaded();
+
   const { assertMedusaStorefrontEnvProduction } = await import(
     "@apparel-commerce/sdk"
   );
