@@ -1,5 +1,6 @@
 "use client";
 
+import { sanitizeCmsHtml } from "@apparel-commerce/validation";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -93,7 +94,7 @@ export function CmsAnnouncementBar({
       {bodyFormat === "html" ? (
         <span
           className="font-body inline-block max-w-full [&_a]:underline [&_a]:underline-offset-2"
-          dangerouslySetInnerHTML={{ __html: body }}
+          dangerouslySetInnerHTML={{ __html: sanitizeCmsHtml(body) }}
         />
       ) : (
         <span className="font-body">{body}</span>
