@@ -20,6 +20,12 @@ import {
 import { resolveCheckoutPaymentAvailability } from "@/lib/checkout-payment-availability";
 import { minorUnitDivisor } from "@/lib/medusa-money";
 import { CHECKOUT_SITE_ORIGIN } from "./checkout-utils";
+import {
+  buildCheckoutReviewItems,
+  type CheckoutReviewItem,
+} from "./checkout-review";
+import { createCheckoutLeaseSubscriber } from "@/lib/checkout-tab-lease";
+import { emitCommerceObservabilityClient } from "@/lib/commerce-observability";
 
 export type CheckoutPendingPayment = {
   checkoutUrl: string;
@@ -49,9 +55,11 @@ const FINALIZE_POLL_MAX = 20;
 export function useCheckoutClient({
   initialResumeCartId,
   initialStripeCheckoutCancel,
+  initialReviewMessage,
 }: {
   initialResumeCartId?: string;
   initialStripeCheckoutCancel?: boolean;
+  initialReviewMessage?: string;
 }) {
   const { data: session, status: authStatus } = useSession();
   const payInFlightRef = useRef(false);
@@ -68,11 +76,18 @@ export function useCheckoutClient({
   const [hydrated, setHydrated] = useState(false);
   const [medusaPricePreview, setMedusaPricePreview] =
     useState<MedusaCheckoutTotalsPreview | null>(null);
+  const [medusaPreviewError, setMedusaPreviewError] = useState<string | null>(
+    null,
+  );
   const [medusaPriceStatus, setMedusaPriceStatus] = useState<
     "idle" | "loading" | "ready" | "error"
   >("idle");
   const [profileGate, setProfileGate] = useState<ProfileGate>("idle");
   const [profileMissing, setProfileMissing] = useState<string[]>([]);
+  const [quoteReviewAcknowledged, setQuoteReviewAcknowledged] = useState(false);
+  const [foreignCheckoutActive, setForeignCheckoutActive] = useState(false);
+  const quoteFingerprintObsRef = useRef<string | null>(null);
+  const leaseConflictLoggedRef = useRef(false);
 
   const fetchProfileStatus = useCallback(async (): Promise<
     "complete" | "incomplete" | "error"
@@ -184,6 +199,12 @@ export function useCheckoutClient({
     }
   }, [initialStripeCheckoutCancel]);
 
+  useEffect(() => {
+    if (initialReviewMessage?.trim()) {
+      setError(initialReviewMessage.trim());
+    }
+  }, [initialReviewMessage]);
+
   const refresh = useCallback(() => {
     setLines(readCart());
   }, []);
@@ -220,10 +241,12 @@ export function useCheckoutClient({
     if (profileGate !== "complete" || !hydrated || lines.length === 0) {
       setMedusaPricePreview(null);
       setMedusaPriceStatus("idle");
+      setMedusaPreviewError(null);
       return;
     }
 
     setMedusaPriceStatus("loading");
+    setMedusaPreviewError(null);
     const seq = ++medusaPreviewSeqRef.current;
     let cancelled = false;
     const t = setTimeout(() => {
@@ -249,11 +272,15 @@ export function useCheckoutClient({
           if (!cancelled && seq === medusaPreviewSeqRef.current) {
             setMedusaPricePreview(preview);
             setMedusaPriceStatus("ready");
+            setMedusaPreviewError(null);
           }
-        } catch {
+        } catch (e) {
           if (!cancelled && seq === medusaPreviewSeqRef.current) {
             setMedusaPricePreview(null);
             setMedusaPriceStatus("error");
+            setMedusaPreviewError(
+              e instanceof Error ? e.message : "Could not load checkout totals.",
+            );
           }
         }
       })();
@@ -281,9 +308,71 @@ export function useCheckoutClient({
   const displayCurrency = useMedusaBagTotals
     ? medusaPricePreview.currencyCode
     : "PHP";
+  const quoteReviewItems: CheckoutReviewItem[] = useMemo(
+    () =>
+      buildCheckoutReviewItems({
+        lines,
+        medusaPricePreview,
+        localTax,
+        localTotal,
+      }),
+    [lines, medusaPricePreview, localTax, localTotal],
+  );
+  const quoteReviewRequired =
+    useMedusaBagTotals &&
+    quoteReviewItems.length > 0 &&
+    !quoteReviewAcknowledged &&
+    !pendingPayment &&
+    !embeddedData;
+
+  useEffect(() => {
+    setQuoteReviewAcknowledged(false);
+  }, [medusaPricePreview?.quoteFingerprint]);
+
+  useEffect(() => {
+    const enabled =
+      profileGate === "complete" &&
+      hydrated &&
+      lines.length > 0 &&
+      authStatus === "authenticated";
+    return createCheckoutLeaseSubscriber(enabled, (foreign) => {
+      setForeignCheckoutActive(foreign);
+      if (foreign && !leaseConflictLoggedRef.current) {
+        leaseConflictLoggedRef.current = true;
+        emitCommerceObservabilityClient("checkout_tab_lease_conflict", {
+          reason: "foreign_tab_active",
+        });
+      }
+      if (!foreign) {
+        leaseConflictLoggedRef.current = false;
+      }
+    });
+  }, [profileGate, hydrated, lines.length, authStatus]);
+
+  useEffect(() => {
+    if (medusaPriceStatus !== "ready" || !medusaPricePreview?.quoteFingerprint) {
+      quoteFingerprintObsRef.current = null;
+      return;
+    }
+    const fp = medusaPricePreview.quoteFingerprint.trim();
+    const prev = quoteFingerprintObsRef.current;
+    if (prev !== null && prev !== fp) {
+      emitCommerceObservabilityClient("checkout_quote_changed", {
+        fromFingerprint: prev,
+        toFingerprint: fp,
+      });
+    }
+    quoteFingerprintObsRef.current = fp;
+  }, [medusaPricePreview?.quoteFingerprint, medusaPriceStatus]);
 
   async function handlePay() {
     if (lines.length === 0 || payInFlightRef.current || !hydrated) return;
+    if (foreignCheckoutActive) {
+      setError(
+        "Checkout is already in progress in another browser tab. Continue there, or close that tab to pay from this window.",
+      );
+      return;
+    }
     if (profileGate !== "complete") {
       setError(
         "Add your delivery address and contact details before you continue to payment.",
@@ -292,6 +381,10 @@ export function useCheckoutClient({
     }
     if (!providerAvailable[paymentMethod]) {
       setError("Choose an available way to pay, or ask the shop owner to turn on that option.");
+      return;
+    }
+    if (quoteReviewRequired) {
+      setError("Review the updated total below before continuing to payment.");
       return;
     }
     payInFlightRef.current = true;
@@ -429,6 +522,9 @@ export function useCheckoutClient({
             provider: providerKey,
             amountMinor,
             currencyCode,
+            quoteFingerprint: result.quoteFingerprint,
+            variantIds: result.variantIds,
+            productIds: result.productIds,
             providerSessionId: paypalOrderId,
           }),
         });
@@ -538,6 +634,7 @@ export function useCheckoutClient({
           status?: string;
           medusaOrderId?: string | null;
           lastError?: string | null;
+          staleReason?: string | null;
         };
         if (
           statusRes.ok &&
@@ -551,11 +648,11 @@ export function useCheckoutClient({
         }
         if (
           statusRes.ok &&
-          statusJson.status === "needs_review" &&
-          typeof statusJson.lastError === "string" &&
-          statusJson.lastError.length > 0
+          (statusJson.status === "needs_review" || statusJson.status === "expired") &&
+          typeof (statusJson.staleReason ?? statusJson.lastError) === "string" &&
+          (statusJson.staleReason ?? statusJson.lastError)!.length > 0
         ) {
-          throw new Error(statusJson.lastError);
+          throw new Error(statusJson.staleReason ?? statusJson.lastError ?? "Checkout needs review.");
         }
       }
 
@@ -606,6 +703,7 @@ export function useCheckoutClient({
     hydrated,
     medusaPricePreview,
     medusaPriceStatus,
+    medusaPreviewError,
     profileGate,
     setProfileGate,
     profileMissing,
@@ -622,5 +720,10 @@ export function useCheckoutClient({
     continueToHostedCheckout,
     copyTrackingLink,
     phVatRate: PH_VAT_RATE,
+    quoteReviewItems,
+    quoteReviewRequired,
+    quoteReviewAcknowledged,
+    acknowledgeQuoteReview: () => setQuoteReviewAcknowledged(true),
+    foreignCheckoutActive,
   };
 }
