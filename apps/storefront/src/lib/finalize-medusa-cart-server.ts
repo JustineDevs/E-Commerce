@@ -45,7 +45,7 @@ export async function finalizeMedusaCartFromServer(
 
   const sdk = createStorefrontMedusaSdk();
   const storeCart = sdk.store.cart as unknown as {
-    complete?: (id: string, body?: unknown) => Promise<CompleteResponse>;
+    complete?: (_id: string, _body?: unknown) => Promise<CompleteResponse>;
   };
   if (typeof storeCart.complete !== "function") {
     return {
