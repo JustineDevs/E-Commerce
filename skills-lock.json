@@ -41,6 +41,11 @@
       "sourceType": "github",
       "computedHash": "f0f4975092d31e94410a711033ba0d7bbdb56a48eab3440924b0058af6379a32"
     },
+    "debugging-code": {
+      "source": "AlmogBaku/debug-skill",
+      "sourceType": "github",
+      "computedHash": "79633c47b5b45e39f17284a294fcdb4072b997b64ea383f81b6711bf02215761"
+    },
     "design-with-taste": {
       "source": "cristicretu/family-taste-skill",
       "sourceType": "github",
@@ -110,6 +115,11 @@
       "source": "wshobson/agents",
       "sourceType": "github",
       "computedHash": "bc5d0d76d6640f534371039426425284176955816a026fa1e0142c9bd160de50"
+    },
+    "systematic-debugging": {
+      "source": "obra/superpowers",
+      "sourceType": "github",
+      "computedHash": "72e9ab72627e4fd8ed26a582e82309a98ecdc4f6e1c99418430ac05682c9e91d"
     },
     "ui-ux-pro-max": {
       "source": "nextlevelbuilder/ui-ux-pro-max-skill",
