@@ -6,17 +6,17 @@ This document is the **live** counterpart to archived notes under `output/full-a
 
 - **Medusa** registers payment modules from **`process.env`** at startup (`apps/medusa/medusa-config.ts`). Set `STRIPE_API_KEY`, `PAYPAL_*`, `PAYMONGO_*`, `MAYA_*`, and webhook secrets in the Medusa deployment environment; restart Medusa after rotation.
 - **Observability:** `GET /admin/payment-health` on Medusa returns which providers have env keys present (no secret values).
-- **Storefront** must not bundle server-only PSP secrets (`scripts/check-storefront-client-boundary.mjs`).
+- **Storefront** must not bundle server-only PSP secrets (`stress-test/scripts/check-storefront-client-boundary.mjs`).
 - **Payment-state reconciliation** is part of production readiness, not only credential hygiene: Supabase `payment_attempts`, server finalize routes, optional `GET /api/cron/finalize-payment-attempts` on the storefront, and staff **Payment attempts** in admin together reduce stuck orders when webhooks or browser returns fail. Treat missing cron or misconfigured `STOREFRONT_*` recovery env vars as an operational gap, not only a security gap.
 
 ## 2. Automated gates (CI and release)
 
 | Check | Script / workflow |
 | --- | --- |
-| Dependency audit triage | `scripts/check-audit-triage.js` (document highs in `internal/docs/audit-triage.md`) |
-| Storefront client bundle (no server secrets) | `scripts/check-storefront-client-boundary.mjs` |
-| Legacy DB migrations vs Medusa commerce tables | `scripts/check-commerce-migration-boundary.mjs` |
-| Admin API routes must show staff or internal guard patterns | `scripts/check-admin-api-staff-guard.mjs` |
+| Dependency audit triage | `stress-test/scripts/check-audit-triage.js` (document highs in `internal/docs/audit-triage.md`) |
+| Storefront client bundle (no server secrets) | `stress-test/scripts/check-storefront-client-boundary.mjs` |
+| Legacy DB migrations vs Medusa commerce tables | `stress-test/scripts/check-commerce-migration-boundary.mjs` |
+| Admin API routes must show staff or internal guard patterns | `stress-test/scripts/check-admin-api-staff-guard.mjs` |
 | Unit tests (incl. Medusa env validation, admin webhook policy) | `pnpm test`, `pnpm release-gate` |
 
 GitHub Actions workflow: `.github/workflows/security-audit.yml`.
@@ -40,4 +40,3 @@ Staff admin sign-in is **Google-only** on `/sign-in`. E2E credentials exist only
 
 - `docs/data-ownership.md` and `packages/database/src/data-boundaries.ts` for Medusa vs Supabase ownership.
 - `apps/medusa/src/loaders/validate-process-env.ts` for production env rules.
-- `docs/archived/adr/0001-byok-credential-management.md` (**superseded**; retained for history).
