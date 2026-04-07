@@ -1,0 +1,7 @@
+# Keep uploads and CLI scans away from local test artifacts (Windows EPERM on locked Playwright logs)
+stress-test/
+playwright-report/
+test-results/
+coverage/
+.turbo/
+**/.playwright-cache/
