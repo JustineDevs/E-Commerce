@@ -49,6 +49,8 @@ const MIGRATION_FILES = [
   "023_payment_attempts_and_webhook_inbox.sql",
   "024_payment_ops_audit_outbox_job_columns.sql",
   "025_catalog_storage_bucket.sql",
+  "026_payment_attempt_quote_fingerprint_and_staleness.sql",
+  "027_payment_attempt_quote_version.sql",
   "enable_rls.sql",
   "rls_deny_anon_sensitive.sql",
 ] as const;
