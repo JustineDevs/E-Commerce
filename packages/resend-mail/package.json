@@ -20,6 +20,7 @@
     "resend": "^4.8.0"
   },
   "devDependencies": {
+    "@types/node": "^20.14.0",
     "@apparel-commerce/config-eslint": "workspace:*",
     "@apparel-commerce/config-typescript": "workspace:*",
     "eslint": "^9.0.0",
