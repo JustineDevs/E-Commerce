@@ -17,7 +17,8 @@ function parse(argv = process.argv.slice(2)) {
     } else if (arg === '--warn-only') {
       opts.warnOnly = true;
     } else if (arg === '--max' && argv[i + 1]) {
-      opts.max = parseInt(argv[++i], 10) || 5;
+      const n = parseInt(argv[++i], 10);
+      opts.max = Number.isNaN(n) || n < 1 ? 1 : n;
     } else if (arg === '--no-stage-all') {
       opts.noStageAll = true;
     } else if (arg === '--skip-preflight') {
