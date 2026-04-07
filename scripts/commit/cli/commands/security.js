@@ -13,14 +13,13 @@ async function run() {
 
 function help() {
   console.log(`
-  security
+  hyperagent security
 
   Scan staged files and working directory for sensitive files.
   Blocks: .env, secrets, credentials, keys, certs, .cursor/mcp.json
   Allows: .env.example, .env.template, .env.sample
 
   Use before committing or as a pre-commit hook.
-  Run: npm run security:check
 `);
 }
 
