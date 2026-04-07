@@ -10,6 +10,9 @@ type PaymentAttemptRow = {
   cart_id: string;
   correlation_id: string;
   provider: string;
+  status?: string;
+  quote_fingerprint?: string | null;
+  stale_reason?: string | null;
 } | null;
 
 type FinalizeResult =
@@ -30,6 +33,7 @@ export type CodPlaceOrderRouteDeps = {
   applyRateLimit: (_req: Request) => Promise<RateLimitResult>;
   readCartIdFromCookie: () => Promise<string | null>;
   getPaymentAttemptRow: (_correlationId: string) => Promise<PaymentAttemptRow>;
+  readCurrentQuoteFingerprint: (_cartId: string) => Promise<string | null>;
   incrementFinalizeAttempts: (_correlationId: string) => Promise<void>;
   updatePaymentAttempt: (
     _correlationId: string,
@@ -64,10 +68,14 @@ export async function handleCodPlaceOrderRequest(
   const row = correlationId
     ? await deps.getPaymentAttemptRow(correlationId)
     : null;
+  const currentQuoteFingerprint = cartId
+    ? await deps.readCurrentQuoteFingerprint(cartId)
+    : null;
   const result = await codPlaceOrderRouteLogic({
     correlationId,
     cartId,
     row,
+    currentQuoteFingerprint,
     incrementFinalizeAttempts: deps.incrementFinalizeAttempts,
     updatePaymentAttempt: deps.updatePaymentAttempt,
     finalizeMedusaCart: deps.finalizeMedusaCart,
