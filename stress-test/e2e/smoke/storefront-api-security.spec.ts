@@ -1,3 +1,4 @@
+import "../runtime-logs-init";
 import { test, expect } from "@playwright/test";
 
 const base =
