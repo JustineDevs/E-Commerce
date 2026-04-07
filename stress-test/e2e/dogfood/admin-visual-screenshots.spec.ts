@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import "../runtime-logs-init";
 import { test } from "@playwright/test";
 
 const OUT_DIR = path.join(process.cwd(), "stress-test", "dogfood-output", "screenshots");
