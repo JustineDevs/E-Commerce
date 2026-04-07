@@ -59,6 +59,7 @@ playwright-report/
 test-results/
 .playwright-cache/
 playwright/.cache/
+stress-test/
 
 # Supabase local
 .supabase/
