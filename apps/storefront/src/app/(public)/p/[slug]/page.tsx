@@ -7,6 +7,7 @@ import {
   loadCmsPagePreviewPublic,
   loadCmsPagePublic,
 } from "@apparel-commerce/platform-data";
+import { sanitizeCmsHtml } from "@apparel-commerce/validation";
 import { CmsBlocksRenderer } from "@/components/CmsBlocksRenderer";
 import { canonicalUrl } from "@/lib/seo";
 import { createStorefrontAnonSupabase } from "@/lib/storefront-supabase";
@@ -113,7 +114,7 @@ export default async function CmsDynamicPage({ params, searchParams }: Props) {
       {page.body.trim() ? (
         <div
           className="mt-8 space-y-6 font-body text-sm leading-relaxed text-on-surface-variant"
-          dangerouslySetInnerHTML={{ __html: page.body }}
+          dangerouslySetInnerHTML={{ __html: sanitizeCmsHtml(page.body) }}
         />
       ) : null}
       <CmsBlocksRenderer blocks={page.blocks} />
