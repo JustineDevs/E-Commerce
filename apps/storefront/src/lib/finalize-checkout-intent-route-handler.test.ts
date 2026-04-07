@@ -18,6 +18,7 @@ test("handleFinalizeCheckoutIntentRequest returns 429 from rate limit guard", as
         }) as const,
       readCartIdFromCookie: async () => "cart_1",
       getPaymentAttemptRow: async () => null,
+      readCurrentQuoteFingerprint: async () => "qf_live",
       incrementFinalizeAttempts: async () => {},
       updatePaymentAttempt: async () => {},
       finalizeMedusaCart: async () => ({
@@ -48,7 +49,9 @@ test("handleFinalizeCheckoutIntentRequest returns order redirect on success", as
         cart_id: "cart_1",
         correlation_id: "corr_1",
         provider: "stripe",
+        quote_fingerprint: "qf_live",
       }),
+      readCurrentQuoteFingerprint: async () => "qf_live",
       incrementFinalizeAttempts: async () => {},
       updatePaymentAttempt: async (_id, patch) => {
         patches.push(patch);
@@ -85,6 +88,7 @@ test("handleFinalizeCheckoutIntentRequest rejects cart mismatch through live han
         correlation_id: "corr_1",
         provider: "stripe",
       }),
+      readCurrentQuoteFingerprint: async () => "qf_live",
       incrementFinalizeAttempts: async () => {},
       updatePaymentAttempt: async () => {},
       finalizeMedusaCart: async () => ({
