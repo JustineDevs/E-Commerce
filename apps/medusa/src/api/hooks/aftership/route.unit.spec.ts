@@ -25,9 +25,9 @@ jest.mock("../../../lib/aftership-webhook-dedup", () => ({
   claimAftershipWebhookDedup: jest.fn(),
 }));
 
-const captureRun = jest.fn();
+const mockCaptureRun = jest.fn();
 jest.mock("@medusajs/medusa/core-flows", () => ({
-  capturePaymentWorkflow: jest.fn(() => ({ run: captureRun })),
+  capturePaymentWorkflow: jest.fn(() => ({ run: mockCaptureRun })),
 }));
 
 function sign(body: string, secret: string): string {
@@ -116,7 +116,7 @@ describe("AfterShip webhook route", () => {
     (mergePaymentAttemptPayloadByMedusaOrderId as jest.Mock).mockResolvedValue(undefined);
     (markWebhookProcessed as jest.Mock).mockResolvedValue(undefined);
     (claimAftershipWebhookDedup as jest.Mock).mockResolvedValue(true);
-    captureRun.mockResolvedValue(undefined);
+    mockCaptureRun.mockResolvedValue(undefined);
   });
 
   afterAll(() => {
@@ -154,7 +154,7 @@ describe("AfterShip webhook route", () => {
     expect(mergePaymentAttemptPayloadByMedusaOrderId).toHaveBeenCalledTimes(1);
     expect(markWebhookProcessed).toHaveBeenCalledWith({ kind: "supabase" }, "wh_1", true);
     expect(req.__orderModule.updateOrders).toHaveBeenCalledTimes(1);
-    expect(captureRun).not.toHaveBeenCalled();
+    expect(mockCaptureRun).not.toHaveBeenCalled();
   });
 
   it("captures COD exactly once on delivered events", async () => {
@@ -173,7 +173,7 @@ describe("AfterShip webhook route", () => {
     await POST(req as never, res as never);
 
     expect(res.statusCode).toBe(200);
-    expect(captureRun).toHaveBeenCalledWith({ input: { payment_id: "pay_1" } });
+    expect(mockCaptureRun).toHaveBeenCalledWith({ input: { payment_id: "pay_1" } });
     expect(mergePaymentAttemptPayloadByMedusaOrderId).toHaveBeenCalled();
     expect(markWebhookProcessed).toHaveBeenCalledWith({ kind: "supabase" }, "wh_1", true);
   });
