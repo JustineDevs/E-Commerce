@@ -5,7 +5,10 @@ import path from "node:path";
 import test from "node:test";
 
 import { medusaAdminFetch } from "./medusa-admin-fetch";
-import { resetStorefrontRuntimeEnvForTests } from "./storefront-runtime-env";
+import {
+  ensureStorefrontRuntimeEnvLoaded,
+  resetStorefrontRuntimeEnvForTests,
+} from "./storefront-runtime-env";
 
 const RUNTIME_ENV_KEYS = [
   "MEDUSA_SECRET_API_KEY",
@@ -65,6 +68,7 @@ test("medusaAdminFetch loads repo-root env for storefront runtime paths", async 
     async (workspaceDir) => {
       const storefrontDir = path.join(workspaceDir, "apps/storefront");
       process.chdir(storefrontDir);
+      ensureStorefrontRuntimeEnvLoaded();
       let calledUrl = "";
       let authHeader = "";
       global.fetch = (async (input, init) => {
@@ -110,6 +114,7 @@ test("medusaAdminFetch keeps explicit process env over repo-root dotenv values",
     },
     async (workspaceDir) => {
       process.chdir(path.join(workspaceDir, "apps/storefront"));
+      ensureStorefrontRuntimeEnvLoaded();
       let calledUrl = "";
       let authHeader = "";
       global.fetch = (async (input, init) => {
