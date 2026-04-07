@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * hyperagent-commit CLI
+ * apparel-commerce-commit CLI (Apparel Commerce monorepo)
  * Composable commands for git commit with security checks and optional Linear integration.
  * Uses cli-building (async-first, composable) and linear-cli skills.
  */
@@ -42,11 +42,11 @@ async function main() {
 
 function printUsage() {
   console.log(`
-${style('hyperagent-commit', 'bright')} - Git commit CLI with security checks
+${style('apparel-commerce-commit', 'bright')} - Git commit CLI with security checks
 
-Usage: hyperagent commit [options]   (default)
-       hyperagent security
-       hyperagent linear [--issue <id>]
+Usage: apparel-commerce-commit commit [options]   (default)
+       apparel-commerce-commit security
+       apparel-commerce-commit linear [--issue <id>]
 
 Commands:
   commit    Parallel commit with security checks (default)
