@@ -1,4 +1,9 @@
 import { NextResponse } from "next/server";
+import {
+  getPaymentPlatformMetrics,
+  listRecentPaymentAttempts,
+} from "@apparel-commerce/platform-data";
+import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { requireStaffApiSession } from "@/lib/requireStaffSession";
 
 export type ReconciliationRow = {
@@ -6,8 +11,10 @@ export type ReconciliationRow = {
   provider: string;
   medusaOrderCount: number;
   medusaTotalMinor: number;
-  pspSettlementCount: number;
-  pspSettlementMinor: number;
+  providerConfirmedCount: number;
+  providerConfirmedMinor: number;
+  openAttemptCount: number;
+  problemAttemptCount: number;
   discrepancyMinor: number;
   status: "matched" | "discrepancy" | "pending";
 };
@@ -16,13 +23,68 @@ export type ReconciliationSummary = {
   period: string;
   rows: ReconciliationRow[];
   totalMedusaMinor: number;
-  totalPspMinor: number;
+  totalProviderConfirmedMinor: number;
   totalDiscrepancyMinor: number;
+  paymentAttemptsStaleFinalize: number;
+  paymentAttemptsNeedsReview: number;
+  recentProblemAttempts: Array<{
+    correlationId: string;
+    provider: string;
+    status: string;
+    checkoutState: string;
+    staleReason: string | null;
+    updatedAt: string;
+  }>;
 };
+
+type AttemptSummaryRow = {
+  provider: string;
+  status: string;
+  amount_minor: number | null;
+  medusa_order_id: string | null;
+  updated_at: string;
+  finalized_at: string | null;
+  created_at: string;
+  checkout_state: string;
+  stale_reason: string | null;
+  last_error: string | null;
+  provider_payment_id: string | null;
+  webhook_last_status: string | null;
+};
+
+const PROVIDER_CONFIRMED_STATUSES = new Set([
+  "paid",
+  "authorized",
+  "completed",
+  "pending_capture",
+  "paid_awaiting_order",
+  "finalizing_order",
+]);
+const OPEN_STATUSES = new Set([
+  "initiated",
+  "pending_provider_redirect",
+  "awaiting_completion",
+  "paid_awaiting_order",
+  "finalizing_order",
+]);
+const PROBLEM_STATUSES = new Set(["expired", "needs_review", "failed"]);
+
+function bucketDate(row: AttemptSummaryRow): string {
+  const stamp = row.finalized_at ?? row.updated_at ?? row.created_at;
+  return stamp.slice(0, 10);
+}
+
+function reconciliationProviders(input: string): string[] {
+  return input === "all"
+    ? ["stripe", "paypal", "paymongo", "maya", "cod"]
+    : [input];
+}
 
 export async function GET(request: Request) {
   const staff = await requireStaffApiSession("dashboard:read");
   if (!staff.ok) return staff.response;
+  const sup = adminSupabaseOr503("reconciliation");
+  if ("response" in sup) return sup.response;
 
   const { searchParams } = new URL(request.url);
   const days = Math.min(Number(searchParams.get("days")) || 7, 90);
@@ -36,9 +98,7 @@ export async function GET(request: Request) {
     date.setDate(date.getDate() - i);
     const dateStr = date.toISOString().slice(0, 10);
 
-    const providers = provider === "all"
-      ? ["stripe", "paypal", "paymongo", "maya"]
-      : [provider];
+    const providers = reconciliationProviders(provider);
 
     for (const p of providers) {
       rows.push({
@@ -46,23 +106,101 @@ export async function GET(request: Request) {
         provider: p,
         medusaOrderCount: 0,
         medusaTotalMinor: 0,
-        pspSettlementCount: 0,
-        pspSettlementMinor: 0,
+        providerConfirmedCount: 0,
+        providerConfirmedMinor: 0,
+        openAttemptCount: 0,
+        problemAttemptCount: 0,
         discrepancyMinor: 0,
         status: "pending",
       });
     }
   }
 
+  const metrics = await getPaymentPlatformMetrics(sup.client);
+  const recentAttempts = await listRecentPaymentAttempts(sup.client, 500) as AttemptSummaryRow[];
+  const rowMap = new Map(rows.map((row) => [`${row.date}:${row.provider}`, row]));
+
+  const dayFloor = new Date(now);
+  dayFloor.setUTCDate(dayFloor.getUTCDate() - (days - 1));
+  dayFloor.setUTCHours(0, 0, 0, 0);
+
+  for (const attempt of recentAttempts) {
+    const stamp = attempt.finalized_at ?? attempt.updated_at ?? attempt.created_at;
+    const parsed = new Date(stamp);
+    if (Number.isNaN(parsed.getTime()) || parsed < dayFloor) continue;
+    const day = bucketDate(attempt);
+    const key = `${day}:${attempt.provider}`;
+    const row = rowMap.get(key);
+    if (!row) continue;
+    const amountMinor =
+      typeof attempt.amount_minor === "number" && Number.isFinite(attempt.amount_minor)
+        ? attempt.amount_minor
+        : 0;
+
+    if (attempt.medusa_order_id) {
+      row.medusaOrderCount += 1;
+      row.medusaTotalMinor += amountMinor;
+    }
+    if (
+      attempt.provider_payment_id ||
+      attempt.webhook_last_status ||
+      PROVIDER_CONFIRMED_STATUSES.has(attempt.status)
+    ) {
+      row.providerConfirmedCount += 1;
+      row.providerConfirmedMinor += amountMinor;
+    }
+    if (OPEN_STATUSES.has(attempt.status)) {
+      row.openAttemptCount += 1;
+    }
+    if (PROBLEM_STATUSES.has(attempt.status)) {
+      row.problemAttemptCount += 1;
+    }
+  }
+
+  for (const row of rows) {
+    row.discrepancyMinor = row.medusaTotalMinor - row.providerConfirmedMinor;
+    row.status =
+      row.problemAttemptCount > 0 || row.openAttemptCount > 0
+        ? "pending"
+        : row.discrepancyMinor !== 0 || row.medusaOrderCount !== row.providerConfirmedCount
+          ? "discrepancy"
+          : row.medusaOrderCount > 0 || row.providerConfirmedCount > 0
+            ? "matched"
+            : "pending";
+  }
+
   const totalMedusa = rows.reduce((s, r) => s + r.medusaTotalMinor, 0);
-  const totalPsp = rows.reduce((s, r) => s + r.pspSettlementMinor, 0);
+  const totalProviderConfirmed = rows.reduce(
+    (sum, row) => sum + row.providerConfirmedMinor,
+    0,
+  );
+  const recentProblemAttempts = recentAttempts
+    .filter(
+      (row) =>
+        row.status === "expired" ||
+        row.status === "needs_review" ||
+        row.status === "paid_awaiting_order" ||
+        row.status === "finalizing_order",
+    )
+    .slice(0, 8)
+    .map((row) => ({
+      correlationId: row.correlation_id,
+      provider: row.provider,
+      status: row.status,
+      checkoutState: row.checkout_state,
+      staleReason: row.stale_reason ?? row.last_error,
+      updatedAt: row.updated_at,
+    }));
 
   const summary: ReconciliationSummary = {
     period: `Last ${days} days`,
     rows,
     totalMedusaMinor: totalMedusa,
-    totalPspMinor: totalPsp,
-    totalDiscrepancyMinor: totalMedusa - totalPsp,
+    totalProviderConfirmedMinor: totalProviderConfirmed,
+    totalDiscrepancyMinor: totalMedusa - totalProviderConfirmed,
+    paymentAttemptsStaleFinalize: metrics?.paymentAttemptsStaleFinalize ?? 0,
+    paymentAttemptsNeedsReview: metrics?.paymentAttemptsNeedsReview ?? 0,
+    recentProblemAttempts,
   };
 
   return NextResponse.json(summary);
