@@ -14,6 +14,7 @@ test("handleCodPlaceOrderRequest rejects invalid JSON at the live handler bounda
     applyRateLimit: async () => ({ ok: true }),
     readCartIdFromCookie: async () => "cart_1",
     getPaymentAttemptRow: async () => null,
+    readCurrentQuoteFingerprint: async () => "qf_live",
     incrementFinalizeAttempts: async () => {},
     updatePaymentAttempt: async () => {},
     finalizeMedusaCart: async () => ({
@@ -45,6 +46,7 @@ test("handleCodPlaceOrderRequest rejects non-COD rows through handler wiring", a
       correlation_id: "corr_1",
       provider: "stripe",
     }),
+    readCurrentQuoteFingerprint: async () => "qf_live",
     incrementFinalizeAttempts: async () => {},
     updatePaymentAttempt: async () => {},
     finalizeMedusaCart: async () => ({
@@ -75,7 +77,9 @@ test("handleCodPlaceOrderRequest returns order redirect on success", async () =>
       cart_id: "cart_cod",
       correlation_id: "corr_cod",
       provider: "cod",
+      quote_fingerprint: "qf_live",
     }),
+    readCurrentQuoteFingerprint: async () => "qf_live",
     incrementFinalizeAttempts: async () => {},
     updatePaymentAttempt: async () => {},
     finalizeMedusaCart: async () => ({
