@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { getPaymentPlatformMetrics } from "@apparel-commerce/platform-data";
 import { requireStaffApiSession } from "@/lib/requireStaffSession";
+import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 
 type TaskItem = {
   id: string;
@@ -16,6 +18,7 @@ export async function GET() {
   if (!staff.ok) return staff.response;
 
   const tasks: TaskItem[] = [];
+  const sup = adminSupabaseOr503("tasks-today");
 
   try {
     const medusaUrl = process.env.MEDUSA_BACKEND_URL || "http://localhost:9000";
@@ -90,6 +93,38 @@ export async function GET() {
     }
   } catch (err) {
     console.error("[tasks/today] Failed to fetch tasks:", err);
+  }
+
+  try {
+    if ("client" in sup) {
+      const metrics = await getPaymentPlatformMetrics(sup.client);
+      if (metrics) {
+        if (metrics.paymentAttemptsStaleFinalize > 0) {
+          tasks.push({
+            id: "stale-payment-attempts",
+            type: "pending_review",
+            title: "Stale payment sessions",
+            description: `${metrics.paymentAttemptsStaleFinalize} checkout attempts need recovery or finalization review`,
+            urgency: metrics.paymentAttemptsStaleFinalize > 5 ? "high" : "medium",
+            link: "/admin/payments",
+            count: metrics.paymentAttemptsStaleFinalize,
+          });
+        }
+        if (metrics.paymentAttemptsNeedsReview > 0) {
+          tasks.push({
+            id: "payment-needs-review",
+            type: "pending_review",
+            title: "Payment attempts need review",
+            description: `${metrics.paymentAttemptsNeedsReview} payment rows are already marked for operator review`,
+            urgency: metrics.paymentAttemptsNeedsReview > 5 ? "high" : "medium",
+            link: "/admin/payments",
+            count: metrics.paymentAttemptsNeedsReview,
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.error("[tasks/today] Failed to fetch payment metrics:", err);
   }
 
   tasks.sort((a, b) => {
