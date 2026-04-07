@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import {
   getPaymentAttemptByCorrelationId,
   incrementFinalizeAttempts,
@@ -9,6 +8,7 @@ import { applyRateLimit, readCartIdFromCookie } from "@/lib/cart-api-helpers";
 import { logCheckoutCompletionEvent } from "@/lib/checkout-telemetry";
 import { handleFinalizeCheckoutIntentRequest } from "@/lib/finalize-checkout-intent-route-handler";
 import { finalizeMedusaCartFromServer } from "@/lib/finalize-medusa-cart-server";
+import { readMedusaCartTotalsPreview } from "@/lib/medusa-checkout-cart-prep";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +29,14 @@ export async function POST(
     readCartIdFromCookie,
     getPaymentAttemptRow: async (id) =>
       sb ? getPaymentAttemptByCorrelationId(sb, id) : null,
+    readCurrentQuoteFingerprint: async (activeCartId) => {
+      try {
+        const preview = await readMedusaCartTotalsPreview(activeCartId);
+        return preview.quoteFingerprint;
+      } catch {
+        return null;
+      }
+    },
     incrementFinalizeAttempts: async (id) => {
       if (!sb) {
         throw new Error("Payment ledger is not configured");
