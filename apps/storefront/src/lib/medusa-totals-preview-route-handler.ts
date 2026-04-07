@@ -4,7 +4,6 @@ import {
 import {
   type CodCartPayload,
   type MedusaCheckoutTotalsPreview,
-  executeMedusaCheckoutTotalsPreview,
 } from "@/lib/medusa-checkout-cart-prep";
 import type { MedusaCartAddressPayload } from "@/lib/medusa-profile-address";
 
@@ -17,24 +16,24 @@ type Body = {
 
 type TotalsPreviewDependencies = {
   getSessionEmail: () => Promise<string | null>;
-  loadCustomerProfile: (email: string) => Promise<ServerCustomerProfile | null>;
-  isProfileComplete: (profile: ServerCustomerProfile | null) => boolean;
-  listMissingProfileParts: (profile: ServerCustomerProfile | null) => string[];
+  loadCustomerProfile: (_email: string) => Promise<ServerCustomerProfile | null>;
+  isProfileComplete: (_profile: ServerCustomerProfile | null) => boolean;
+  listMissingProfileParts: (_profile: ServerCustomerProfile | null) => string[];
   profileToCodCartAddresses: (
-    profile: ServerCustomerProfile,
-    sessionEmail: string,
+    _profile: ServerCustomerProfile,
+    _sessionEmail: string,
   ) => {
     email: string;
     shipping_address: MedusaCartAddressPayload;
     billing_address: MedusaCartAddressPayload;
   } | null;
-  executePreview: (input: {
+  executePreview: (_input: {
     lines: Array<{ variantId: string; quantity: number }>;
     email?: string;
     loyaltyPointsToRedeem?: number;
     codCartPayload?: CodCartPayload;
   }) => Promise<MedusaCheckoutTotalsPreview>;
-  logEvent: (event: string, payload: Record<string, unknown>) => void;
+  logEvent: (_event: string, _payload: Record<string, unknown>) => void;
 };
 
 function isCodPaymentMethod(method: string | undefined): boolean {
