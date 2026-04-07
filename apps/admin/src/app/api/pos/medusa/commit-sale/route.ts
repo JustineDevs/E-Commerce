@@ -18,7 +18,6 @@ import {
 } from "@/lib/medusa-pos";
 import { posCommitSaleRouteLogic } from "@/lib/pos-commit-sale-route-logic";
 import { requireStaffApiSession } from "@/lib/requireStaffSession";
-import { correlatedJson, correlatedError, tagResponse } from "@/lib/staff-api-response";
 
 const inflight = new Map<string, number>();
 const INFLIGHT_TTL_MS = 30_000;
