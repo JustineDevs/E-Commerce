@@ -1,3 +1,4 @@
+import "../runtime-logs-init";
 import { expect, type Page } from "@playwright/test";
 
 /**
