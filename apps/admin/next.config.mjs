@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
-const { loadMonorepoRootEnv } = require("../../scripts/load-monorepo-root-env.cjs");
+const { loadMonorepoRootEnv } = require("../../stress-test/scripts/load-monorepo-root-env.cjs");
 loadMonorepoRootEnv(__dirname);
 
 function imageRemotePatterns() {
