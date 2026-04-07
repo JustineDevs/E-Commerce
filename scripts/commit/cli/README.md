@@ -1,6 +1,6 @@
-# hyperagent-commit CLI
+# apparel-commerce-commit CLI
 
-Composable CLI for git commits with security checks. Uses cli-building (async-first, composable commands) and optional linear-cli integration.
+Composable CLI for git commits with security checks in the **Apparel Commerce** monorepo. Uses async-first composable commands and optional Linear CLI integration.
 
 ## Commands
 
@@ -12,13 +12,12 @@ Composable CLI for git commits with security checks. Uses cli-building (async-fi
 
 ```bash
 # From repo root
-node .github/version/scripts/commit/cli/index.js [command] [options]
+node scripts/commit/cli/index.js [command] [options]
 
 # Or via pnpm
 pnpm run commit          # commit (default)
-pnpm run commit:dry     # commit --dry-run
-pnpm run security:check # security
-pnpm run commit:cli     # show usage
+pnpm run commit:dry      # commit --dry-run
+pnpm run commit:cli      # show usage
 ```
 
 ## Options (commit)
@@ -26,15 +25,14 @@ pnpm run commit:cli     # show usage
 - `--dry-run` — Preview without committing
 - `--no-security-check` — Disable security checks (not recommended)
 - `--warn-only` — Warn on sensitive files, do not fail
-- `--max <n>` — Max concurrent commits (default: 5)
+- `--max <n>` — Files per batch (default: 1; see inline help)
 
-## Linear Integration
+## Linear integration
 
-When `linear` CLI is installed, use `linear issue id` to resolve the current issue from the branch name (e.g. `feature/ENG-123`). Append the output to commit messages for traceability.
+When the `linear` CLI is installed, use `linear issue id` to resolve the current issue from the branch name (for example `feature/ENG-123`). Append the output to commit messages for traceability.
 
 ```bash
-node .github/version/scripts/commit/cli/index.js linear
-# Output: Linear-issue: ENG-123
+node scripts/commit/cli/index.js linear
 ```
 
 ## NO_COLOR
