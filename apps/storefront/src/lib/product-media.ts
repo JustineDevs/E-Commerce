@@ -53,3 +53,59 @@ export function isDirectVideoUrl(url: string): boolean {
   }
   return false;
 }
+
+/** Extract YouTube video id for poster thumbnails, or null. */
+export function youtubeVideoId(url: string): string | null {
+  try {
+    const u = new URL(url);
+    if (u.hostname === "youtu.be") {
+      const id = u.pathname.replace(/^\//, "").split("/")[0];
+      return id || null;
+    }
+    if (u.hostname.includes("youtube.com")) {
+      const v = u.searchParams.get("v");
+      if (v) return v;
+      const embed = u.pathname.match(/\/embed\/([^/?]+)/);
+      if (embed?.[1]) return embed[1];
+      const shorts = u.pathname.match(/\/shorts\/([^/?]+)/);
+      if (shorts?.[1]) return shorts[1];
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+/** Static thumbnail URL for YouTube slides (no API key). */
+export function youtubeThumbnailUrl(url: string): string | null {
+  const id = youtubeVideoId(url);
+  if (!id) return null;
+  return `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
+}
+
+/**
+ * True when the URL path looks like a raster or SVG still image.
+ * Catalog often stores image URLs in `gallery_video_urls`; feeding those to `<video>` fails and shows the error fallback.
+ */
+export function urlLooksLikeRasterImage(url: string): boolean {
+  const s = url.trim();
+  if (!s) return false;
+  if (/\.(png|jpe?g|gif|webp|avif|bmp|svg)(\?|#|$)/i.test(s)) return true;
+  try {
+    const u = new URL(s);
+    return /\.(png|jpe?g|gif|webp|avif|bmp|svg)(\?|#|$)/i.test(u.pathname);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Normalize slide kind when metadata lists an image URL as "video".
+ */
+export function effectiveGallerySlideKind(
+  slide: { kind: "image" | "video"; url: string },
+): "image" | "video" {
+  if (slide.kind === "image") return "image";
+  if (urlLooksLikeRasterImage(slide.url)) return "image";
+  return "video";
+}
