@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   getPaymentPlatformMetrics,
   listRecentPaymentAttempts,
+  type PaymentAttemptRow,
 } from "@apparel-commerce/platform-data";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { requireStaffApiSession } from "@/lib/requireStaffSession";
@@ -37,21 +38,6 @@ export type ReconciliationSummary = {
   }>;
 };
 
-type AttemptSummaryRow = {
-  provider: string;
-  status: string;
-  amount_minor: number | null;
-  medusa_order_id: string | null;
-  updated_at: string;
-  finalized_at: string | null;
-  created_at: string;
-  checkout_state: string;
-  stale_reason: string | null;
-  last_error: string | null;
-  provider_payment_id: string | null;
-  webhook_last_status: string | null;
-};
-
 const PROVIDER_CONFIRMED_STATUSES = new Set([
   "paid",
   "authorized",
@@ -69,7 +55,7 @@ const OPEN_STATUSES = new Set([
 ]);
 const PROBLEM_STATUSES = new Set(["expired", "needs_review", "failed"]);
 
-function bucketDate(row: AttemptSummaryRow): string {
+function bucketDate(row: PaymentAttemptRow): string {
   const stamp = row.finalized_at ?? row.updated_at ?? row.created_at;
   return stamp.slice(0, 10);
 }
@@ -117,7 +103,7 @@ export async function GET(request: Request) {
   }
 
   const metrics = await getPaymentPlatformMetrics(sup.client);
-  const recentAttempts = await listRecentPaymentAttempts(sup.client, 500) as AttemptSummaryRow[];
+  const recentAttempts = await listRecentPaymentAttempts(sup.client, 500);
   const rowMap = new Map(rows.map((row) => [`${row.date}:${row.provider}`, row]));
 
   const dayFloor = new Date(now);
