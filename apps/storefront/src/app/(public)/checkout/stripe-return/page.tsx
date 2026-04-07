@@ -6,6 +6,10 @@ import { useSearchParams } from "next/navigation";
 
 const STORAGE_KEY = "payment_checkout_correlation_id";
 
+function checkoutReviewHref(message: string): string {
+  return `/checkout?review=1&message=${encodeURIComponent(message)}`;
+}
+
 async function resolveCorrelationId(
   paymentMethod: string,
 ): Promise<string | undefined> {
@@ -61,6 +65,15 @@ function StripeReturnInner() {
         };
         if (cancelled.current) return;
         if (
+          finalizeOnce.status === 409 &&
+          typeof finalizeJson.error === "string" &&
+          finalizeJson.error.trim()
+        ) {
+          const msg = finalizeJson.error.trim();
+          window.location.href = checkoutReviewHref(msg);
+          return;
+        }
+        if (
           finalizeOnce.ok &&
           typeof finalizeJson.redirectUrl === "string" &&
           finalizeJson.redirectUrl.length > 0
@@ -83,6 +96,8 @@ function StripeReturnInner() {
           const stJson = (await st.json().catch(() => ({}))) as {
             status?: string;
             medusaOrderId?: string | null;
+            staleReason?: string | null;
+            lastError?: string | null;
           };
           if (cancelled.current) return;
           if (
@@ -92,6 +107,17 @@ function StripeReturnInner() {
             stJson.medusaOrderId
           ) {
             window.location.href = `/track/${encodeURIComponent(stJson.medusaOrderId)}`;
+            return;
+          }
+          if (
+            st.ok &&
+            (stJson.status === "expired" || stJson.status === "needs_review") &&
+            typeof (stJson.staleReason ?? stJson.lastError) === "string" &&
+            (stJson.staleReason ?? stJson.lastError)!.trim().length > 0
+          ) {
+            window.location.href = checkoutReviewHref(
+              (stJson.staleReason ?? stJson.lastError ?? "Review your updated total before paying again.").trim(),
+            );
             return;
           }
         }
