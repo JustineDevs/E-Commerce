@@ -16,13 +16,19 @@ import {
   getMedusaPublishableKey,
 } from "./storefront-medusa-env";
 import {
+  cartToTotalsPreview,
   prepareMedusaStoreCart,
   readMedusaCartMinorField,
-  reconcileMedusaCartGrandTotalMajor,
   type MedusaCheckoutLine,
   type CodCartPayload,
   type MedusaCheckoutTotalsPreview,
 } from "./medusa-checkout-cart-prep";
+import { emitCommerceObservabilityClient } from "./commerce-observability";
+import {
+  pickPaymentSessionForProvider,
+  resolveCheckoutAction,
+  type CheckoutAction,
+} from "./medusa-checkout-action";
 
 export type { MedusaCheckoutLine, CodCartPayload, MedusaCheckoutTotalsPreview };
 
@@ -42,6 +48,18 @@ export type MedusaCheckoutResult = {
   codOrderPlaced?: boolean;
   /** Medusa order id when codOrderPlaced (e.g. order_...). */
   orderId?: string;
+  /** Fresh authoritative quote fingerprint for the cart used to create this session. */
+  quoteFingerprint: string;
+  variantIds: string[];
+  productIds: string[];
+  /** Resolved Medusa payment session action after initiatePaymentSession. */
+  checkoutActionKind?: CheckoutAction["kind"];
+  /** Wallet-style hosted URL when action kind is wallet. */
+  walletUrl?: string;
+  /** QR image URL when action kind is qr and backend returns an image. */
+  qrImageUrl?: string;
+  /** Raw QR payload when action kind is qr. */
+  qrPayload?: string;
 };
 
 /** Provider IDs from the store payment module (pp_{module}_{id}). */
@@ -175,31 +193,39 @@ export async function startMedusaCheckout(input: {
     );
 
     const sessions = payment_collection?.payment_sessions ?? [];
-    const session =
-      sessions.find(
-        (s: { provider_id?: string }) => s.provider_id === providerId,
-      ) ?? sessions[0];
-    const data = session?.data as Record<string, unknown> | undefined;
-
-    const stripeClientSecret =
-      typeof data?.client_secret === "string" ? data.client_secret : undefined;
-    const paypalOid =
-      typeof data?.paypal_order_id === "string"
-        ? data.paypal_order_id
-        : typeof data?.id === "string" && providerId.includes("paypal")
-          ? data.id
-          : undefined;
-
-    const checkoutUrl =
-      typeof data?.checkout_url === "string" ? data.checkout_url
-        : typeof data?.approval_url === "string" ? data.approval_url
-        : "";
-    const hasEmbedded = Boolean(stripeClientSecret || paypalOid);
-    const codSession = codFlow || data?.cod === true;
-    if (!codSession && !hasEmbedded && (!checkoutUrl || !checkoutUrl.startsWith("https://"))) {
+    const session = pickPaymentSessionForProvider(
+      sessions as { id?: string; provider_id?: string; data?: Record<string, unknown> }[],
+      providerId,
+    );
+    if (!session) {
       throw new Error(
-        "Payment session did not return a checkout URL or embedded payment data. Check provider configuration.",
+        `No payment session for provider ${providerId}. Found sessions: ${sessions.map((s: { provider_id?: string }) => s.provider_id ?? "?").join(", ") || "(none)"}.`,
       );
+    }
+
+    const action = resolveCheckoutAction(providerId, session);
+    if (action.kind === "error") {
+      throw new Error(action.message);
+    }
+
+    let checkoutUrl = "";
+    let stripeClientSecret: string | undefined;
+    let paypalOid: string | undefined;
+    let walletUrl: string | undefined;
+    let qrImageUrl: string | undefined;
+    let qrPayload: string | undefined;
+    if (action.kind === "redirect") {
+      checkoutUrl = action.url;
+    } else if (action.kind === "wallet") {
+      walletUrl = action.url;
+      checkoutUrl = action.url;
+    } else if (action.kind === "qr") {
+      qrImageUrl = action.imageUrl;
+      qrPayload = action.payload;
+      checkoutUrl = action.imageUrl ?? "";
+    } else if (action.kind === "embedded") {
+      stripeClientSecret = action.stripeClientSecret;
+      paypalOid = action.paypalOrderId;
     }
 
     const entry = Object.entries(PAYMENT_PROVIDER_IDS).find(
@@ -211,22 +237,37 @@ export async function startMedusaCheckout(input: {
 
     const { cart: priced } = await sdk.store.cart.retrieve(cartId, {
       fields:
-        "id,total,currency_code,subtotal,tax_total,shipping_total,discount_total",
+        "id,region_id,total,currency_code,subtotal,tax_total,shipping_total,discount_total,*items,*shipping_methods",
     } as never);
+    const preview = cartToTotalsPreview(priced);
+
+    const redirectOrWalletPresent =
+      action.kind === "redirect" ||
+      action.kind === "wallet" ||
+      (action.kind === "qr" && Boolean(action.imageUrl?.startsWith("https://")));
+    const embeddedPresent =
+      action.kind === "embedded" &&
+      Boolean(stripeClientSecret || paypalOid);
+    emitCommerceObservabilityClient("checkout_provider_action_resolved", {
+      provider_id: providerId,
+      region_id: regionId,
+      cart_id: cartId,
+      payment_session_id: typeof session?.id === "string" ? session.id : null,
+      action_kind: action.kind,
+      redirect_url_present: redirectOrWalletPresent,
+      embedded_intent_present: embeddedPresent,
+      stripe_client_secret_present: Boolean(stripeClientSecret),
+      paypal_order_id_present: Boolean(paypalOid),
+      correlation_id: preview.quoteFingerprint,
+    });
     const pricedObj =
       priced && typeof priced === "object"
         ? (priced as unknown as Record<string, unknown>)
         : {};
-    const currencyRaw =
-      priced && typeof priced === "object" && "currency_code" in priced
-        ? String((priced as { currency_code?: string }).currency_code ?? "PHP")
-        : "PHP";
-    const { totalMajor: confirmedTotal } = reconcileMedusaCartGrandTotalMajor(
-      pricedObj,
-      currencyRaw,
-    );
+    const confirmedTotal = preview.total;
+    const currencyCode = preview.currencyCode;
 
-    if (codSession) {
+    if (action.kind === "manual") {
       const amountMinor = Math.max(0, Math.floor(readMedusaCartMinorField(pricedObj, "total")));
       const medusaPaymentSessionId =
         typeof session?.id === "string" ? session.id : undefined;
@@ -237,8 +278,11 @@ export async function startMedusaCheckout(input: {
         body: JSON.stringify({
           provider: "cod",
           amountMinor,
-          currencyCode: currencyRaw,
+          currencyCode,
           medusaPaymentSessionId,
+          quoteFingerprint: preview.quoteFingerprint,
+          variantIds: preview.variantIds,
+          productIds: preview.productIds,
         }),
       });
       const regJson = (await reg.json().catch(() => ({}))) as {
@@ -275,8 +319,12 @@ export async function startMedusaCheckout(input: {
         orderId: placeJson.orderId,
         providerLabel,
         confirmedTotal,
-        currencyCode: currencyRaw.toUpperCase(),
+        currencyCode,
         codOrderPlaced: true,
+        quoteFingerprint: preview.quoteFingerprint,
+        variantIds: preview.variantIds,
+        productIds: preview.productIds,
+        checkoutActionKind: action.kind,
       };
     }
 
@@ -285,9 +333,16 @@ export async function startMedusaCheckout(input: {
       cartId,
       providerLabel,
       confirmedTotal,
-      currencyCode: currencyRaw.toUpperCase(),
+      currencyCode,
       stripeClientSecret,
       paypalOrderId: paypalOid,
+      quoteFingerprint: preview.quoteFingerprint,
+      variantIds: preview.variantIds,
+      productIds: preview.productIds,
+      checkoutActionKind: action.kind,
+      walletUrl,
+      qrImageUrl,
+      qrPayload,
     };
   } catch (e) {
     if (cartId) {
