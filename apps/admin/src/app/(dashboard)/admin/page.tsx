@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { isStaffRole, staffHasPermission, staffPermissionListForSession } from "@apparel-commerce/database";
 import { AdminPageShell, AuditTimeline } from "@/components/admin-console";
 import { AdminTechnicalDetails } from "@/components/AdminTechnicalDetails";
+import { TaskOrientedDashboard } from "@/components/TaskOrientedDashboard";
 import { fetchMedusaOrdersForAdmin } from "@/lib/medusa-order-bridge";
 import { fetchAllMedusaInventoryRows } from "@/lib/medusa-inventory-bridge";
 import { authOptions } from "@/lib/auth";
@@ -273,6 +274,9 @@ export default async function AdminDashboardPage({
             </div>
           )}
           <div className="bg-surface-container-lowest p-8 rounded shadow-[0px_20px_40px_rgba(0,0,0,0.02)]">
+            <div className="mb-8 border-b border-outline-variant/15 pb-6">
+              <TaskOrientedDashboard />
+            </div>
             <h3 className="font-bold text-lg tracking-tight mb-4">
               Quick Actions
             </h3>
