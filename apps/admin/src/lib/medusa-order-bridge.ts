@@ -317,7 +317,7 @@ export async function fetchMedusaOrderPaymentsForAdmin(
   const qs = new URLSearchParams();
   qs.set(
     "fields",
-    "id,payment_collection,payment_collections,*payment_collection.payments,*payment_collections.payments",
+    "id,payment_collections,*payment_collections.payments",
   );
   const res = await medusaAdminFetch(
     `/admin/orders/${encodeURIComponent(orderId)}?${qs.toString()}`,
