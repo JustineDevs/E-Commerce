@@ -29,17 +29,22 @@ function buildOptionalIntegerQuerySchema(
     .optional();
 }
 
-function buildOptionalNonNegativeNumberQuerySchema(): z.ZodEffects<
-  z.ZodOptional<z.ZodNumber>,
-  number | undefined,
-  unknown
-> {
-  return z.coerce
-    .number()
-    .optional()
-    .transform((value) =>
-      value != null && Number.isFinite(value) && value >= 0 ? value : undefined,
-    );
+function preprocessOptionalNonNegativeNumber(value: unknown): unknown {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n) || n < 0) {
+    return undefined;
+  }
+  return n;
+}
+
+function buildOptionalNonNegativeNumberQuerySchema() {
+  return z.preprocess(
+    preprocessOptionalNonNegativeNumber,
+    z.number().optional(),
+  );
 }
 
 function preprocessProductSearchQuery(value: unknown): string | undefined {
