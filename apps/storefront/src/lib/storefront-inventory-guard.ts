@@ -1,6 +1,14 @@
 import { availableQuantityFromVariantRaw } from "@apparel-commerce/validation";
 import { medusaAdminFetch } from "@/lib/medusa-admin-fetch";
 import type { MedusaCheckoutLine } from "@/lib/medusa-checkout-cart-prep";
+import { tryDeleteStoreCart } from "@/lib/medusa-checkout-errors";
+import { createStorefrontMedusaSdk } from "@/lib/medusa-sdk";
+import {
+  getMedusaPublishableKey,
+  getMedusaRegionId,
+  getMedusaStoreBaseUrl,
+  withSalesChannelId,
+} from "./storefront-medusa-env";
 
 const VARIANT_FIELDS =
   "id,sku,manage_inventory,*inventory_items,*inventory_items.inventory,*inventory_items.inventory.location_levels";
@@ -8,6 +16,45 @@ const VARIANT_FIELDS =
 export type StorefrontStockResult =
   | { ok: true }
   | { ok: false; message: string; code: "INSUFFICIENT_STOCK" | "INVENTORY_CHECK_FAILED" };
+
+/**
+ * When Admin GET /admin/product-variants/:id returns 404, the variant may still be
+ * sellable via the Store API (admin route shape, key scope, or stale Admin index).
+ * Probing with a throwaway cart matches what checkout will do.
+ */
+async function variantSellableViaStoreCart(
+  variantId: string,
+  need: number,
+): Promise<boolean> {
+  const regionId = getMedusaRegionId();
+  const publishableKey = getMedusaPublishableKey();
+  const baseUrl = getMedusaStoreBaseUrl();
+  if (!regionId || !publishableKey) return false;
+
+  const sdk = createStorefrontMedusaSdk();
+  let cartId: string | undefined;
+  const qty = Math.min(Math.max(Math.floor(need), 1), 500);
+  try {
+    const { cart: created } = await sdk.store.cart.create(
+      withSalesChannelId({ region_id: regionId }) as Parameters<
+        typeof sdk.store.cart.create
+      >[0],
+    );
+    cartId = created?.id;
+    if (!cartId) return false;
+    await sdk.store.cart.createLineItem(cartId, {
+      variant_id: variantId,
+      quantity: qty,
+    });
+    return true;
+  } catch {
+    return false;
+  } finally {
+    if (cartId) {
+      await tryDeleteStoreCart(cartId, baseUrl, publishableKey);
+    }
+  }
+}
 
 /**
  * Server-side stock check against Medusa Admin API (same source as POS). Runs before cart creation.
@@ -35,9 +82,18 @@ export async function assertStorefrontLinesStock(
       return { ok: false, message: msg, code: "INVENTORY_CHECK_FAILED" };
     }
     if (!res.ok) {
+      if (res.status === 404) {
+        const okStore = await variantSellableViaStoreCart(variantId, need);
+        if (okStore) {
+          continue;
+        }
+      }
       return {
         ok: false,
-        message: `Variant lookup failed (${res.status})`,
+        message:
+          res.status === 404
+            ? "This bag line points to a variant that is not in the catalog (or no longer exists). Remove the item and add it again from the product page."
+            : `Variant lookup failed (${res.status})`,
         code: "INVENTORY_CHECK_FAILED",
       };
     }
