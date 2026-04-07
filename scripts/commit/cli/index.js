@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 
 /**
- * commit CLI - Git commit with parallel processing and security checks.
- * Composable commands: commit, security, linear (optional).
+ * hyperagent-commit CLI
+ * Composable commands for git commit with security checks and optional Linear integration.
+ * Uses cli-building (async-first, composable) and linear-cli skills.
  */
 
 const { parse } = require('./lib/parser');
@@ -12,10 +13,6 @@ const commands = {
   commit: require('./commands/commit'),
   security: require('./commands/security'),
   linear: require('./commands/linear'),
-  help: {
-    run: () => {},
-    help: () => printUsage(),
-  },
 };
 
 async function main() {
@@ -30,7 +27,7 @@ async function main() {
     process.exit(1);
   }
 
-  if (opts.help || sub === 'help') {
+  if (opts.help) {
     cmd.help();
     return;
   }
@@ -45,17 +42,16 @@ async function main() {
 
 function printUsage() {
   console.log(`
-${style('commit', 'bright')} - Git commit CLI with security checks
+${style('hyperagent-commit', 'bright')} - Git commit CLI with security checks
 
-Usage: npm run commit [options]     (default: parallel commit)
-       npm run commit:dry           (preview)
-       npm run security:check       (scan for sensitive files)
-       npm run commit:cli           (show this usage)
+Usage: hyperagent commit [options]   (default)
+       hyperagent security
+       hyperagent linear [--issue <id>]
 
 Commands:
   commit    Parallel commit with security checks (default)
   security  Scan for sensitive files only
-  linear    Print Linear issue trailer (requires linear CLI)
+  linear    Print Linear issue trailer for commit messages
 
 Options:
   -h, --help    Show help for command
