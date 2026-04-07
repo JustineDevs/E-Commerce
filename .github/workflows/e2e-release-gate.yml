@@ -30,7 +30,7 @@ jobs:
           MEDUSA_BACKEND_URL: http://localhost:9000
           NEXT_PUBLIC_MEDUSA_URL: http://localhost:9000
       - name: Run explicit critical browser suites
-        run: pnpm test:e2e:critical --project=chromium
+        run: pnpm test:e2e:critical -- --project=chromium
         env:
           MEDUSA_BACKEND_URL: http://localhost:9000
           NEXT_PUBLIC_MEDUSA_URL: http://localhost:9000
