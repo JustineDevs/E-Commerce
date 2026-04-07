@@ -13,7 +13,7 @@ async function run() {
 
 function help() {
   console.log(`
-  hyperagent security
+  apparel-commerce-commit security
 
   Scan staged files and working directory for sensitive files.
   Blocks: .env, secrets, credentials, keys, certs, .cursor/mcp.json
