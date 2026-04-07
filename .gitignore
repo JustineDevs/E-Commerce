@@ -77,3 +77,6 @@ internal/docs/exclusive/
 # Lockfile: pnpm only
 package-lock.json
 yarn.lock
+
+.vercel
+.env*.local
