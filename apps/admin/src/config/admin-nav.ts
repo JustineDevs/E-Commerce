@@ -41,6 +41,12 @@ export const ADMIN_NAV_GROUPS: { label: string; items: readonly AdminNavItem[] }
         icon: "account_balance_wallet",
         permission: "dashboard:read",
       },
+      {
+        href: "/admin/commerce-metrics",
+        label: "Commerce recovery",
+        icon: "published_with_changes",
+        permission: "dashboard:read",
+      },
       { href: "/admin/pos", label: "POS", icon: "dock", permission: "pos:use" },
       {
         href: "/admin/offline-queue",
