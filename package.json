@@ -15,6 +15,8 @@
     "security:check": "node scripts/commit/cli/index.js security",
     "build": "pnpm exec turbo build",
     "lint": "pnpm exec turbo lint",
+    "ci:preflight": "node scripts/ci-preflight.cjs",
+    "ci:preflight:full": "node scripts/ci-preflight-full.cjs",
     "db:migrate": "pnpm --filter @apparel-commerce/database migrate",
     "db:migrate:status": "pnpm --filter @apparel-commerce/database migrate:status",
     "medusa:seed:categories": "pnpm --filter medusa seed:categories",
@@ -55,6 +57,7 @@
     "vercel": "^50.0.0"
   },
   "devDependencies": {
+    "@next/eslint-plugin-next": "^15.0.0",
     "@playwright/test": "^1.49.0",
     "@typescript-eslint/parser": "^8.18.0",
     "dotenv": "^16.4.5",
