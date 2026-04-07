@@ -44,9 +44,9 @@ pnpm --filter @apparel-commerce/sdk test
 E2E often needs services and seed data. From root:
 
 - `pnpm e2e:prep` (Medusa prep + staff ensure)
-- Then `pnpm test:e2e` or targeted specs via `node scripts/run-e2e.js <path-or-pattern>`
+- Then `pnpm test:e2e` or targeted specs via `node stress-test/scripts/run-e2e.js <path-or-pattern>`
 
-Read `playwright.config.ts` and `scripts/run-e2e.js` when the user needs custom projects or grep.
+Read `playwright.config.ts` and `stress-test/scripts/run-e2e.js` when the user needs custom projects or grep.
 
 ## Agent behavior
 
