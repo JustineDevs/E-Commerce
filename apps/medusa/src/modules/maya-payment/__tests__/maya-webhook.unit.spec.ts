@@ -1,7 +1,9 @@
 import crypto from "crypto";
 import { MedusaError, PaymentActions } from "@medusajs/framework/utils";
 
-import MayaPaymentProviderService from "../service";
+import MayaPaymentProviderService, {
+  formatMayaCreateInvoiceError,
+} from "../service";
 import { claimMayaWebhookDedup } from "../../../lib/maya-webhook-dedup";
 
 jest.mock("../../../lib/maya-webhook-dedup", () => ({
@@ -74,6 +76,26 @@ describe("Maya webhook signature verification", () => {
   it("rejects a signature with different length", () => {
     const body = JSON.stringify({ id: "inv_001" });
     expect(verifyMayaSignature(body, "abcdef", secret)).toBe(false);
+  });
+});
+
+describe("formatMayaCreateInvoiceError", () => {
+  it("adds an environment hint for auth failures", () => {
+    expect(
+      formatMayaCreateInvoiceError(
+        new Error("Maya create invoice failed: 401 Unauthorized"),
+        true,
+      ),
+    ).toContain("MAYA_SECRET_KEY and MAYA_SANDBOX");
+  });
+
+  it("removes duplicate prefixes from nested Maya invoice errors", () => {
+    expect(
+      formatMayaCreateInvoiceError(
+        new Error("Maya create invoice failed: 500 upstream"),
+        false,
+      ),
+    ).toBe("500 upstream");
   });
 });
 
