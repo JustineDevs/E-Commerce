@@ -1,9 +1,28 @@
 import { defineConfig, devices } from "@playwright/test";
 import { config as loadEnv } from "dotenv";
+import { existsSync } from "fs";
 import { resolve } from "path";
 
+/**
+ * http-flow scripts often set `PLAYWRIGHT_SKIP_WEBSERVER=1` in `.env`. That must not disable
+ * `webServer` when you run `pnpm exec playwright test` without exporting the var in the shell,
+ * or every API test gets `ECONNREFUSED` on 3000/9000. Only a shell-exported skip wins.
+ */
+const shellPlaywrightSkipWebServer = process.env.PLAYWRIGHT_SKIP_WEBSERVER;
+
 process.env.NODE_ENV = process.env.NODE_ENV ?? "development";
+/** Match `stress-test/scripts/load-monorepo-root-env.cjs`: `.env` then `.env.local` (override). */
 loadEnv({ path: resolve(process.cwd(), ".env"), override: false });
+const rootEnvLocal = resolve(process.cwd(), ".env.local");
+if (existsSync(rootEnvLocal)) {
+  loadEnv({ path: rootEnvLocal, override: true });
+}
+
+/** Shared with storefront webServer so invalidation integration tests match the running app. */
+if (!process.env.STOREFRONT_INTERNAL_INVALIDATION_SECRET?.trim()) {
+  process.env.STOREFRONT_INTERNAL_INVALIDATION_SECRET =
+    "playwright-e2e-invalidation-secret";
+}
 
 /**
  * Root `.env` often sets NODE_ENV=production for deploy docs. `next dev` must run as
@@ -17,12 +36,23 @@ function nextDevServerEnv(): NodeJS.ProcessEnv {
  * Root `.env` usually sets NEXTAUTH_URL to the storefront (3000). Admin on 3001 must use
  * its own URL or NextAuth cookies/session never match and sign-in stays on /sign-in.
  */
+function storefrontInvalidationSecretForE2E(): string {
+  return (
+    process.env.STOREFRONT_INTERNAL_INVALIDATION_SECRET?.trim() ||
+    "playwright-e2e-invalidation-secret"
+  );
+}
+
 function storefrontDevServerEnv(): NodeJS.ProcessEnv {
+  const inv = storefrontInvalidationSecretForE2E();
   return {
     ...process.env,
     NODE_ENV: "development",
     NEXTAUTH_URL:
       process.env.PLAYWRIGHT_STOREFRONT_NEXTAUTH_URL ?? "http://localhost:3000",
+    STOREFRONT_INTERNAL_INVALIDATION_SECRET: inv,
+    // Survives if dotenv clears the primary key; route reads this in invalidate-commerce-state
+    __PLAYWRIGHT_STOREFRONT_INVALIDATION_SECRET: inv,
   };
 }
 
@@ -34,8 +64,11 @@ function adminDevServerEnv(): NodeJS.ProcessEnv {
   };
 }
 
-/** Local dev default. Deployed preview: https://maharlika-apparel-custom.vercel.app */
-const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
+/**
+ * Default `127.0.0.1` avoids `ECONNREFUSED ::1` on Windows when Next binds IPv4 only.
+ * Override with PLAYWRIGHT_BASE_URL when needed.
+ */
+const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3000";
 
 /**
  * Playwright treats the server as "already up" only when this URL returns 2xx–3xx (<404).
@@ -47,6 +80,16 @@ const storefrontWebServerUrl =
 
 const reuseDevServer = !process.env.CI;
 
+const skipPlaywrightWebServer =
+  shellPlaywrightSkipWebServer === "1" || shellPlaywrightSkipWebServer === "true";
+
+const e2eTrace =
+  process.env.E2E_TRACE === "all" || process.env.E2E_TRACE === "on"
+    ? ("on" as const)
+    : process.env.E2E_TRACE === "off"
+      ? ("off" as const)
+      : ("retain-on-failure" as const);
+
 export default defineConfig({
   testDir: "./stress-test/e2e",
   outputDir: "./stress-test/test-results",
@@ -54,10 +97,17 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 2 : undefined,
-  reporter: [["html", { open: "never", outputFolder: "stress-test/playwright-report" }], ["list"]],
+  reporter: [
+    ["html", { open: "never", outputFolder: "stress-test/playwright-report" }],
+    ["list"],
+    [
+      "./stress-test/e2e/reporters/test-artifact-reporter.ts",
+      { outputBase: process.env.E2E_RUNTIME_LOG_DIR },
+    ],
+  ],
   use: {
     baseURL,
-    trace: "on-first-retry",
+    trace: e2eTrace,
     screenshot: "only-on-failure",
     video: "off",
     /** Catalog + cold Next compile can exceed 60s under parallel load; helpers wait up to 90s for PDP. */
@@ -77,7 +127,7 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
   ],
-  webServer: process.env.PLAYWRIGHT_SKIP_WEBSERVER
+  webServer: skipPlaywrightWebServer
     ? undefined
     : [
         {
@@ -103,7 +153,12 @@ export default defineConfig({
         {
           command: "pnpm --filter @apparel-commerce/storefront dev",
           url: storefrontWebServerUrl,
-          reuseExistingServer: reuseDevServer,
+          /**
+           * Do not reuse a manually started storefront: it often lacks
+           * `STOREFRONT_INTERNAL_INVALIDATION_SECRET`, which breaks commerce invalidation HTTP tests.
+           * Free port 3000 before running Playwright, or set `PLAYWRIGHT_SKIP_WEBSERVER=1` and align `.env`.
+           */
+          reuseExistingServer: false,
           timeout: 240_000,
           stdout: "pipe",
           stderr: "pipe",
