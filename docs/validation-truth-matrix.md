@@ -6,7 +6,7 @@ This matrix defines what a green validation run means in this repository.
 
 | Category | Primary commands | What it proves | What it does **not** prove | Ship blocker |
 | --- | --- | --- | --- | --- |
-| Static / policy / security | `pnpm lint`, `pnpm build`, `pnpm security:check`, boundary scripts in `scripts/` | Type/build health, boundary enforcement, obvious policy regressions | Checkout, payment, order, tracking, or POS business truth | Yes |
+| Static / policy / security | `pnpm lint`, `pnpm build`, `pnpm security:check`, boundary scripts in `stress-test/scripts/` | Type/build health, boundary enforcement, obvious policy regressions | Checkout, payment, order, tracking, or POS business truth | Yes |
 | Logic / handler / unit | `pnpm test` | Pure logic, handler wiring, idempotency, auth gating, route-level error semantics, webhook parsing and mutation rules covered by tests | Real external PSP/browser completion unless the test explicitly asserts it | Yes |
 | Browser critical suites | `pnpm test:e2e:critical` | Explicit browser journeys selected for release confidence; currently catalog browse shell, COD checkout to tracking redirect, API/admin auth smoke | Hosted PSP payment truth unless a suite explicitly asserts signed server-owned completion | Yes when run via `release-gate:full` |
 | Browser exploratory / full suite | `pnpm test:e2e`, `pnpm dogfood:screenshots` | Broader UX coverage, smoke, screenshots, manual QA support | Release truth by itself | No |
