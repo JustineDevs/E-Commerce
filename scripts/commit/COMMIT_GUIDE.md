@@ -4,18 +4,40 @@ This repository includes a CLI for git commit management with parallel processin
 
 ## Quick Start
 
+### CI preflight (before commit)
+
+`pnpm run commit` runs **`pnpm run ci:preflight`** first unless you skip it. Preflight runs **`pnpm turbo run lint typecheck test --continue`** (see `scripts/ci-preflight.cjs`), then optionally black, isort, and mypy on `services/orchestrator/` if Python tools are installed.
+
+| Skip | When |
+|------|------|
+| `pnpm run commit -- --skip-preflight` | Emergency only; not recommended on shared branches |
+| `COMMIT_SKIP_PREFLIGHT=1 pnpm run commit` | Same as `--skip-preflight` |
+| `PREFLIGHT_SKIP_PYTHON=1 pnpm run ci:preflight` | Skips Python quality checks but still runs Turbo |
+
+**Stronger parity with GitHub Actions** (before you push): `pnpm run ci:preflight:full` runs the same Turbo + Python steps as `ci:preflight`, then the gateway/middleware build chain and a Studio production build with CI-like `NEXT_PUBLIC_*` env (see `scripts/ci-preflight-full.cjs`). Preflight installs `services/orchestrator/requirements-mypy.txt` so mypy has `types-PyYAML`, matching the lint job. Jobs that need Postgres (migrations, RLS setup, integration pytest) still require a local DB or CI.
+
+Run preflight alone anytime:
+
+```bash
+pnpm run ci:preflight
+pnpm run ci:preflight:full   # optional: add gateway + Studio build gates
+```
+
 ### CLI (Recommended)
 
 ```bash
-# From repository root (E-commerce Website/)
-npm run commit
-# or: pnpm run commit
+# Default: ci:preflight, then parallel commit with security checks (stages all with git add -A unless --no-stage-all)
+pnpm run commit
+# or: node .github/version/scripts/commit/cli/index.js commit
 
 # Preview what will be committed
-npm run commit:dry
+pnpm run commit:dry
 
 # Security check only
-npm run security:check
+pnpm run security:check
+
+# Linear issue trailer (requires linear CLI)
+node .github/version/scripts/commit/cli/index.js linear
 ```
 
 ### CLI Commands
@@ -69,13 +91,13 @@ The scripts now include **automatic security checks** to prevent committing sens
 
 ```bash
 # Default: Security checks enabled, fails on sensitive files
-npm run commit
+pnpm run commit
 
 # Warn only (not recommended for production)
-node scripts/commit/cli/index.js commit --warn-only
+node .github/version/scripts/commit/parallel-commit.js --warn-only
 
 # Disable security checks (NOT RECOMMENDED)
-node scripts/commit/cli/index.js commit --no-security-check
+node .github/version/scripts/commit/parallel-commit.js --no-security-check
 ```
 
 ## Commit Message Generation (Diff-Parser, No LLM)
@@ -98,11 +120,19 @@ The script uses `git diff -U0 --word-diff` to extract specific changed "words" a
 ### Adjust Concurrency
 ```bash
 # Limit to 3 concurrent commits
-bash scripts/parallel-commit.sh --max 3
+bash .github/version/scripts/commit/parallel-commit.sh --max 3
+```
+
+### Staging
+
+By default the commit flow runs **`git add -A`** so new and untracked files are included. To only commit paths already known to git:
+
+```bash
+pnpm run commit -- --no-stage-all
 ```
 
 ### Exclude Files
-Edit the `excludePatterns` in `scripts/commit/parallel-commit.js`:
+Edit the `excludePatterns` in `.github/version/scripts/commit/parallel-commit.js`:
 ```javascript
 excludePatterns: [
   'node_modules/**',
@@ -120,10 +150,10 @@ excludePatterns: [
 ```bash
 # 1. Make your changes
 # 2. Preview what will be committed
-npm run commit:dry
+pnpm run commit:dry
 
-# 3. Commit all changes
-npm run commit
+# 3. Commit all changes (runs ci:preflight first)
+pnpm run commit
 
 # 4. Push to remote
 git push
@@ -132,47 +162,53 @@ git push
 ### Large Refactoring
 ```bash
 # For many files, use limited concurrency
-bash scripts/commit/parallel-commit.sh --max 2
+bash .github/version/scripts/commit/parallel-commit.sh --max 2
 
 # Or commit everything at once
-npm run commit:all
+pnpm run commit:all
 ```
 
 ### Safe Testing
 ```bash
 # Always test first with dry run
-npm run commit:dry
+pnpm run commit:dry
 
 # Then commit for real
-npm run commit
+pnpm run commit
 ```
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Script not found**: Run from repository root (`E-commerce Website/`). Root `package.json` must exist with commit scripts.
-2. **Permission denied**: Run `chmod +x scripts/commit/parallel-commit.sh`
+1. **Script not found**: Make sure you're in the repository root
+2. **Permission denied**: Run `chmod +x .github/version/scripts/commit/parallel-commit.sh`
 3. **Node.js not found**: Use the bash version instead
 4. **No changes**: Script will tell you if there's nothing to commit
+5. **Preflight fails**: Fix lint, typecheck, or tests (or run `pnpm run ci:preflight` to see the same output). Use `--skip-preflight` only when you accept skipping those gates.
 
 ### Performance Tips
 
 - Use `--max 3` for slower systems
-- Use `npm run commit:all` for bulk changes
-- Always run `--dry-run` first to preview
+- Use `pnpm run commit:all` for bulk changes
+- Always run `pnpm run commit:dry` first to preview
 
 ## Available Commands
 
 | Command | Description |
 |---------|-------------|
-| `npm run commit` | Parallel commit with security checks (via CLI) |
-| `npm run commit:dry` | Preview what would be committed |
-| `npm run commit:cli` | Show CLI usage and available commands |
-| `npm run commit:sh` | Bash script version |
-| `npm run commit:sh:dry` | Bash script dry run |
-| `npm run commit:all` | Single commit for all changes |
-| `npm run security:check` | Security scan only (via CLI) |
+| `pnpm run ci:preflight` | Turbo lint, typecheck, test; optional Python on orchestrator |
+| `pnpm run commit` | CLI: parallel commit with security checks |
+| `pnpm run commit:dry` | CLI: preview what would be committed |
+| `pnpm run commit:cli` | CLI: full interface (commit \| security \| linear) |
+| `pnpm run commit:sh` | Bash script version |
+| `pnpm run commit:sh:dry` | Bash script dry run |
+| `pnpm run commit:all` | Single commit for all changes |
+| `pnpm run commit:auto` | CLI commit with max 3 concurrent |
+| `pnpm run security:check` | CLI: security scan only |
+| `pnpm run status` | Show git status |
+| `pnpm run changes` | Show changed files |
+| `pnpm run staged` | Show staged files |
 
 ## Security Best Practices
 
@@ -180,7 +216,7 @@ npm run commit
 
 Always run a security check:
 ```bash
-npm run security:check
+pnpm run security:check
 ```
 
 This will:
@@ -235,7 +271,7 @@ These files are **allowed** and safe to commit:
 ### Issue: "Commit blocked for security reasons"
 
 **Solution**: 
-1. Check which files are sensitive: `npm run security:check`
+1. Check which files are sensitive: `pnpm run security:check`
 2. Remove sensitive files from staging: `git reset HEAD <file>`
 3. Ensure files are in `.gitignore`
 4. Use `.env.example` as a template instead
@@ -248,4 +284,4 @@ These files are **allowed** and safe to commit:
   - Or be in `.cursor/` with `.example` in the name
 - For other cases, you can temporarily use `--warn-only` (not recommended)
 
-For detailed documentation, see `scripts/README.md`.
+Script snippets to copy into the root `package.json` are in `.github/version/scripts/commit/package.json.txt`.
