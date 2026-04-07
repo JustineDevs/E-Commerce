@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { CmsBlock } from "@apparel-commerce/platform-data";
+import { sanitizeCmsHtml } from "@apparel-commerce/validation";
 import { CatalogProductCard } from "@/components/CatalogProductCard";
 import { getCachedProductBySlug } from "@/lib/cached-product";
 import { isDirectVideoUrl, youtubeEmbedUrl } from "@/lib/product-media";
@@ -77,7 +78,7 @@ export async function CmsBlocksRenderer({ blocks }: { blocks: CmsBlock[] }) {
         break;
       }
       case "rich_text": {
-        const html = String(b.props.html ?? "");
+        const html = sanitizeCmsHtml(String(b.props.html ?? ""));
         if (!html.trim()) break;
         nodes.push(
           <div
@@ -153,7 +154,8 @@ export async function CmsBlocksRenderer({ blocks }: { blocks: CmsBlock[] }) {
         break;
       }
       case "two_column": {
-        const html = String(b.props.html ?? "");
+        const htmlRaw = String(b.props.html ?? "");
+        const html = sanitizeCmsHtml(htmlRaw);
         const imageUrl = String(b.props.imageUrl ?? "");
         const imageAlt = String(b.props.imageAlt ?? "");
         const reverse = Boolean(b.props.reverse);
@@ -205,7 +207,7 @@ export async function CmsBlocksRenderer({ blocks }: { blocks: CmsBlock[] }) {
                 </summary>
                 <div
                   className="mt-2 text-sm leading-relaxed text-on-surface-variant"
-                  dangerouslySetInnerHTML={{ __html: item.a }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeCmsHtml(item.a) }}
                 />
               </details>
             ))}
