@@ -35,7 +35,7 @@ function help() {
     --skip-preflight       Skip pnpm ci:preflight (turbo lint/typecheck/test + Python)
     --no-security-check    Disable security checks (not recommended)
     --warn-only            Warn on sensitive files, do not fail
-    --max <n>              Max concurrent commits (default: 5)
+    --max <n>              Files per batch (Promise.all within each batch). Default 1 (sequential; avoids .git/index.lock races on Windows). Use >1 only if you accept risk.
     -h, --help             Show this help
 
   Examples:
