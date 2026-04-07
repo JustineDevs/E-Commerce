@@ -6,9 +6,11 @@ import {
   getMedusaStoreBaseUrl,
   withSalesChannelId,
 } from "./storefront-medusa-env";
+import { createStorefrontMedusaSdk } from "./medusa-sdk";
 import { medusaMinorToMajor } from "./medusa-money";
 import { tryDeleteStoreCart } from "./medusa-checkout-errors";
 import { assertStorefrontLinesStock } from "./storefront-inventory-guard";
+import { buildCheckoutQuoteFingerprint } from "./checkout-quote-fingerprint";
 import type { MedusaCartAddressPayload } from "@/lib/medusa-profile-address";
 
 export type MedusaCheckoutLine = { variantId: string; quantity: number };
@@ -27,6 +29,11 @@ export type MedusaCheckoutTotalsPreview = {
   total: number;
   currencyCode: string;
   lineSubtotalsByVariantId: Record<string, number>;
+  quoteFingerprint: string;
+  variantIds: string[];
+  productIds: string[];
+  shippingMethodIds: string[];
+  regionId: string | null;
 };
 
 type PrepareMedusaCartInput = {
@@ -149,22 +156,19 @@ export async function prepareMedusaStoreCart(
   return { sdk, cartId, baseUrl, publishableKey };
 }
 
-/** Medusa cart monetary fields are integers in the smallest currency unit. */
-export function readMedusaCartMinorField(
-  cart: Record<string, unknown>,
-  key: string,
-): number {
-  const v = cart[key];
+function readMinorField(record: Record<string, unknown>, key: string): number {
+  const v = record[key];
   if (typeof v === "bigint") return Number(v);
   const n = typeof v === "number" ? v : Number(v);
   return Number.isFinite(n) ? n : 0;
 }
 
-function readCartMinorField(
+/** Medusa cart monetary fields are integers in the smallest currency unit. */
+export function readMedusaCartMinorField(
   cart: Record<string, unknown>,
   key: string,
 ): number {
-  return readMedusaCartMinorField(cart, key);
+  return readMinorField(cart, key);
 }
 
 const TOTAL_RECONCILE_TOLERANCE_MAJOR = 0.02;
@@ -178,11 +182,11 @@ export function reconcileMedusaCartGrandTotalMajor(
   currencyCode: string,
 ): { totalMajor: number; reconciled: boolean } {
   const cur = currencyCode.trim().toUpperCase();
-  const sub = medusaMinorToMajor(readCartMinorField(cart, "subtotal"), cur);
-  const ship = medusaMinorToMajor(readCartMinorField(cart, "shipping_total"), cur);
-  const tax = medusaMinorToMajor(readCartMinorField(cart, "tax_total"), cur);
-  const disc = medusaMinorToMajor(readCartMinorField(cart, "discount_total"), cur);
-  const api = medusaMinorToMajor(readCartMinorField(cart, "total"), cur);
+  const sub = medusaMinorToMajor(readMinorField(cart, "subtotal"), cur);
+  const ship = medusaMinorToMajor(readMinorField(cart, "shipping_total"), cur);
+  const tax = medusaMinorToMajor(readMinorField(cart, "tax_total"), cur);
+  const disc = medusaMinorToMajor(readMinorField(cart, "discount_total"), cur);
+  const api = medusaMinorToMajor(readMinorField(cart, "total"), cur);
   const componentsSum = sub + ship + tax - disc;
   const roundedSum = Math.round(componentsSum * 1e6) / 1e6;
   const roundedApi = Math.round(api * 1e6) / 1e6;
@@ -195,36 +199,28 @@ export function reconcileMedusaCartGrandTotalMajor(
   return { totalMajor: roundedApi, reconciled: false };
 }
 
-function readItemMinorField(
-  item: Record<string, unknown>,
-  key: string,
-): number {
-  const v = item[key];
-  if (typeof v === "bigint") return Number(v);
-  const n = typeof v === "number" ? v : Number(v);
-  return Number.isFinite(n) ? n : 0;
-}
-
 export function cartToTotalsPreview(cart: unknown): MedusaCheckoutTotalsPreview {
   if (!cart || typeof cart !== "object") {
     throw new Error("Invalid cart response from store.");
   }
   const c = cart as Record<string, unknown>;
   const currencyRaw = String(c.currency_code ?? "PHP");
-  const subtotal = medusaMinorToMajor(readCartMinorField(c, "subtotal"), currencyRaw);
-  const taxTotal = medusaMinorToMajor(readCartMinorField(c, "tax_total"), currencyRaw);
+  const subtotal = medusaMinorToMajor(readMinorField(c, "subtotal"), currencyRaw);
+  const taxTotal = medusaMinorToMajor(readMinorField(c, "tax_total"), currencyRaw);
   const shippingTotal = medusaMinorToMajor(
-    readCartMinorField(c, "shipping_total"),
+    readMinorField(c, "shipping_total"),
     currencyRaw,
   );
   const discountTotal = medusaMinorToMajor(
-    readCartMinorField(c, "discount_total"),
+    readMinorField(c, "discount_total"),
     currencyRaw,
   );
   const { totalMajor: total } = reconcileMedusaCartGrandTotalMajor(c, currencyRaw);
 
   const lineSubtotalsByVariantId: Record<string, number> = {};
   const items = Array.isArray(c.items) ? c.items : [];
+  const variantIds = new Set<string>();
+  const productIds = new Set<string>();
   for (const raw of items) {
     if (!raw || typeof raw !== "object") continue;
     const it = raw as Record<string, unknown>;
@@ -236,9 +232,19 @@ export function cartToTotalsPreview(cart: unknown): MedusaCheckoutTotalsPreview 
           ? variant.id
           : "";
     if (!variantId) continue;
-    let subMinor = readItemMinorField(it, "subtotal");
+    variantIds.add(variantId.trim());
+    const productId =
+      typeof it.product_id === "string"
+        ? it.product_id
+        : typeof variant?.product_id === "string"
+          ? variant.product_id
+          : "";
+    if (productId.trim()) {
+      productIds.add(productId.trim());
+    }
+    let subMinor = readMinorField(it, "subtotal");
     if (subMinor <= 0) {
-      const unit = readItemMinorField(it, "unit_price");
+      const unit = readMinorField(it, "unit_price");
       const qty =
         typeof it.quantity === "number" && Number.isFinite(it.quantity)
           ? Math.max(1, Math.floor(it.quantity))
@@ -250,6 +256,42 @@ export function cartToTotalsPreview(cart: unknown): MedusaCheckoutTotalsPreview 
       (lineSubtotalsByVariantId[variantId] ?? 0) + lineMajor;
   }
 
+  const shippingMethodIds = new Set<string>();
+  const shippingMethods = Array.isArray(c.shipping_methods)
+    ? c.shipping_methods
+    : [];
+  for (const raw of shippingMethods) {
+    if (!raw || typeof raw !== "object") continue;
+    const shippingMethod = raw as Record<string, unknown>;
+    const methodId =
+      typeof shippingMethod.shipping_option_id === "string"
+        ? shippingMethod.shipping_option_id
+        : typeof shippingMethod.id === "string"
+          ? shippingMethod.id
+          : "";
+    if (methodId.trim()) {
+      shippingMethodIds.add(methodId.trim());
+    }
+  }
+
+  const regionId =
+    typeof c.region_id === "string" && c.region_id.trim()
+      ? c.region_id.trim()
+      : null;
+  const quoteFingerprint = buildCheckoutQuoteFingerprint({
+    currencyCode: currencyRaw,
+    subtotal,
+    taxTotal,
+    shippingTotal,
+    discountTotal,
+    total,
+    lineSubtotalsByVariantId,
+    variantIds: [...variantIds],
+    productIds: [...productIds],
+    shippingMethodIds: [...shippingMethodIds],
+    regionId,
+  });
+
   return {
     subtotal,
     taxTotal,
@@ -258,6 +300,11 @@ export function cartToTotalsPreview(cart: unknown): MedusaCheckoutTotalsPreview 
     total,
     currencyCode: currencyRaw.toUpperCase(),
     lineSubtotalsByVariantId,
+    quoteFingerprint,
+    variantIds: [...variantIds].sort(),
+    productIds: [...productIds].sort(),
+    shippingMethodIds: [...shippingMethodIds].sort(),
+    regionId,
   };
 }
 
@@ -282,10 +329,21 @@ export async function executeMedusaCheckoutTotalsPreview(input: {
   try {
     const { cart } = await ctx.sdk.store.cart.retrieve(ctx.cartId, {
       fields:
-        "id,total,currency_code,subtotal,tax_total,shipping_total,discount_total,*items",
+        "id,region_id,total,currency_code,subtotal,tax_total,shipping_total,discount_total,*items,*shipping_methods",
     } as never);
     return cartToTotalsPreview(cart);
   } finally {
     await tryDeleteStoreCart(ctx.cartId, ctx.baseUrl, ctx.publishableKey);
   }
+}
+
+export async function readMedusaCartTotalsPreview(
+  cartId: string,
+): Promise<MedusaCheckoutTotalsPreview> {
+  const sdk = createStorefrontMedusaSdk();
+  const { cart } = await sdk.store.cart.retrieve(cartId, {
+    fields:
+      "id,region_id,total,currency_code,subtotal,tax_total,shipping_total,discount_total,*items,*shipping_methods",
+  } as never);
+  return cartToTotalsPreview(cart);
 }
