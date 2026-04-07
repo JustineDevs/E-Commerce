@@ -61,9 +61,9 @@ export default function ReconciliationPage() {
               </p>
             </div>
             <div className="bg-white border border-gray-200 rounded-lg p-4">
-              <p className="text-xs text-gray-500 uppercase tracking-wide">Provider settlement</p>
+              <p className="text-xs text-gray-500 uppercase tracking-wide">Provider confirmed</p>
               <p className="text-2xl font-semibold mt-1">
-                {(data.totalPspMinor / 100).toLocaleString("en-PH", { style: "currency", currency: "PHP" })}
+                {(data.totalProviderConfirmedMinor / 100).toLocaleString("en-PH", { style: "currency", currency: "PHP" })}
               </p>
             </div>
             <div className="bg-white border border-gray-200 rounded-lg p-4">
@@ -73,6 +73,24 @@ export default function ReconciliationPage() {
               </p>
             </div>
           </div>
+          {(data.paymentAttemptsStaleFinalize > 0 || data.paymentAttemptsNeedsReview > 0) && (
+            <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-950">
+              <p className="font-semibold">Payment recovery needs attention</p>
+              <p className="mt-1 text-amber-900/90">
+                {data.paymentAttemptsStaleFinalize} stale/finalization rows and{" "}
+                {data.paymentAttemptsNeedsReview} rows already marked for review are affecting clean reconciliation.
+              </p>
+              <p className="mt-2 text-xs text-amber-900/80">
+                Provider-confirmed totals below come from the current payment ledger, not external settlement files.
+              </p>
+              <a
+                href="/admin/payments"
+                className="mt-3 inline-flex rounded border border-amber-500 px-3 py-2 text-xs font-bold uppercase tracking-widest text-amber-900 transition-colors hover:bg-amber-100"
+              >
+                Open payment attempts
+              </a>
+            </div>
+          )}
 
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
             <table className="w-full text-sm">
@@ -82,7 +100,9 @@ export default function ReconciliationPage() {
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Provider</th>
                   <th className="text-right px-4 py-3 font-medium text-gray-600">Store orders</th>
                   <th className="text-right px-4 py-3 font-medium text-gray-600">Store total</th>
-                  <th className="text-right px-4 py-3 font-medium text-gray-600">Provider paid</th>
+                  <th className="text-right px-4 py-3 font-medium text-gray-600">Provider confirmed</th>
+                  <th className="text-right px-4 py-3 font-medium text-gray-600">Open</th>
+                  <th className="text-right px-4 py-3 font-medium text-gray-600">Problem</th>
                   <th className="text-right px-4 py-3 font-medium text-gray-600">Discrepancy</th>
                   <th className="text-center px-4 py-3 font-medium text-gray-600">Status</th>
                 </tr>
@@ -94,7 +114,9 @@ export default function ReconciliationPage() {
                     <td className="px-4 py-3 text-gray-700 capitalize">{row.provider}</td>
                     <td className="px-4 py-3 text-right text-gray-700">{row.medusaOrderCount}</td>
                     <td className="px-4 py-3 text-right text-gray-700">{(row.medusaTotalMinor / 100).toFixed(2)}</td>
-                    <td className="px-4 py-3 text-right text-gray-700">{(row.pspSettlementMinor / 100).toFixed(2)}</td>
+                    <td className="px-4 py-3 text-right text-gray-700">{(row.providerConfirmedMinor / 100).toFixed(2)}</td>
+                    <td className="px-4 py-3 text-right text-gray-700">{row.openAttemptCount}</td>
+                    <td className="px-4 py-3 text-right text-gray-700">{row.problemAttemptCount}</td>
                     <td className={`px-4 py-3 text-right ${row.discrepancyMinor !== 0 ? "text-red-600" : "text-gray-700"}`}>
                       {(row.discrepancyMinor / 100).toFixed(2)}
                     </td>
@@ -104,6 +126,42 @@ export default function ReconciliationPage() {
               </tbody>
             </table>
           </div>
+          {data.recentProblemAttempts.length > 0 ? (
+            <div className="mt-6 bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <div className="border-b border-gray-200 bg-gray-50 px-4 py-3">
+                <h2 className="text-sm font-semibold text-gray-900">
+                  Recent payment attempts affecting reconciliation
+                </h2>
+              </div>
+              <table className="w-full text-sm">
+                <thead className="border-b border-gray-100 bg-white">
+                  <tr>
+                    <th className="text-left px-4 py-3 font-medium text-gray-600">Provider</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-600">Reason</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-600">Updated</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.recentProblemAttempts.map((row) => (
+                    <tr key={row.correlationId} className="border-b border-gray-100 last:border-0">
+                      <td className="px-4 py-3 text-gray-700 capitalize">{row.provider}</td>
+                      <td className="px-4 py-3">
+                        <StatusBadge status={row.status === "expired" ? "discrepancy" : "pending"} />
+                        <div className="mt-1 text-[11px] text-gray-400">{row.checkoutState}</div>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-gray-700">
+                        {row.staleReason ?? "Needs review"}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-gray-500">
+                        {new Date(row.updatedAt).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
         </>
       )}
     </div>
