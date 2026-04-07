@@ -1,14 +1,21 @@
+import type { NextResponse } from "next/server";
 import { correlatedError, correlatedJson, tagResponse } from "./staff-api-response";
 import type { PosCommitSaleInput, PosCommitSaleRouteResult } from "./pos-commit-sale-route-logic";
+import type { AdminApiLogPhase } from "./admin-api-log";
 
 type StaffResult =
   | { ok: true }
-  | { ok: false; response: Response };
+  | { ok: false; response: NextResponse };
 
 export type PosCommitSaleRouteDeps = {
   getCorrelationId: (_req: Request) => string;
   requireStaffApiSession: (_permission: string) => Promise<StaffResult>;
-  logAdminApiEvent: (_payload: Record<string, unknown>) => void;
+  logAdminApiEvent: (_payload: {
+    route: string;
+    correlationId: string;
+    phase: AdminApiLogPhase;
+    detail?: Record<string, unknown>;
+  }) => void;
   getIdempotencyKey: (_req: Request) => string | undefined;
   getCompletedReplayOrderNumber: (_key: string) => string | undefined;
   isInflight: (_key: string) => boolean;
@@ -28,7 +35,7 @@ export async function handlePosCommitSaleRequest(
   const correlationId = deps.getCorrelationId(req);
   const staff = await deps.requireStaffApiSession("pos:use");
   if (!staff.ok) {
-    return tagResponse(staff.response as Response, correlationId);
+    return tagResponse(staff.response, correlationId);
   }
 
   deps.logAdminApiEvent({
