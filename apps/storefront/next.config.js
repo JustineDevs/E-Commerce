@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const path = require("path");
-const { loadMonorepoRootEnv } = require("../../scripts/load-monorepo-root-env.cjs");
+const { loadMonorepoRootEnv } = require("../../stress-test/scripts/load-monorepo-root-env.cjs");
 // Repo-root `.env` + `.env.local` (e.g. MEDUSA_SECRET_API_KEY for checkout totals preview)
 loadMonorepoRootEnv(__dirname);
 
@@ -66,6 +66,15 @@ const nextConfig = {
   },
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
+  },
+  /** Older clients or typos called `/api/medusa-totals-preview`; canonical route is under `/api/checkout/`. */
+  async rewrites() {
+    return [
+      {
+        source: "/api/medusa-totals-preview",
+        destination: "/api/checkout/medusa-totals-preview",
+      },
+    ];
   },
   webpack: (config) => {
     config.resolve.alias = {
