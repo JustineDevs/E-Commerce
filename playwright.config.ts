@@ -11,7 +11,7 @@ import { resolve } from "path";
 const shellPlaywrightSkipWebServer = process.env.PLAYWRIGHT_SKIP_WEBSERVER;
 
 process.env.NODE_ENV = process.env.NODE_ENV ?? "development";
-/** Match `stress-test/scripts/load-monorepo-root-env.cjs`: `.env` then `.env.local` (override). */
+/** Match `scripts/load-monorepo-root-env.cjs`: `.env` then `.env.local` (override). */
 loadEnv({ path: resolve(process.cwd(), ".env"), override: false });
 const rootEnvLocal = resolve(process.cwd(), ".env.local");
 if (existsSync(rootEnvLocal)) {
