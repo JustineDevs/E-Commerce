@@ -4,6 +4,7 @@ import { registerPaymentAttempt } from "@apparel-commerce/platform-data";
 import { applyRateLimit, readCartIdFromCookie } from "@/lib/cart-api-helpers";
 import { registerCheckoutIntentRouteLogic } from "@/lib/payment-attempt-route-logic";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
+import { logCommerceObservabilityServer } from "@/lib/commerce-observability";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,9 @@ type Body = {
   provider?: string;
   amountMinor?: number;
   currencyCode?: string;
+  quoteFingerprint?: string;
+  variantIds?: string[];
+  productIds?: string[];
   medusaPaymentSessionId?: string;
   providerSessionId?: string;
   idempotencyKey?: string;
@@ -57,6 +61,18 @@ export async function POST(req: Request) {
     provider,
     amountMinor,
     currencyCode,
+    quoteFingerprint:
+      typeof body.quoteFingerprint === "string" ? body.quoteFingerprint.trim() : undefined,
+    variantIds: Array.isArray(body.variantIds)
+      ? body.variantIds.filter(
+          (value): value is string => typeof value === "string" && value.trim().length > 0,
+        )
+      : undefined,
+    productIds: Array.isArray(body.productIds)
+      ? body.productIds.filter(
+          (value): value is string => typeof value === "string" && value.trim().length > 0,
+        )
+      : undefined,
     medusaPaymentSessionId: body.medusaPaymentSessionId,
     providerSessionId: body.providerSessionId,
     idempotencyKey: body.idempotencyKey,
@@ -68,6 +84,18 @@ export async function POST(req: Request) {
       return registerPaymentAttempt(sb, input);
     },
   });
+
+  if (result.status === 200 && result.body && typeof result.body === "object") {
+    const b = result.body as { correlationId?: string; reused?: boolean };
+    logCommerceObservabilityServer("payment_session_created", {
+      correlationId: b.correlationId,
+      cartId,
+      provider,
+      reused: b.reused === true,
+      quoteFingerprint:
+        typeof body.quoteFingerprint === "string" ? body.quoteFingerprint.trim() : null,
+    });
+  }
 
   return NextResponse.json(result.body, { status: result.status });
 }
