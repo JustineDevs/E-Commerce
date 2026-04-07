@@ -8,6 +8,12 @@ import {
 } from "@/lib/medusa-checkout";
 import { updateLineQuantity } from "@/lib/cart";
 import { CheckoutTrustBadges } from "@/components/CheckoutTrustBadges";
+import {
+  AuthoritativeTotalPanel,
+  CheckoutChangeReviewCard,
+  CommerceStateBanner,
+  StaleSessionNotice,
+} from "@/components/commerce-state";
 import { PaymentProviderLogo } from "@/components/PaymentProviderLogo";
 import dynamic from "next/dynamic";
 import { formatCheckoutMoney } from "./checkout-utils";
@@ -32,9 +38,11 @@ const PayPalEmbeddedCheckout = dynamic(
 export function CheckoutClient({
   initialResumeCartId,
   initialStripeCheckoutCancel,
+  initialReviewMessage,
 }: {
   initialResumeCartId?: string;
   initialStripeCheckoutCancel?: boolean;
+  initialReviewMessage?: string;
 }) {
   const {
     session,
@@ -57,6 +65,7 @@ export function CheckoutClient({
     hydrated,
     medusaPricePreview,
     medusaPriceStatus,
+    medusaPreviewError,
     profileGate,
     setProfileGate,
     profileMissing,
@@ -73,7 +82,16 @@ export function CheckoutClient({
     continueToHostedCheckout,
     copyTrackingLink,
     phVatRate,
-  } = useCheckoutClient({ initialResumeCartId, initialStripeCheckoutCancel });
+    quoteReviewItems,
+    quoteReviewRequired,
+    quoteReviewAcknowledged,
+    acknowledgeQuoteReview,
+    foreignCheckoutActive,
+  } = useCheckoutClient({
+    initialResumeCartId,
+    initialStripeCheckoutCancel,
+    initialReviewMessage,
+  });
 
   if (authStatus === "loading") {
     return (
@@ -193,6 +211,13 @@ export function CheckoutClient({
         </span>
       </p>
 
+      {foreignCheckoutActive ? (
+        <CommerceStateBanner variant="amber" title="Checkout active in another tab">
+          Continue checkout in the other window, or close that tab to place an order from here. This tab
+          stays read-only until then.
+        </CommerceStateBanner>
+      ) : null}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
         <div className="space-y-8">
           <section>
@@ -216,8 +241,8 @@ export function CheckoutClient({
                       aria-checked={selected}
                       aria-disabled={!ok}
                       data-testid={`payment-${key.toLowerCase()}`}
-                      disabled={!ok}
-                      onClick={() => ok && setPaymentMethod(key)}
+                      disabled={!ok || foreignCheckoutActive}
+                      onClick={() => ok && !foreignCheckoutActive && setPaymentMethod(key)}
                       className={`flex w-full items-center gap-3 rounded-lg border px-3 py-3 text-left transition-colors ${
                         ok
                           ? "cursor-pointer border-outline-variant/20 hover:border-primary/25 hover:bg-surface-container-low/60"
@@ -299,7 +324,7 @@ export function CheckoutClient({
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               autoComplete="email"
-              disabled={paymentMethod === "COD"}
+              disabled={paymentMethod === "COD" || foreignCheckoutActive}
               className="w-full bg-surface-container-lowest border border-outline-variant/30 rounded px-4 py-3 font-body text-sm outline-none focus:ring-2 focus:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-60"
             />
             <p className="text-xs text-on-surface-variant mt-2">
@@ -325,7 +350,8 @@ export function CheckoutClient({
               value={loyaltyPoints}
               onChange={(e) => setLoyaltyPoints(e.target.value)}
               placeholder="0"
-              className="w-full bg-surface-container-lowest border border-outline-variant/30 rounded px-4 py-3 font-body text-sm outline-none focus:ring-2 focus:ring-primary/30"
+              disabled={foreignCheckoutActive}
+              className="w-full bg-surface-container-lowest border border-outline-variant/30 rounded px-4 py-3 font-body text-sm outline-none focus:ring-2 focus:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-60"
             />
             <p className="text-xs text-on-surface-variant mt-2">
               Each point lowers your total by 1.00 in the shop currency. Your balance is checked
@@ -392,7 +418,8 @@ export function CheckoutClient({
                       <div className="flex items-center gap-2 mt-2">
                         <button
                           type="button"
-                          className="w-8 h-8 rounded bg-surface-container-high text-sm"
+                          className="w-8 h-8 rounded bg-surface-container-high text-sm disabled:opacity-40"
+                          disabled={foreignCheckoutActive}
                           onClick={() => {
                             updateLineQuantity(l.variantId, l.quantity - 1);
                             refresh();
@@ -406,7 +433,8 @@ export function CheckoutClient({
                         </span>
                         <button
                           type="button"
-                          className="w-8 h-8 rounded bg-surface-container-high text-sm"
+                          className="w-8 h-8 rounded bg-surface-container-high text-sm disabled:opacity-40"
+                          disabled={foreignCheckoutActive}
                           onClick={() => {
                             updateLineQuantity(l.variantId, l.quantity + 1);
                             refresh();
@@ -447,64 +475,40 @@ export function CheckoutClient({
                   Updating totals with shipping and catalog prices…
                 </p>
               ) : null}
-              {medusaPriceStatus === "error" && lines.length > 0 ? (
-                <p className="text-xs text-amber-800 mb-2" role="status">
-                  Live totals are unavailable. Figures below omit shipping and use your bag prices only. Refresh the page or try again.
+            {medusaPriceStatus === "error" && lines.length > 0 ? (
+              <div className="text-xs text-amber-800 mb-2 space-y-1" role="status">
+                <p>
+                  Live totals are unavailable. Figures below omit shipping and use
+                  your bag line prices only (they may differ from the product page if
+                  the bag is stale or the server could not price your cart).
                 </p>
-              ) : null}
-              {useMedusaBagTotals && medusaPricePreview ? (
-                <>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-on-surface-variant">Subtotal</span>
-                    <span>
-                      {formatCheckoutMoney(
-                        medusaPricePreview.subtotal,
-                        displayCurrency,
-                      )}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-on-surface-variant">Shipping</span>
-                    <span>
-                      {formatCheckoutMoney(
-                        medusaPricePreview.shippingTotal,
-                        displayCurrency,
-                      )}
-                    </span>
-                  </div>
-                  {medusaPricePreview.taxTotal > 0 ? (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-on-surface-variant">Tax</span>
-                      <span>
-                        {formatCheckoutMoney(
-                          medusaPricePreview.taxTotal,
-                          displayCurrency,
-                        )}
-                      </span>
-                    </div>
-                  ) : null}
-                  {medusaPricePreview.discountTotal > 0 ? (
-                    <div className="flex justify-between text-sm text-green-800">
-                      <span>Discount</span>
-                      <span>
-                        −
-                        {formatCheckoutMoney(
-                          medusaPricePreview.discountTotal,
-                          displayCurrency,
-                        )}
-                      </span>
-                    </div>
-                  ) : null}
-                  <div className="flex justify-between font-headline font-bold text-lg pt-2">
-                    <span>Total</span>
-                    <span>
-                      {formatCheckoutMoney(
-                        medusaPricePreview.total,
-                        displayCurrency,
-                      )}
-                    </span>
-                  </div>
-                </>
+                {medusaPreviewError ? (
+                  <p className="font-mono text-[11px] break-words opacity-90">
+                    {medusaPreviewError}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+            {useMedusaBagTotals && quoteReviewItems.length > 0 ? (
+              <CheckoutChangeReviewCard
+                quoteReviewRequired={quoteReviewRequired}
+                quoteReviewAcknowledged={quoteReviewAcknowledged}
+                quoteReviewItems={quoteReviewItems}
+                onAcknowledge={() => {
+                  acknowledgeQuoteReview();
+                  setError(null);
+                }}
+              />
+            ) : null}
+            {useMedusaBagTotals && medusaPricePreview ? (
+                <AuthoritativeTotalPanel
+                  displayCurrency={displayCurrency}
+                  subtotal={medusaPricePreview.subtotal}
+                  shippingTotal={medusaPricePreview.shippingTotal}
+                  taxTotal={medusaPricePreview.taxTotal}
+                  discountTotal={medusaPricePreview.discountTotal}
+                  total={medusaPricePreview.total}
+                />
               ) : (
                 <>
                   <div className="flex justify-between text-sm">
@@ -534,11 +538,14 @@ export function CheckoutClient({
               )}
             </div>
 
-            {error && (
-              <p className="mt-4 text-sm text-red-600 font-medium" role="alert">
-                {error}
-              </p>
-            )}
+            {error ? (
+              <StaleSessionNotice
+                message={error}
+                onDismiss={() => {
+                  setError(null);
+                }}
+              />
+            ) : null}
 
             {pendingPayment && (
               <div
@@ -653,8 +660,10 @@ export function CheckoutClient({
                 !hydrated ||
                 lines.length === 0 ||
                 loading ||
+                quoteReviewRequired ||
                 Boolean(pendingPayment) ||
-                Boolean(embeddedData)
+                Boolean(embeddedData) ||
+                foreignCheckoutActive
               }
               onClick={handlePay}
               className="w-full mt-6 py-4 bg-primary text-on-primary font-headline font-bold text-sm uppercase tracking-widest rounded hover:opacity-90 active:scale-[0.99] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
@@ -663,6 +672,8 @@ export function CheckoutClient({
                 ? paymentMethod === "COD"
                   ? "Placing your order…"
                   : "Starting checkout…"
+                : quoteReviewRequired
+                  ? "Review updated totals above"
                 : pendingPayment || embeddedData
                   ? "Next step above"
                   : paymentMethod === "COD"
