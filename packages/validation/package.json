@@ -11,14 +11,16 @@
   },
   "scripts": {
     "lint": "eslint src --ext .ts",
-    "test": "node --import tsx/esm --test src/shop-catalog.contract.test.ts src/validation.stress.test.ts src/http-schemas.test.ts src/medusa-inventory-math.test.ts"
+    "test": "node --import tsx/esm --test src/shop-catalog.contract.test.ts src/validation.stress.test.ts src/http-schemas.test.ts src/medusa-inventory-math.test.ts src/sanitize-cms-html.test.ts"
   },
   "dependencies": {
+    "sanitize-html": "^2.17.0",
     "zod": "^3.23.0"
   },
   "devDependencies": {
     "@apparel-commerce/config-eslint": "workspace:*",
     "@apparel-commerce/config-typescript": "workspace:*",
+    "@types/sanitize-html": "^2.16.0",
     "eslint": "^9.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0"
