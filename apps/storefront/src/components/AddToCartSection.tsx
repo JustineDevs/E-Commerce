@@ -6,6 +6,10 @@ import { useSession } from "next-auth/react";
 import type { Product } from "@apparel-commerce/types";
 import { addCartLine, type CartLine } from "@/lib/cart";
 import { WishlistToggle } from "@/components/WishlistToggle";
+import {
+  cssColorForVariantColorLabel,
+  swatchNeedsLightStroke,
+} from "@/lib/variant-color-swatch";
 
 export function AddToCartSection({ product }: { product: Product }) {
   const router = useRouter();
@@ -65,21 +69,28 @@ export function AddToCartSection({ product }: { product: Product }) {
           <span className="text-secondary font-normal">{color || "None"}</span>
         </p>
         <div className="flex flex-wrap gap-3">
-          {colors.map((c) => (
-            <button
-              key={c}
-              type="button"
-              onClick={() => setColor(c)}
-              className={`w-10 h-10 rounded-full bg-surface-container-high ring-1 transition-all ${
-                color === c
-                  ? "ring-2 ring-primary scale-105"
-                  : "ring-outline-variant hover:ring-primary"
-              }`}
-              title={c}
-              aria-label={`Color ${c}`}
-              aria-pressed={color === c}
-            />
-          ))}
+          {colors.map((c) => {
+            const fill = cssColorForVariantColorLabel(c);
+            const light = swatchNeedsLightStroke(fill);
+            return (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setColor(c)}
+                style={{ backgroundColor: fill }}
+                className={`w-10 h-10 rounded-full transition-all ${
+                  color === c
+                    ? "ring-2 ring-primary scale-105"
+                    : light
+                      ? "ring-1 ring-outline-variant hover:ring-primary"
+                      : "ring-1 ring-black/20 hover:ring-primary"
+                }`}
+                title={c}
+                aria-label={`Color ${c}`}
+                aria-pressed={color === c}
+              />
+            );
+          })}
         </div>
       </div>
 
