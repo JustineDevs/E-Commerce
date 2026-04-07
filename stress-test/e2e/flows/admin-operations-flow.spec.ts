@@ -34,7 +34,7 @@ const ADMIN_OPERATION_PATHS: readonly string[] = [
 
 test.describe.configure({ mode: "serial" });
 
-test.describe("Admin operations E2E", () => {
+test.describe("@admin Admin operations E2E", () => {
   test("authenticated stress pass over core routes", async ({ page }) => {
     /** Serial pass over many routes; dev cold compile can exceed default 180s. */
     test.setTimeout(300_000);
