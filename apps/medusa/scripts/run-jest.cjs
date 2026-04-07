@@ -6,6 +6,14 @@
 const { spawnSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
+const { checkRuntime } = require(path.join(
+  __dirname,
+  "..",
+  "..",
+  "..",
+  "scripts",
+  "check-test-runtime.cjs",
+));
 
 const root = path.join(__dirname, "..");
 /** Writable temp under the app (avoids EPERM when bundled Node uses a read-only install dir). */
@@ -32,6 +40,14 @@ process.env.TEST_TYPE = testType;
 process.env.NODE_OPTIONS = [process.env.NODE_OPTIONS, "--experimental-vm-modules"]
   .filter(Boolean)
   .join(" ");
+try {
+  checkRuntime("swc", root);
+} catch (error) {
+  const message =
+    error instanceof Error ? error.message : String(error ?? "unknown error");
+  console.error(`\n[run-jest] ${message}\n`);
+  process.exit(1);
+}
 
 let jestEntry = null;
 const resolveRoots = [root, path.join(root, ".."), path.join(root, "..", "..")];
