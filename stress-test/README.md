@@ -6,7 +6,14 @@ All Playwright-related tests, reports, and artifacts live under this directory.
 
 ```
 stress-test/
-├── e2e/                    # Test specs (smoke, flows, dogfood)
+├── e2e/                    # Playwright testDir: specs, manifests, workflows, helpers
+│   ├── README.md           # Harness tags, commands, artifact paths
+│   ├── manifests/          # route-coverage.json, component-coverage.json, etc.
+│   ├── workflows/          # Composable *.workflow.ts + harness *.spec.ts
+│   ├── layouts/            # Viewport / shell stress
+│   ├── components/         # UI surface matrix
+│   ├── fixtures/           # Env + worker seed
+│   └── reporters/          # Optional stderr reporter for failures
 ├── test-results/            # Playwright test artifacts (traces, screenshots)
 ├── playwright-report/       # HTML test report
 ├── dogfood-output/         # Dogfood screenshot outputs
@@ -26,9 +33,19 @@ From project root:
 ### Individual phases
 
 - `pnpm test:e2e` — Run all E2E tests (headless)
+- `pnpm test:e2e:smoke` — Grep `@smoke` only
+- `pnpm test:e2e:workflow` — Grep `@workflow`
+- `pnpm test:e2e:checkout` — Checkout harness + commerce journey + medusa checkout smoke
+- `pnpm test:e2e:admin` — Admin operations flow (`@admin`)
+- `pnpm test:e2e:matrix` — `e2e/components` + `e2e/layouts`
+- `pnpm test:e2e:chaos` — Network chaos / resilience spec
+- `pnpm test:e2e:cross-app` — Cross-app HTTP + optional admin orders shell
+- `pnpm test:e2e:parallel` — Same runner with `--workers=4`
 - `pnpm test:e2e:ui` — Run Playwright UI mode
 - `pnpm test:e2e:report` — Open last HTML report
 - `pnpm dogfood:screenshots` — Capture full-page screenshots (storefront + admin)
+
+Focused runs: `node stress-test/scripts/run-e2e.js --grep @layout` or pass a single file. See `stress-test/e2e/README.md`.
 
 ### Admin E2E (full stress run)
 
