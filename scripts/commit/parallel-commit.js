@@ -412,6 +412,7 @@ async function main() {
     log('  --skip-preflight       Do not run pnpm ci:preflight (turbo lint/typecheck/test + Python)', 'cyan');
     log('  --no-security-check    Disable security checks (NOT RECOMMENDED)', 'cyan');
     log('  --warn-only            Warn about sensitive files but don\'t fail', 'cyan');
+    log('  --max <n>              Files per batch (default: 1; >1 runs commits in parallel within each batch)', 'cyan');
     log('  --help, -h             Show this help message', 'cyan');
     log('\nConfiguration:', 'cyan');
     log(`  Max concurrent commits: ${config.maxConcurrentCommits}`, 'cyan');
@@ -439,7 +440,15 @@ async function main() {
     config.failOnSensitive = false;
     log('⚠️  Warning mode: Will warn but not fail on sensitive files', 'yellow');
   }
-  
+
+  const maxIdx = args.indexOf('--max');
+  if (maxIdx !== -1 && args[maxIdx + 1] !== undefined && !String(args[maxIdx + 1]).startsWith('-')) {
+    const n = parseInt(args[maxIdx + 1], 10);
+    if (!Number.isNaN(n) && n >= 1) {
+      config.maxConcurrentCommits = n;
+    }
+  }
+
   try {
     // Check if we're in a git repository
     execSync('git rev-parse --git-dir', { stdio: 'pipe' });
