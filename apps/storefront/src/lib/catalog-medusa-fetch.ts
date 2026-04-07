@@ -2,6 +2,7 @@
  * Medusa Store API catalog queries (listing, PDP, facets, categories, sitemap).
  * Imported by `catalog-fetch.ts`, which re-exports the public surface.
  */
+import { unstable_cache } from "next/cache";
 import type { Product } from "@apparel-commerce/types";
 import {
   catalogProductFromMedusaRaw,
@@ -64,6 +65,19 @@ export type VariantFacetsResult =
 export type FeaturedProductsResult =
   | { kind: "ok"; products: Product[] }
   | CommerceFetchFailure;
+
+function normalizedCategoryTag(category: string | undefined): string | null {
+  const value = category?.trim().toLowerCase();
+  return value ? `collection:${value}` : null;
+}
+
+function catalogCacheTags(options: CatalogQuery, extra: string[] = []): string[] {
+  const tags = new Set<string>(["catalog:list", ...extra]);
+  const collectionTag = normalizedCategoryTag(options.category);
+  if (collectionTag) tags.add(collectionTag);
+  if (options.q?.trim()) tags.add("catalog:search");
+  return [...tags];
+}
 
 function misconfigured(detail: string): CommerceFetchFailure {
   return { kind: "misconfigured", detail };
@@ -365,13 +379,41 @@ export async function fetchProductsPage(
   limit: number,
   options: CatalogQuery = {},
 ): Promise<ProductsPageResult> {
-  return fetchMedusaProductsPage(limit, options);
+  const normalizedOptions = {
+    ...options,
+    category: options.category?.trim() || undefined,
+    size: options.size?.trim() || undefined,
+    color: options.color?.trim() || undefined,
+    brand: options.brand?.trim() || undefined,
+    q: options.q?.trim() || undefined,
+  };
+  const cached = unstable_cache(
+    async () => fetchMedusaProductsPage(limit, normalizedOptions),
+    [
+      "storefront-products-page",
+      String(limit),
+      JSON.stringify(normalizedOptions),
+    ],
+    {
+      revalidate: normalizedOptions.revalidate ?? 60,
+      tags: catalogCacheTags(normalizedOptions),
+    },
+  );
+  return cached();
 }
 
 export async function fetchFeaturedProducts(
   limit = 4,
 ): Promise<FeaturedProductsResult> {
-  const r = await fetchMedusaProductsPage(limit, { sort: "newest" });
+  const cached = unstable_cache(
+    async () => fetchMedusaProductsPage(limit, { sort: "newest" }),
+    ["storefront-featured-products", String(limit)],
+    {
+      revalidate: 60,
+      tags: ["catalog:list", "storefront:home"],
+    },
+  );
+  const r = await cached();
   if (r.kind !== "ok") {
     return r;
   }
@@ -428,7 +470,15 @@ export async function fetchProductBySlug(
 export type CategorySummary = { category: string; count: number };
 
 export async function fetchCategorySummaries(): Promise<CategorySummariesResult> {
-  return fetchMedusaCategorySummaries();
+  const cached = unstable_cache(
+    async () => fetchMedusaCategorySummaries(),
+    ["storefront-category-summaries"],
+    {
+      revalidate: 60,
+      tags: ["catalog:list", "collections:index"],
+    },
+  );
+  return cached();
 }
 
 export type VariantFacets = {
@@ -440,7 +490,16 @@ export type VariantFacets = {
 export async function fetchVariantFacets(
   category: string | undefined,
 ): Promise<VariantFacetsResult> {
-  return fetchMedusaVariantFacets(category);
+  const normalizedCategory = category?.trim() || undefined;
+  const cached = unstable_cache(
+    async () => fetchMedusaVariantFacets(normalizedCategory),
+    ["storefront-variant-facets", normalizedCategory ?? "__all__"],
+    {
+      revalidate: 60,
+      tags: catalogCacheTags({ category: normalizedCategory }),
+    },
+  );
+  return cached();
 }
 
 export async function fetchProductSlugsForSitemap(

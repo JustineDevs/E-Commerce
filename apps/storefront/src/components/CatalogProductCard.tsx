@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Badge, Card, CardContent } from "@apparel-commerce/ui";
 import type { Product } from "@apparel-commerce/types";
+import { BrowsePriceFreshnessCue } from "@/components/BrowsePriceFreshnessCue";
 import { QuickViewButton } from "@/components/QuickViewButton";
 import { trackProductClick } from "@/lib/analytics";
 
@@ -111,9 +112,15 @@ export function CatalogProductCard({ product, intervalMs = 3000 }: Props) {
                 {firstVariant?.color ?? ""}
               </p>
             </div>
-            <span className="shrink-0 font-headline text-lg font-medium text-primary">
-              PHP {minPrice.toLocaleString("en-PH")}
-            </span>
+            <div className="shrink-0 text-right">
+              <span className="block font-headline text-lg font-medium text-primary">
+                PHP {minPrice.toLocaleString("en-PH")}
+              </span>
+              <BrowsePriceFreshnessCue
+                slug={product.slug}
+                initialMinPrice={minPrice}
+              />
+            </div>
           </div>
         </CardContent>
       </Link>

@@ -6,6 +6,8 @@ import type {
   ProductVariant,
 } from "@apparel-commerce/types";
 
+import { urlLooksLikeRasterImage } from "./product-media";
+
 type MedusaOptionRow = {
   id?: string;
   value?: string;
@@ -169,7 +171,11 @@ function buildGallerySlides(
     if (!videos.includes(t)) videos.push(t);
   }
   for (const u of videos) {
-    slides.push({ kind: "video", url: u });
+    slides.push(
+      urlLooksLikeRasterImage(u)
+        ? { kind: "image", url: u }
+        : { kind: "video", url: u },
+    );
   }
   return slides;
 }

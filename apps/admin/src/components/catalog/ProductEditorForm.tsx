@@ -7,34 +7,35 @@ import type {
 import { useAdminToast } from "@/components/admin-console";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  CatalogProductPreview,
+  type CatalogPreviewLayoutDensity,
+} from "./CatalogProductPreview";
+import {
+  CatalogMediaPickerDialog,
+  type CatalogAddPlacement,
+} from "./CatalogMediaPickerDialog";
+import { CatalogUnifiedMediaList } from "./CatalogUnifiedMediaList";
+import { normalizeCatalogAssetUrl } from "@/lib/catalog-asset-url";
 import { RelatedProductsPicker } from "./RelatedProductsPicker";
 import { VariantMatrixField } from "./VariantMatrixField";
+import { CatalogMutationImpactPanel } from "./CatalogMutationImpactPanel";
+import type { StorefrontCatalogMutationClassification } from "@/lib/storefront-commerce-invalidation";
 
 type CategoryOption = { id: string; name: string; handle: string };
 
-function parseImageUrlsFlexible(text: string): string[] {
-  return text
-    .split(/\r?\n/)
-    .flatMap((line) => line.split(","))
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
-function splitCarouselVideos(text: string): {
-  videoUrl: string | null;
-  galleryVideoUrlsText: string;
-} {
-  const lines = text
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter(Boolean);
-  if (lines.length === 0) return { videoUrl: null, galleryVideoUrlsText: "" };
-  const [first, ...rest] = lines;
-  return {
-    videoUrl: first ?? null,
-    galleryVideoUrlsText: rest.join("\n"),
-  };
+function catalogPreviewDensity(width: number): CatalogPreviewLayoutDensity {
+  if (width >= 1040) return "spacious";
+  if (width >= 720) return "comfortable";
+  return "compact";
 }
 
 function buildCarouselVideosInitial(
@@ -79,20 +80,35 @@ function matrixCellKey(size: string, color: string): string {
   return `${size.trim()}\u0000${color.trim()}`;
 }
 
-function filterVariantStockRowsForMatrix(
-  rows: CatalogVariantStockRow[],
+/** One row per selected size × color; optional match to an existing Medusa variant. */
+type MatrixStockWireRow = {
+  cellKey: string;
+  label: string;
+  serverRow: CatalogVariantStockRow | null;
+};
+
+function buildMatrixStockWireRows(
   sizes: string[],
   colors: string[],
-): CatalogVariantStockRow[] {
-  const allowed = new Set<string>();
+  serverRows: CatalogVariantStockRow[],
+): MatrixStockWireRow[] {
+  const byKey = new Map<string, CatalogVariantStockRow>();
+  for (const r of serverRows) {
+    const k = matrixCellKey(r.sizeLabel, r.colorLabel);
+    if (!byKey.has(k)) byKey.set(k, r);
+  }
+  const out: MatrixStockWireRow[] = [];
   for (const sz of sizes) {
     for (const col of colors) {
-      allowed.add(matrixCellKey(sz, col));
+      const k = matrixCellKey(sz, col);
+      out.push({
+        cellKey: k,
+        label: `${sz.trim()} / ${col.trim()}`,
+        serverRow: byKey.get(k) ?? null,
+      });
     }
   }
-  return rows.filter((r) =>
-    allowed.has(matrixCellKey(r.sizeLabel, r.colorLabel)),
-  );
+  return out;
 }
 
 function initialDefaultMatrixStock(product: CatalogProductDetail): string {
@@ -128,9 +144,29 @@ export function ProductEditorForm(props: Props) {
     p?.pricePhp != null ? String(p.pricePhp) : "",
   );
   const [sku, setSku] = useState(p?.sku ?? "");
-  const [imageUrlsText, setImageUrlsText] = useState(() => {
-    if (p?.imageUrls?.length) return p.imageUrls.join("\n");
-    return (p?.thumbnail ?? "").trim();
+  const [unifiedMedia, setUnifiedMedia] = useState<string[]>(() => {
+    const main =
+      p?.imageUrls?.length && p.imageUrls.length > 0
+        ? [...p.imageUrls]
+        : (p?.thumbnail ?? "").trim()
+          ? [(p?.thumbnail ?? "").trim()]
+          : [];
+    const gLines = buildCarouselVideosInitial(
+      isEdit && p ? p.storefrontMetadata : null,
+    )
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+    return [...main, ...gLines];
+  });
+  const [mainImageCount, setMainImageCount] = useState(() => {
+    const main =
+      p?.imageUrls?.length && p.imageUrls.length > 0
+        ? [...p.imageUrls]
+        : (p?.thumbnail ?? "").trim()
+          ? [(p?.thumbnail ?? "").trim()]
+          : [];
+    return main.length;
   });
   const [categoryIds, setCategoryIds] = useState<string[]>(p?.categoryIds ?? []);
   const [stockQuantity, setStockQuantity] = useState(() => {
@@ -153,14 +189,12 @@ export function ProductEditorForm(props: Props) {
         )
       : {},
   );
-  const [defaultMatrixStock, setDefaultMatrixStock] = useState(() =>
-    isEdit && p ? initialDefaultMatrixStock(p) : "0",
-  );
+  /** Stock for matrix cells that do not have a Medusa variant yet (per size/color, independent). */
+  const [stockByMatrixCell, setStockByMatrixCell] = useState<
+    Record<string, string>
+  >({});
   const sm = isEdit ? p?.storefrontMetadata : null;
   const [brand, setBrand] = useState(sm?.brand ?? "");
-  const [carouselVideosText, setCarouselVideosText] = useState(() =>
-    buildCarouselVideosInitial(sm ?? null),
-  );
   const [weightKg, setWeightKg] = useState(
     sm?.weightKg != null ? String(sm.weightKg) : "",
   );
@@ -181,6 +215,8 @@ export function ProductEditorForm(props: Props) {
   const [matrixColors, setMatrixColors] = useState<string[]>(() =>
     isEdit && p?.matrixColors?.length ? [...p.matrixColors] : [],
   );
+  const [lastMutationClassification, setLastMutationClassification] =
+    useState<StorefrontCatalogMutationClassification | null>(null);
   const [hotspotsJson, setHotspotsJson] = useState(sm?.hotspotsJson ?? "");
   const [variantBarcode, setVariantBarcode] = useState(
     isEdit && p?.variantBarcode ? p.variantBarcode : "",
@@ -196,6 +232,132 @@ export function ProductEditorForm(props: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [uploadingCatalogImage, setUploadingCatalogImage] = useState(false);
+  const [uploadingCatalogVideo, setUploadingCatalogVideo] = useState(false);
+  const [uploadingBulk, setUploadingBulk] = useState(false);
+  const [catalogPickerOpen, setCatalogPickerOpen] = useState(false);
+  const [catalogAddPlacement, setCatalogAddPlacement] =
+    useState<CatalogAddPlacement>("gallery");
+  const bulkUploadInputRef = useRef<HTMLInputElement>(null);
+  const mainImageCountRef = useRef(mainImageCount);
+
+  const productIdForUpload = isEdit && p ? p.id : "";
+
+  mainImageCountRef.current = mainImageCount;
+
+  useEffect(() => {
+    setMainImageCount((c) =>
+      Math.min(Math.max(0, c), unifiedMedia.length),
+    );
+  }, [unifiedMedia.length]);
+
+  const postCatalogMediaFile = useCallback(
+    async (file: File): Promise<string | null> => {
+      const fd = new FormData();
+      fd.append("file", file);
+      if (productIdForUpload) fd.append("productId", productIdForUpload);
+      try {
+        const res = await fetch("/api/admin/catalog/media", {
+          method: "POST",
+          body: fd,
+        });
+        const body = (await res.json()) as {
+          error?: string;
+          data?: { public_url?: string };
+        };
+        if (!res.ok) {
+          toast.push(body.error ?? "Upload failed", "error");
+          return null;
+        }
+        const url = body.data?.public_url?.trim();
+        if (!url) {
+          toast.push("Upload did not return a file address.", "error");
+          return null;
+        }
+        return normalizeCatalogAssetUrl(url);
+      } catch {
+        toast.push("Upload failed", "error");
+        return null;
+      }
+    },
+    [productIdForUpload, toast],
+  );
+
+  const handleBulkUpload = useCallback(
+    async (files: FileList | null) => {
+      if (!files?.length) return;
+      const arr = Array.from(files);
+      setUploadingBulk(true);
+      try {
+        for (const file of arr) {
+          const isImage =
+            /^image\//.test(file.type) ||
+            /\.(png|jpe?g|webp|gif)$/i.test(file.name);
+          if (isImage) setUploadingCatalogImage(true);
+          else setUploadingCatalogVideo(true);
+          const url = await postCatalogMediaFile(file);
+          if (isImage) setUploadingCatalogImage(false);
+          else setUploadingCatalogVideo(false);
+          if (!url) continue;
+          if (isImage) {
+            setUnifiedMedia((prev) => {
+              const n = [...prev];
+              const mc = mainImageCountRef.current;
+              n.splice(mc, 0, url);
+              return n;
+            });
+            setMainImageCount((c) => {
+              const v = c + 1;
+              mainImageCountRef.current = v;
+              return v;
+            });
+          } else {
+            setUnifiedMedia((prev) => [...prev, url]);
+          }
+        }
+        toast.push(
+          "Files saved to catalog storage. Save the product to apply them.",
+          "success",
+        );
+      } finally {
+        setUploadingBulk(false);
+        setUploadingCatalogImage(false);
+        setUploadingCatalogVideo(false);
+        if (bulkUploadInputRef.current) bulkUploadInputRef.current.value = "";
+      }
+    },
+    [postCatalogMediaFile, toast],
+  );
+
+  const handlePickManyFromCatalog = useCallback(
+    (urls: string[]) => {
+      const normalized = urls.map(normalizeCatalogAssetUrl).filter(Boolean);
+      if (normalized.length === 0) return;
+      if (catalogAddPlacement === "main") {
+        setUnifiedMedia((prev) => {
+          const n = [...prev];
+          let mc = mainImageCountRef.current;
+          for (const u of normalized) {
+            n.splice(mc, 0, u);
+            mc += 1;
+          }
+          return n;
+        });
+        setMainImageCount((c) => {
+          const v = c + normalized.length;
+          mainImageCountRef.current = v;
+          return v;
+        });
+      } else {
+        setUnifiedMedia((prev) => [...prev, ...normalized]);
+      }
+      toast.push(
+        "Added from catalog library. Save the product to apply it.",
+        "success",
+      );
+    },
+    [catalogAddPlacement, toast],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -242,15 +404,62 @@ export function ProductEditorForm(props: Props) {
         ]),
       ),
     );
-    setDefaultMatrixStock(initialDefaultMatrixStock(p));
   }, [isEdit, p?.id, stockRowsFingerprint]);
 
-  const visibleVariantStockRows = useMemo(() => {
+  const stockMatrixProductIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!isEdit || !p || !showPerVariantStock) return;
+    const productSwitched = stockMatrixProductIdRef.current !== p.id;
+    stockMatrixProductIdRef.current = p.id;
+    setStockByMatrixCell((prev) => {
+      const base = productSwitched ? {} : prev;
+      const serverKeys = new Set(
+        p.variantStockRows.map((r) =>
+          matrixCellKey(r.sizeLabel, r.colorLabel),
+        ),
+      );
+      const next: Record<string, string> = {};
+      const hadAny = Object.keys(base).length > 0;
+      for (const sz of matrixSizes) {
+        for (const col of matrixColors) {
+          const k = matrixCellKey(sz, col);
+          if (serverKeys.has(k)) continue;
+          if (base[k] !== undefined) {
+            next[k] = base[k]!;
+          } else {
+            next[k] = hadAny ? "0" : initialDefaultMatrixStock(p);
+          }
+        }
+      }
+      return next;
+    });
+  }, [
+    isEdit,
+    p?.id,
+    showPerVariantStock,
+    matrixSizes,
+    matrixColors,
+    stockRowsFingerprint,
+  ]);
+
+  const draftMatrixPairKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const sz of matrixSizes) {
+      for (const col of matrixColors) {
+        keys.add(matrixCellKey(sz, col));
+      }
+    }
+    return keys;
+  }, [matrixSizes, matrixColors]);
+
+  /** Same order as "N sizes × M colors" — one stock row per checkbox combination. */
+  const matrixStockWireRows = useMemo(() => {
     if (!isEdit || !p || !showPerVariantStock) return [];
-    return filterVariantStockRowsForMatrix(
-      p.variantStockRows,
+    return buildMatrixStockWireRows(
       matrixSizes,
       matrixColors,
+      p.variantStockRows,
     );
   }, [
     isEdit,
@@ -260,6 +469,58 @@ export function ProductEditorForm(props: Props) {
     matrixColors,
     stockRowsFingerprint,
   ]);
+
+  const orphanServerVariantRows = useMemo(() => {
+    if (!isEdit || !p || !showPerVariantStock) return [];
+    return p.variantStockRows.filter(
+      (r) =>
+        !draftMatrixPairKeys.has(
+          matrixCellKey(r.sizeLabel, r.colorLabel),
+        ),
+    );
+  }, [
+    isEdit,
+    p?.id,
+    showPerVariantStock,
+    draftMatrixPairKeys,
+    stockRowsFingerprint,
+  ]);
+
+  const previewImageUrls = useMemo(
+    () =>
+      unifiedMedia
+        .slice(0, mainImageCount)
+        .map((s) => s.trim())
+        .filter(Boolean),
+    [unifiedMedia, mainImageCount],
+  );
+
+  const previewVideoUrls = useMemo(
+    () =>
+      unifiedMedia
+        .slice(mainImageCount)
+        .map((s) => s.trim())
+        .filter(Boolean),
+    [unifiedMedia, mainImageCount],
+  );
+
+  const selectedCategoryLabels = useMemo(() => {
+    const loaded = categories
+      .filter((category) => categoryIds.includes(category.id))
+      .map((category) => category.name.trim())
+      .filter(Boolean);
+    if (loaded.length > 0) return loaded;
+    if (!isEdit || !p) return [];
+    const byId = new Map<string, string>();
+    for (let index = 0; index < p.categoryIds.length; index += 1) {
+      const id = p.categoryIds[index];
+      const label = p.categoryLabels[index];
+      if (id && label) byId.set(id, label);
+    }
+    return categoryIds
+      .map((id) => byId.get(id)?.trim() ?? "")
+      .filter(Boolean);
+  }, [categories, categoryIds, isEdit, p]);
 
   function toggleCategory(id: string) {
     setCategoryIds((prev) =>
@@ -323,37 +584,38 @@ export function ProductEditorForm(props: Props) {
     }
 
     let stockQtyInt: number;
-    let variantStocksPayload:
-      | Array<{ variantId: string; quantity: number }>
+    let matrixCellStocksPayload:
+      | Array<{ sizeLabel: string; colorLabel: string; quantity: number }>
       | undefined;
 
     if (showPerVariantStock && p) {
-      const defaultParsed = parseStrictStockUnits(defaultMatrixStock);
-      if (!defaultParsed.ok) {
-        setError(defaultParsed.error);
-        setSaving(false);
-        return;
-      }
-      stockQtyInt = defaultParsed.value;
-      const visible = filterVariantStockRowsForMatrix(
-        p.variantStockRows,
-        matrixSizes,
-        matrixColors,
-      );
-      variantStocksPayload = [];
-      for (const row of visible) {
-        const raw = variantStockById[row.variantId] ?? "0";
-        const rowParsed = parseStrictStockUnits(raw);
-        if (!rowParsed.ok) {
-          setError(`${row.label}: ${rowParsed.error}`);
-          setSaving(false);
-          return;
+      matrixCellStocksPayload = [];
+      for (const sz of matrixSizes) {
+        for (const col of matrixColors) {
+          const k = matrixCellKey(sz, col);
+          const serverRow = p.variantStockRows.find(
+            (r) => matrixCellKey(r.sizeLabel, r.colorLabel) === k,
+          );
+          const raw = serverRow
+            ? (variantStockById[serverRow.variantId] ?? "0")
+            : (stockByMatrixCell[k] ?? "0");
+          const rowParsed = parseStrictStockUnits(raw);
+          if (!rowParsed.ok) {
+            const label = serverRow
+              ? serverRow.label
+              : `${sz.trim()} / ${col.trim()}`;
+            setError(`${label}: ${rowParsed.error}`);
+            setSaving(false);
+            return;
+          }
+          matrixCellStocksPayload.push({
+            sizeLabel: sz.trim(),
+            colorLabel: col.trim(),
+            quantity: rowParsed.value,
+          });
         }
-        variantStocksPayload.push({
-          variantId: row.variantId,
-          quantity: rowParsed.value,
-        });
       }
+      stockQtyInt = 0;
     } else {
       const stockParsed = parseStrictStockUnits(stockQuantity);
       if (!stockParsed.ok) {
@@ -362,7 +624,7 @@ export function ProductEditorForm(props: Props) {
         return;
       }
       stockQtyInt = stockParsed.value;
-      variantStocksPayload = undefined;
+      matrixCellStocksPayload = undefined;
     }
 
     if (matrixSizes.length < 1 || matrixColors.length < 1) {
@@ -377,8 +639,12 @@ export function ProductEditorForm(props: Props) {
       return;
     }
 
-    const { videoUrl, galleryVideoUrlsText } =
-      splitCarouselVideos(carouselVideosText);
+    const galleryLines = unifiedMedia
+      .slice(mainImageCount)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const videoUrl = galleryLines[0] ?? null;
+    const galleryVideoUrlsText = galleryLines.slice(1).join("\n");
 
     const storefrontMetadata = {
       brand: brand.trim() || null,
@@ -398,7 +664,10 @@ export function ProductEditorForm(props: Props) {
       hotspotsJson,
     };
 
-    const imageUrls = parseImageUrlsFlexible(imageUrlsText);
+    const imageUrls = unifiedMedia
+      .slice(0, mainImageCount)
+      .map((s) => s.trim())
+      .filter(Boolean);
 
     const sharedPayload = {
       title: title.trim(),
@@ -426,15 +695,18 @@ export function ProductEditorForm(props: Props) {
           patchBody.sku = sku.trim() || null;
           patchBody.variantBarcode = variantBarcode.trim() || null;
         }
-        if (variantStocksPayload?.length) {
-          patchBody.variantStocks = variantStocksPayload;
+        if (matrixCellStocksPayload?.length) {
+          patchBody.matrixCellStocks = matrixCellStocksPayload;
         }
         const res = await fetch(`/api/admin/catalog/products/${p.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(patchBody),
         });
-        const j = (await res.json()) as { error?: string };
+        const j = (await res.json()) as {
+          error?: string;
+          mutationClassification?: StorefrontCatalogMutationClassification;
+        };
         if (!res.ok) {
           const msg = j.error ?? "Unable to save changes";
           setError(msg);
@@ -442,7 +714,31 @@ export function ProductEditorForm(props: Props) {
           setSaving(false);
           return;
         }
-        toast.push("Changes saved. Returning to the product list.", "success");
+        const cls = j.mutationClassification;
+        if (cls) {
+          setLastMutationClassification(cls);
+        }
+        if (cls === "checkout_affecting") {
+          toast.push(
+            "Changes saved. Price changed: storefront listings refresh and open checkouts may need a total review.",
+            "success",
+          );
+        } else if (cls === "sellability_affecting") {
+          toast.push(
+            "Changes saved. Stock, publish, or variant matrix changed: matching open checkouts are flagged for review.",
+            "success",
+          );
+        } else if (cls === "merchandising_only") {
+          toast.push(
+            "Changes saved. Merchandising updated. Active checkout payment rows were not reset for quote totals.",
+            "success",
+          );
+        } else {
+          toast.push(
+            "Changes saved. Editorial update. Active checkout payment rows were not reset.",
+            "success",
+          );
+        }
         router.push("/admin/catalog?flash=updated");
         router.refresh();
         return;
@@ -515,8 +811,64 @@ export function ProductEditorForm(props: Props) {
     }
   }
 
+  const catalogLayoutRef = useRef<HTMLDivElement>(null);
+  const [catalogLayoutWidth, setCatalogLayoutWidth] = useState(0);
+
+  useLayoutEffect(() => {
+    const el = catalogLayoutRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width ?? 0;
+      setCatalogLayoutWidth(Math.round(w));
+    });
+    ro.observe(el);
+    setCatalogLayoutWidth(Math.round(el.getBoundingClientRect().width));
+    return () => ro.disconnect();
+  }, []);
+
+  const previewDensity = useMemo(
+    () =>
+      catalogLayoutWidth === 0 ? "comfortable" : catalogPreviewDensity(catalogLayoutWidth),
+    [catalogLayoutWidth],
+  );
+
+  const catalogGridClassName = useMemo(() => {
+    switch (previewDensity) {
+      case "spacious":
+        return "grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,480px)] lg:gap-8 lg:items-start xl:gap-10";
+      case "compact":
+        return "grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(220px,340px)] lg:gap-6 lg:items-start";
+      default:
+        return "grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(260px,400px)] lg:gap-7 lg:items-start xl:gap-8";
+    }
+  }, [previewDensity]);
+
   return (
-    <form onSubmit={(e) => void submit(e)} className="max-w-2xl space-y-6">
+    <form onSubmit={(e) => void submit(e)} className="w-full min-w-0">
+      <div ref={catalogLayoutRef} className={catalogGridClassName}>
+        <aside className="order-1 min-w-0 w-full lg:order-2 lg:sticky lg:top-6 lg:z-[1] lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:overscroll-contain lg:self-start xl:top-8">
+          <CatalogProductPreview
+            title={title}
+            handle={handle}
+            description={description}
+            status={status}
+            brand={brand}
+            currencyCode={isEdit && p ? p.currencyCode : createCurrency}
+            pricePhp={pricePhp}
+            imageUrls={previewImageUrls}
+            videoUrls={previewVideoUrls}
+            categoryLabels={selectedCategoryLabels}
+            sizes={matrixSizes}
+            colors={matrixColors}
+            layoutDensity={previewDensity}
+          />
+        </aside>
+        <div className="order-2 min-w-0 space-y-6 lg:order-1">
+      {isEdit ? (
+        <CatalogMutationImpactPanel
+          lastClassification={lastMutationClassification}
+        />
+      ) : null}
       {isEdit ? (
         <div className="flex flex-wrap items-center gap-3">
           <Link
@@ -659,9 +1011,8 @@ export function ProductEditorForm(props: Props) {
         <div>
           <p className="font-medium text-on-surface">Public product details</p>
           <p className="mt-1 text-sm leading-relaxed text-on-surface-variant">
-            Optional extras for the public product page: brand, video, specs, related items, search
-            description, and interactive hotspots. Use the hotspots field only if your theme reads
-            that data.
+            Optional extras for the public product page: brand, weight and size notes, related items,
+            search snippet, and optional image hotspot data for supported layouts.
           </p>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -679,33 +1030,14 @@ export function ProductEditorForm(props: Props) {
           </div>
           <div className="sm:col-span-2">
             <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
-              SEO description
+              Search listing description
             </label>
             <textarea
               className="mt-2 w-full min-h-[72px] rounded-lg border border-outline-variant/30 px-3 py-2 text-sm"
               value={seoDescription}
               onChange={(e) => setSeoDescription(e.target.value)}
-              placeholder="Optional. Overrides auto-truncated description in meta tags."
+              placeholder="Optional. Replaces the short text shown in search results when set."
               maxLength={500}
-            />
-          </div>
-          <div className="sm:col-span-2">
-            <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
-              Gallery videos (after product images)
-            </label>
-            <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
-              One URL per line. The first line is the primary carousel clip. The rest follow in order.
-              YouTube watch URLs, youtu.be, and direct mp4 or webm links are supported by the storefront
-              player.
-            </p>
-            <textarea
-              className="mt-2 w-full min-h-[120px] rounded-lg border border-outline-variant/30 px-3 py-2 font-mono text-xs"
-              value={carouselVideosText}
-              onChange={(e) => setCarouselVideosText(e.target.value)}
-              placeholder={
-                "https://www.youtube.com/watch?v=...\nhttps://example.com/second.mp4\nhttps://example.com/third.webm"
-              }
-              maxLength={8000}
             />
           </div>
           <div>
@@ -747,17 +1079,18 @@ export function ProductEditorForm(props: Props) {
           </div>
           <div className="sm:col-span-2">
             <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
-              Lifestyle image URL
+              Lifestyle image
             </label>
             <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
-              https, http, protocol-relative, site-relative paths, or data:image URLs.
+              Optional full-width photo for lookbook or campaign use. Paste a web address, a path on
+              your site starting with /, or a small embedded image.
             </p>
             <input
               type="text"
               className="mt-2 w-full rounded-lg border border-outline-variant/30 px-3 py-2 text-sm"
               value={lifestyleImageUrl}
               onChange={(e) => setLifestyleImageUrl(e.target.value)}
-              placeholder="https://… or /images/lookbook.jpg or data:image/png;base64,…"
+              placeholder="Web address or site path"
               maxLength={2000}
             />
           </div>
@@ -779,7 +1112,7 @@ export function ProductEditorForm(props: Props) {
           </div>
           <div className="sm:col-span-2">
             <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
-              Hotspots JSON
+              Image hotspots (advanced)
             </label>
             <textarea
               className="mt-2 w-full min-h-[120px] rounded-lg border border-outline-variant/30 px-3 py-2 font-mono text-xs"
@@ -952,9 +1285,9 @@ export function ProductEditorForm(props: Props) {
               Stock by variant (warehouse)
             </span>
             <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
-              Stocked quantity at the first warehouse for each size and color. Rows match your
-              matrix. If inventory data failed to load for a row, you can still enter a whole
-              number and save.
+              One row per combination from Size and Color above (same count as “N sizes × M colors”).
+              Each cell has its own quantity. Changing one row does not change the others. Combinations
+              not in the store yet keep their value here until you save and variants are created.
             </p>
           </div>
           <div className="overflow-x-auto rounded-lg border border-outline-variant/20 bg-white">
@@ -962,7 +1295,7 @@ export function ProductEditorForm(props: Props) {
               <thead>
                 <tr className="border-b border-outline-variant/20 bg-surface-container-low/80">
                   <th className="px-3 py-2 text-xs font-bold uppercase tracking-wider text-on-surface-variant">
-                    Variant
+                    Variant (size / color)
                   </th>
                   <th className="px-3 py-2 text-xs font-bold uppercase tracking-wider text-on-surface-variant">
                     Stock (units)
@@ -970,42 +1303,69 @@ export function ProductEditorForm(props: Props) {
                 </tr>
               </thead>
               <tbody>
-                {visibleVariantStockRows.length === 0 ? (
+                {matrixStockWireRows.length === 0 ? (
                   <tr>
                     <td
                       colSpan={2}
                       className="px-3 py-3 text-on-surface-variant"
                     >
-                      No variants match the current matrix. Adjust sizes and colors above, or save
-                      to sync variants.
+                      No matrix combinations to show.
                     </td>
                   </tr>
                 ) : (
-                  visibleVariantStockRows.map((row) => (
+                  matrixStockWireRows.map((wire) => (
                     <tr
-                      key={row.variantId}
+                      key={wire.cellKey}
                       className="border-b border-outline-variant/15 last:border-0"
                     >
                       <td className="px-3 py-2 align-middle text-on-surface">
-                        {row.label}
+                        <div className="flex flex-col gap-0.5">
+                          <span>{wire.label}</span>
+                          {wire.serverRow ? null : (
+                            <span className="text-[11px] font-normal normal-case tracking-normal text-on-surface-variant">
+                              Not in store yet — stock applies to this combination only when you save
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-3 py-2 align-middle">
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          autoComplete="off"
-                          className="w-28 rounded-lg border border-outline-variant/30 px-2 py-1.5 font-mono text-sm"
-                          value={variantStockById[row.variantId] ?? "0"}
-                          onChange={(e) => {
-                            const next = e.target.value.replace(/\D/g, "");
-                            setVariantStockById((prev) => ({
-                              ...prev,
-                              [row.variantId]: next,
-                            }));
-                          }}
-                          aria-label={`Stock for ${row.label}`}
-                        />
+                        {wire.serverRow ? (
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            autoComplete="off"
+                            className="w-28 rounded-lg border border-outline-variant/30 px-2 py-1.5 font-mono text-sm"
+                            value={
+                              variantStockById[wire.serverRow.variantId] ?? "0"
+                            }
+                            onChange={(e) => {
+                              const next = e.target.value.replace(/\D/g, "");
+                              setVariantStockById((prev) => ({
+                                ...prev,
+                                [wire.serverRow!.variantId]: next,
+                              }));
+                            }}
+                            aria-label={`Stock for ${wire.label}`}
+                          />
+                        ) : (
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            autoComplete="off"
+                            className="w-28 rounded-lg border border-outline-variant/30 px-2 py-1.5 font-mono text-sm"
+                            value={stockByMatrixCell[wire.cellKey] ?? "0"}
+                            onChange={(e) => {
+                              const next = e.target.value.replace(/\D/g, "");
+                              setStockByMatrixCell((prev) => ({
+                                ...prev,
+                                [wire.cellKey]: next,
+                              }));
+                            }}
+                            aria-label={`Stock for ${wire.label} (not in store yet)`}
+                          />
+                        )}
                       </td>
                     </tr>
                   ))
@@ -1013,39 +1373,26 @@ export function ProductEditorForm(props: Props) {
               </tbody>
             </table>
           </div>
-          <div>
-            <label
-              htmlFor="catalog-default-matrix-stock"
-              className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant"
+          {orphanServerVariantRows.length > 0 ? (
+            <div
+              className="rounded-lg border border-amber-200/80 bg-amber-50/90 px-3 py-3 text-xs leading-relaxed text-amber-950"
+              role="status"
             >
-              Default stock for new combinations
-            </label>
-            <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
-              When you add a size or color and save, any new variant uses this stocked quantity
-              until you change it in the table after reload.
-            </p>
-            <input
-              id="catalog-default-matrix-stock"
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              autoComplete="off"
-              className="mt-2 w-full max-w-xs rounded-lg border border-outline-variant/30 px-3 py-2 text-sm sm:max-w-sm"
-              value={defaultMatrixStock}
-              onChange={(e) => {
-                const next = e.target.value.replace(/\D/g, "");
-                setDefaultMatrixStock(next);
-              }}
-              required
-              aria-describedby="catalog-default-matrix-stock-help"
-            />
-            <p
-              id="catalog-default-matrix-stock-help"
-              className="mt-1 text-xs text-on-surface-variant"
-            >
-              Applies to variants created on this save that are not listed above yet.
-            </p>
-          </div>
+              <p className="font-semibold text-amber-950">
+                Combinations still in the store but not selected above (
+                {orphanServerVariantRows.length})
+              </p>
+              <p className="mt-1">
+                Saving applies your current Size and Color lists. These pairs are removed from the
+                product unless you add matching options back.
+              </p>
+              <ul className="mt-2 list-inside list-disc text-on-surface">
+                {orphanServerVariantRows.map((r) => (
+                  <li key={r.variantId}>{r.label}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -1104,20 +1451,61 @@ export function ProductEditorForm(props: Props) {
 
       <div>
         <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
-          Image URLs (optional)
+          Product media
         </label>
         <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
-          One URL per line, or several URLs separated by commas on one line. The first image is the
-          main thumbnail. https, http, protocol-relative (//), site paths (/media/…), and data:image
-          URLs are accepted when safe.
+          Main photos and gallery in one list. The first main photo is the shop preview. Use Send to
+          gallery to move clips or extra stills below the main block. Upload several files at once or
+          pick multiple files from the catalog library (choose Main or Gallery before adding).
         </p>
-        <textarea
-          className="mt-2 w-full min-h-[120px] rounded-lg border border-outline-variant/30 px-3 py-2 font-mono text-xs"
-          value={imageUrlsText}
-          onChange={(e) => setImageUrlsText(e.target.value)}
-          placeholder={"https://cdn.example.com/front.jpg\nhttps://cdn.example.com/back.jpg"}
-          maxLength={16000}
-        />
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <input
+            ref={bulkUploadInputRef}
+            type="file"
+            multiple
+            accept="image/*,video/mp4,video/webm,video/quicktime,video/ogg,.mp4,.webm,.mov,.png,.jpg,.jpeg,.webp,.gif"
+            className="sr-only"
+            aria-hidden
+            tabIndex={-1}
+            onChange={(e) => {
+              void handleBulkUpload(e.target.files);
+            }}
+          />
+          <button
+            type="button"
+            disabled={
+              uploadingBulk ||
+              uploadingCatalogImage ||
+              uploadingCatalogVideo ||
+              saving
+            }
+            className="rounded-lg border border-outline-variant/30 bg-surface-container-high px-3 py-1.5 text-xs font-semibold text-on-surface disabled:opacity-50"
+            onClick={() => bulkUploadInputRef.current?.click()}
+          >
+            {uploadingBulk ||
+            uploadingCatalogImage ||
+            uploadingCatalogVideo
+              ? "Uploading…"
+              : "Upload files"}
+          </button>
+          <button
+            type="button"
+            disabled={saving}
+            className="rounded-lg border border-outline-variant/30 bg-surface-container-high px-3 py-1.5 text-xs font-semibold text-on-surface disabled:opacity-50"
+            onClick={() => setCatalogPickerOpen(true)}
+          >
+            Pick from catalog library
+          </button>
+        </div>
+        <div className="mt-3">
+          <CatalogUnifiedMediaList
+            items={unifiedMedia}
+            mainImageCount={mainImageCount}
+            onItemsChange={setUnifiedMedia}
+            onMainCountChange={setMainImageCount}
+            disabled={saving || uploadingBulk}
+          />
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3 pt-4">
@@ -1146,6 +1534,15 @@ export function ProductEditorForm(props: Props) {
           </button>
         ) : null}
       </div>
+        </div>
+      </div>
+      <CatalogMediaPickerDialog
+        open={catalogPickerOpen}
+        addPlacement={catalogAddPlacement}
+        onAddPlacementChange={setCatalogAddPlacement}
+        onClose={() => setCatalogPickerOpen(false)}
+        onPickMany={handlePickManyFromCatalog}
+      />
     </form>
   );
 }

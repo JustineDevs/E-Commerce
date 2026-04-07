@@ -7,7 +7,9 @@ import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { jsonFromAdminOperationResult } from "@/lib/staff-api-operation";
 import { insertStaffAuditLog } from "@/lib/staff-audit";
+import { fetchCatalogProductDetail } from "@/lib/medusa-catalog-service";
 import {
+  parseOptionalMatrixCellStocks,
   parseOptionalStockQuantity,
   parseOptionalVariantStocks,
 } from "@/lib/parse-optional-stock-quantity";
@@ -16,7 +18,15 @@ import {
   parseVariantBarcodeFromBody,
 } from "@/lib/parse-catalog-product-body";
 import { parseCatalogOptionArray } from "@/lib/parse-catalog-option-array";
+import { collectCatalogMediaUrlsFromBody } from "@/lib/catalog-product-media-db";
 import { correlatedJson } from "@/lib/staff-api-response";
+import { ensureExternalCatalogProductMediaRows } from "@apparel-commerce/platform-data";
+import {
+  buildStorefrontCommerceInvalidationPayload,
+  classifyCatalogMutation,
+  notifyStorefrontCommerceInvalidation,
+} from "@/lib/storefront-commerce-invalidation";
+import { logAdminCatalogMutationClassified } from "@/lib/commerce-observability-log";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +47,7 @@ export async function PATCH(req: Request, ctx: RouteParams) {
   }
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+  const beforeDetail = await fetchCatalogProductDetail(productId).catch(() => null);
   const title = typeof body.title === "string" ? body.title : "";
   const handle = typeof body.handle === "string" ? body.handle : "";
   const pricePhp = Number(body.pricePhp);
@@ -73,6 +84,14 @@ export async function PATCH(req: Request, ctx: RouteParams) {
       { status: 400 },
     );
   }
+  const matrixCellStocksParsed = parseOptionalMatrixCellStocks(body);
+  if (!matrixCellStocksParsed.ok) {
+    return correlatedJson(
+      correlationId,
+      { error: matrixCellStocksParsed.error },
+      { status: 400 },
+    );
+  }
 
   const storefrontMetadata = parseStorefrontMetadataFromBody(body);
   const variantBarcode = parseVariantBarcodeFromBody(body);
@@ -101,6 +120,7 @@ export async function PATCH(req: Request, ctx: RouteParams) {
     colorLabels: colorLabelsArr,
     stockQuantity: stockParsed.value,
     variantStocks: variantStocksParsed.value,
+    matrixCellStocks: matrixCellStocksParsed.value,
     variantBarcode,
     storefrontMetadata,
   });
@@ -110,9 +130,13 @@ export async function PATCH(req: Request, ctx: RouteParams) {
   }
 
   const actorEmail = session.user.email?.trim();
-  if (actorEmail) {
-    const sup = adminSupabaseOr503(correlationId);
-    if ("client" in sup) {
+  const sup = adminSupabaseOr503(correlationId);
+  if ("client" in sup) {
+    await ensureExternalCatalogProductMediaRows(
+      sup.client,
+      collectCatalogMediaUrlsFromBody(body),
+    );
+    if (actorEmail) {
       await insertStaffAuditLog(sup.client, {
         actorEmail,
         action: "catalog.product.update",
@@ -127,8 +151,37 @@ export async function PATCH(req: Request, ctx: RouteParams) {
       });
     }
   }
+  const afterDetail = await fetchCatalogProductDetail(result.data.productId).catch(() => null);
+  const classification = classifyCatalogMutation(beforeDetail, afterDetail);
+  logAdminCatalogMutationClassified({
+    classification,
+    productId: result.data.productId,
+    correlationId,
+    actorEmail,
+  });
+  const invalidation = await notifyStorefrontCommerceInvalidation(
+    buildStorefrontCommerceInvalidationPayload({
+      classification,
+      before: beforeDetail,
+      after: afterDetail,
+      actorEmail,
+      reason:
+        classification === "checkout_affecting"
+          ? "A catalog change affected your order. Review the updated price, availability, and total before continuing."
+          : classification === "sellability_affecting"
+            ? "Availability, publish state, or variant options changed for an item in your order. Review before continuing."
+            : undefined,
+    }),
+  );
+  if (!invalidation.ok) {
+    console.warn("[admin catalog update] storefront invalidation:", invalidation.error);
+  }
 
-  return correlatedJson(correlationId, { productId: result.data.productId });
+  return correlatedJson(correlationId, {
+    productId: result.data.productId,
+    storefrontInvalidation: invalidation.ok ? "ok" : invalidation.error,
+    mutationClassification: classification,
+  });
 }
 
 export async function DELETE(req: Request, ctx: RouteParams) {
@@ -144,6 +197,7 @@ export async function DELETE(req: Request, ctx: RouteParams) {
   if (!productId) {
     return correlatedJson(correlationId, { error: "Missing id" }, { status: 400 });
   }
+  const beforeDetail = await fetchCatalogProductDetail(productId).catch(() => null);
 
   const ops = createMedusaCatalogOperations();
   const result = await ops.deleteProduct(productId);
@@ -168,6 +222,26 @@ export async function DELETE(req: Request, ctx: RouteParams) {
         .eq("entity_id", productId);
     }
   }
+  const invalidation = await notifyStorefrontCommerceInvalidation(
+    buildStorefrontCommerceInvalidationPayload({
+      classification:
+        beforeDetail?.status === "published" ? "sellability_affecting" : "editorial_only",
+      before: beforeDetail,
+      actorEmail,
+      reason:
+        beforeDetail?.status === "published"
+          ? "A product was removed from the catalog. Review your order before continuing."
+          : undefined,
+    }),
+  );
+  if (!invalidation.ok) {
+    console.warn("[admin catalog delete] storefront invalidation:", invalidation.error);
+  }
 
-  return jsonFromAdminOperationResult(correlationId, result, 200);
+  return correlatedJson(correlationId, {
+    deleted: result.data.deleted,
+    mutationClassification:
+      beforeDetail?.status === "published" ? "sellability_affecting" : "editorial_only",
+    storefrontInvalidation: invalidation.ok ? "ok" : invalidation.error,
+  });
 }

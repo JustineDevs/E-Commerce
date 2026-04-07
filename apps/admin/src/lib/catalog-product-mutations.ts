@@ -84,6 +84,14 @@ export type UpdateCatalogProductBody = {
    * Per-variant stocked quantity at the default warehouse. Ids not in the synced matrix are ignored.
    */
   variantStocks?: Array<{ variantId: string; quantity: number }>;
+  /**
+   * Stock by matrix cell (size × color). Applied after variants sync; overrides {@link variantStocks} for the same variant.
+   */
+  matrixCellStocks?: Array<{
+    sizeLabel: string;
+    colorLabel: string;
+    quantity: number;
+  }>;
   variantBarcode?: string | null;
   storefrontMetadata?: CatalogProductMetadataFields;
 };
@@ -102,6 +110,19 @@ function slugFromTitle(title: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 120);
+}
+
+const MAX_CATALOG_HANDLE_LEN = 200;
+
+/** Lowercase URL-safe handle for Medusa (a-z, 0-9, hyphens). */
+function normalizeCatalogProductHandle(raw: string, fallback: string): string {
+  const s = raw
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, MAX_CATALOG_HANDLE_LEN);
+  return s || fallback;
 }
 
 function normalizeCategoryIds(ids: string[] | null | undefined): string[] {
@@ -315,9 +336,10 @@ export async function createCatalogProduct(
       503,
     );
   }
-  const handle = (body.handle?.trim() || slugFromTitle(title) || "product").slice(
-    0,
-    200,
+  const titleSlug = slugFromTitle(title);
+  const handle = normalizeCatalogProductHandle(
+    body.handle?.trim() ?? "",
+    titleSlug || "product",
   );
   const salesChannelId = getMedusaSalesChannelId();
   const amount = phpPesosToMinorUnits(body.pricePhp);
@@ -586,12 +608,17 @@ export async function updateCatalogProduct(
       (current as { metadata?: Record<string, unknown> | null }).metadata ??
       null;
     const imgUrls = normalizeProductImageUrls(body);
+    const titleSlug = slugFromTitle(title);
+    const normalizedHandle = normalizeCatalogProductHandle(
+      body.handle.trim(),
+      titleSlug || "product",
+    );
 
     const productUpdatePayload: Parameters<
       typeof sdk.admin.product.update
     >[1] = {
       title,
-      handle: body.handle.trim(),
+      handle: normalizedHandle,
       description: body.description?.trim() || null,
       status: body.status === "published" ? "published" : "draft",
       thumbnail: imgUrls[0] ?? null,
@@ -777,6 +804,19 @@ export async function updateCatalogProduct(
       const q = normalizeStockQuantity(row.quantity);
       if (q === undefined) continue;
       overrideMap.set(id, q);
+    }
+    for (const cell of body.matrixCellStocks ?? []) {
+      const sz =
+        typeof cell.sizeLabel === "string" ? cell.sizeLabel.trim() : "";
+      const col =
+        typeof cell.colorLabel === "string" ? cell.colorLabel.trim() : "";
+      if (!sz || !col) continue;
+      const k = variantPairKey(sz, col);
+      const vid = keyToVariantId.get(k);
+      if (!vid) continue;
+      const q = normalizeStockQuantity(cell.quantity);
+      if (q === undefined) continue;
+      overrideMap.set(vid, q);
     }
     const hasStockPatch =
       defaultStock !== undefined || overrideMap.size > 0;

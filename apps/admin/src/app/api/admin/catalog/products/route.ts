@@ -7,13 +7,20 @@ import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { jsonFromAdminOperationResult } from "@/lib/staff-api-operation";
 import { insertStaffAuditLog } from "@/lib/staff-audit";
+import { fetchCatalogProductDetail } from "@/lib/medusa-catalog-service";
 import { parseOptionalStockQuantity } from "@/lib/parse-optional-stock-quantity";
 import {
   parseStorefrontMetadataFromBody,
   parseVariantBarcodeFromBody,
 } from "@/lib/parse-catalog-product-body";
 import { parseCatalogOptionArray } from "@/lib/parse-catalog-option-array";
+import { collectCatalogMediaUrlsFromBody } from "@/lib/catalog-product-media-db";
 import { correlatedJson } from "@/lib/staff-api-response";
+import { ensureExternalCatalogProductMediaRows } from "@apparel-commerce/platform-data";
+import {
+  buildStorefrontCommerceInvalidationPayload,
+  notifyStorefrontCommerceInvalidation,
+} from "@/lib/storefront-commerce-invalidation";
 
 export const dynamic = "force-dynamic";
 
@@ -84,9 +91,13 @@ export async function POST(req: Request) {
   }
 
   const actorEmail = session.user.email?.trim();
-  if (actorEmail) {
-    const sup = adminSupabaseOr503(correlationId);
-    if ("client" in sup) {
+  const sup = adminSupabaseOr503(correlationId);
+  if ("client" in sup) {
+    await ensureExternalCatalogProductMediaRows(
+      sup.client,
+      collectCatalogMediaUrlsFromBody(body),
+    );
+    if (actorEmail) {
       await insertStaffAuditLog(sup.client, {
         actorEmail,
         action: "catalog.product.create",
@@ -102,9 +113,32 @@ export async function POST(req: Request) {
     }
   }
 
+  const createdDetail = await fetchCatalogProductDetail(result.data.productId).catch(
+    () => null,
+  );
+  const invalidation = await notifyStorefrontCommerceInvalidation(
+    buildStorefrontCommerceInvalidationPayload({
+      classification: status === "published" ? "sellability_affecting" : "editorial_only",
+      after: createdDetail,
+      actorEmail,
+      reason:
+        status === "published"
+          ? "A new product was published. Browse surfaces refresh and live availability updates where relevant."
+          : undefined,
+    }),
+  );
+  if (!invalidation.ok) {
+    console.warn("[admin catalog create] storefront invalidation:", invalidation.error);
+  }
+
   return correlatedJson(
     correlationId,
-    { productId: result.data.productId },
+    {
+      productId: result.data.productId,
+      mutationClassification:
+        status === "published" ? "sellability_affecting" : "editorial_only",
+      storefrontInvalidation: invalidation.ok ? "ok" : invalidation.error,
+    },
     { status: 201 },
   );
 }

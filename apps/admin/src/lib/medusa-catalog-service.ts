@@ -43,6 +43,8 @@ export type CatalogProductDetail = {
   currencyCode: string;
   /** Medusa category ids (shop category filter + PDP). */
   categoryIds: string[];
+  /** Category handles for storefront `collection:{handle}` cache tags. */
+  categoryHandles: string[];
   /** Display names for selected categories. */
   categoryLabels: string[];
   /** First variant Size option (shop size filter). */
@@ -71,6 +73,18 @@ export type CatalogProductDetail = {
   storefrontMetadata: CatalogProductMetadataFields;
   /** Optional variant rows for tooling or future admin UI. */
   variantSummaries?: Array<{ id: string; sku: string | null; title?: string }>;
+  /**
+   * Sorted join of variant id + sell price minor amount in default region currency (mutation classification).
+   */
+  variantSellPriceSignature: string;
+  /**
+   * Sorted join of variant id + compare-at metadata (e.g. legacy_compare_at_price_minor), or "none".
+   */
+  variantCompareAtSignature: string;
+  /** Title, description, thumbnail, images — editorial merchandising surface without sell price. */
+  editorialSurfaceSignature: string;
+  /** Stable string for non-price storefront metadata (brand, SEO, related, hotspots, etc.). */
+  storefrontMetadataSignature: string;
 };
 
 /** PHP amount in minor units (centavos) for Medusa `prices[].amount`. */
@@ -94,6 +108,82 @@ function uniqueOptionValuesPreservingOrder(values: string[]): string[] {
     out.push(t);
   }
   return out;
+}
+
+function buildVariantSellPriceSignature(
+  variants: Array<{
+    id?: string;
+    prices?: Array<{ amount?: number; currency_code?: string | null }>;
+  }>,
+  currencyCodeResolved: string,
+): string {
+  const cur = currencyCodeResolved.toLowerCase();
+  const parts: string[] = [];
+  for (const v of variants) {
+    const vid = v?.id != null ? String(v.id) : "";
+    if (!vid) continue;
+    const prices = v.prices ?? [];
+    const priceRow =
+      prices.find((p) => (p.currency_code ?? "").toLowerCase() === cur) ??
+      prices.find((p) => (p.currency_code ?? "").toLowerCase() === "php") ??
+      prices[0];
+    const amt =
+      priceRow && typeof priceRow.amount === "number" ? priceRow.amount : -1;
+    parts.push(`${vid}:${amt}`);
+  }
+  return parts.sort().join("|");
+}
+
+function buildVariantCompareAtSignature(
+  variants: Array<{ id?: string; metadata?: Record<string, unknown> | null }>,
+): string {
+  const parts: string[] = [];
+  for (const v of variants) {
+    const vid = v?.id != null ? String(v.id) : "";
+    if (!vid) continue;
+    const meta =
+      v.metadata && typeof v.metadata === "object" ? v.metadata : {};
+    const raw = meta["legacy_compare_at_price_minor"];
+    const val =
+      typeof raw === "number" && Number.isFinite(raw)
+        ? String(Math.round(raw))
+        : typeof raw === "string" && raw.trim()
+          ? raw.trim()
+          : "none";
+    parts.push(`${vid}:${val}`);
+  }
+  return parts.sort().join("|");
+}
+
+function buildEditorialSurfaceSignature(input: {
+  title: string;
+  description: string | null;
+  thumbnail: string | null;
+  imageUrls: string[];
+}): string {
+  return [
+    input.title.trim(),
+    (input.description ?? "").trim(),
+    (input.thumbnail ?? "").trim(),
+    input.imageUrls.join(","),
+  ].join("\u0001");
+}
+
+function buildStorefrontMetadataSignature(
+  m: CatalogProductMetadataFields,
+): string {
+  return JSON.stringify({
+    brand: m.brand,
+    videoUrl: m.videoUrl,
+    galleryVideoUrlsText: m.galleryVideoUrlsText,
+    weightKg: m.weightKg,
+    dimensionsLabel: m.dimensionsLabel,
+    material: m.material,
+    lifestyleImageUrl: m.lifestyleImageUrl,
+    seoDescription: m.seoDescription,
+    relatedHandlesText: m.relatedHandlesText,
+    hotspotsJson: m.hotspotsJson,
+  });
 }
 
 /**
@@ -125,7 +215,7 @@ export async function fetchCatalogProductDetail(
     const currencyCodeResolved = await getCatalogPriceCurrencyCode();
     const { product } = await sdk.admin.product.retrieve(productId, {
       fields:
-        "id,title,handle,description,status,thumbnail,metadata,*images,*variants,*variants.prices,*variants.options,*variants.options.option,*categories,*options",
+        "id,title,handle,description,status,thumbnail,metadata,*images,*variants,*variants.prices,*variants.metadata,*variants.options,*variants.options.option,*categories,*options",
     });
     if (!product) return null;
     const variants = product.variants ?? [];
@@ -179,10 +269,14 @@ export async function fetchCatalogProductDetail(
       optionTitles.some((t) => t.includes("size")) &&
       optionTitles.some((t) => t.includes("color"));
 
-    const rawCats = (product as { categories?: Array<{ id?: string; name?: string }> })
-      .categories;
+    const rawCats = (product as {
+      categories?: Array<{ id?: string; name?: string; handle?: string }>;
+    }).categories;
     const categoryIds = (rawCats ?? [])
       .map((c) => (c?.id != null ? String(c.id) : ""))
+      .filter(Boolean);
+    const categoryHandles = (rawCats ?? [])
+      .map((c) => (typeof c?.handle === "string" ? c.handle.trim() : ""))
       .filter(Boolean);
     const categoryLabels = (rawCats ?? [])
       .map((c) => (c?.name != null ? String(c.name) : ""))
@@ -238,6 +332,8 @@ export async function fetchCatalogProductDetail(
     const rawMeta = (product as { metadata?: Record<string, unknown> | null })
       .metadata;
     const storefrontMetadata = catalogMetadataFromMedusa(rawMeta);
+    const storefrontMetadataSignature =
+      buildStorefrontMetadataSignature(storefrontMetadata);
 
     const rawImages = (
       product as { images?: Array<{ url?: string | null } | null> | null }
@@ -251,6 +347,28 @@ export async function fetchCatalogProductDetail(
     if (imageUrls.length === 0 && thumb) {
       imageUrls = [thumb];
     }
+
+    const variantSellPriceSignature = buildVariantSellPriceSignature(
+      variants as Array<{
+        id?: string;
+        prices?: Array<{ amount?: number; currency_code?: string | null }>;
+      }>,
+      currencyCodeResolved,
+    );
+    const variantCompareAtSignature = buildVariantCompareAtSignature(
+      variants as Array<{
+        id?: string;
+        metadata?: Record<string, unknown> | null;
+      }>,
+    );
+    const editorialSurfaceSignature = buildEditorialSurfaceSignature({
+      title: String(product.title ?? ""),
+      description:
+        typeof product.description === "string" ? product.description : null,
+      thumbnail:
+        typeof product.thumbnail === "string" ? product.thumbnail : null,
+      imageUrls,
+    });
 
     return {
       id: String(product.id),
@@ -268,6 +386,7 @@ export async function fetchCatalogProductDetail(
       pricePhp,
       currencyCode: currencyCodeResolved,
       categoryIds,
+      categoryHandles,
       categoryLabels,
       sizeLabel,
       colorLabel,
@@ -279,6 +398,10 @@ export async function fetchCatalogProductDetail(
       variantBarcode,
       storefrontMetadata,
       variantSummaries,
+      variantSellPriceSignature,
+      variantCompareAtSignature,
+      editorialSurfaceSignature,
+      storefrontMetadataSignature,
     };
   } catch {
     return null;

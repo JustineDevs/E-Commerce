@@ -83,6 +83,11 @@ export default async function CatalogEditPage({
           title="Changes to this product"
         />
       }
+      inspectorCollapsible={{
+        storageKey: `admin.inspector.catalog-product:${product.id}`,
+        expandLabel: "Activity",
+        collapseLabel: "Hide activity",
+      }}
     >
       <ProductEditorForm mode="edit" product={product} />
     </AdminPageShell>

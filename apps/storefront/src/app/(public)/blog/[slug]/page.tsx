@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { loadCmsBlogPostPublic } from "@apparel-commerce/platform-data";
+import { sanitizeCmsHtml } from "@apparel-commerce/validation";
 import { DEFAULT_PUBLIC_SITE_ORIGIN } from "@apparel-commerce/sdk";
 import { canonicalUrl } from "@/lib/seo";
 
@@ -70,7 +71,7 @@ export default async function BlogPostPage({ params }: Props) {
       ) : null}
       <div
         className="mt-10 space-y-6 font-body text-sm leading-relaxed text-on-surface-variant"
-        dangerouslySetInnerHTML={{ __html: post.body }}
+        dangerouslySetInnerHTML={{ __html: sanitizeCmsHtml(post.body) }}
       />
     </article>
   );
