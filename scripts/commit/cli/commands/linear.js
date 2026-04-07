@@ -59,15 +59,15 @@ async function run(opts = {}) {
 
 function help() {
   console.log(`
-  linear [--issue <id>]
+  hyperagent linear [--issue <id>]
 
   Print Linear issue trailer for commit messages.
   Uses current branch to resolve issue ID if --issue not given.
   Requires linear CLI on PATH.
 
   Example:
-    node scripts/commit/cli/index.js linear
-    node scripts/commit/cli/index.js linear --issue ENG-123
+    hyperagent linear
+    hyperagent linear --issue ENG-123
 `);
 }
 
