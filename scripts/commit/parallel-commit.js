@@ -4,6 +4,19 @@ const { execSync, spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
+function isTrackableCommitPath(relPath) {
+  const p = relPath.replace(/^["']|["']$/g, '').trim();
+  if (!p || p.endsWith('/')) return false;
+  const abs = path.join(process.cwd(), p);
+  try {
+    const st = fs.statSync(abs);
+    if (st.isDirectory()) return false;
+  } catch {
+    // Missing path (deleted?): still allow Git to handle
+  }
+  return true;
+}
+
 // Colors for console output
 const colors = {
   reset: '\x1b[0m',
@@ -61,8 +74,12 @@ const ALLOWED_EXAMPLES = [
 
 // Configuration
 const config = {
+  /** Run `git add -A` before listing files so new/untracked paths are included (use --no-stage-all to skip). */
+  stageAllBeforeScan: true,
+  /** Run `pnpm run ci:preflight` before staging/commits (turbo lint/typecheck/test + optional Python). */
+  runCiPreflight: true,
   maxConcurrentCommits: 1, // Sequential: each file must be added+committed before next (parallel would race)
-  // Message generation: diff-parser (getSpecificMessage) extracts exact changes; no static prefix
+  // Message generation: diff-parser (getSpecificMessage); messages are conventional-commit (type: subject)
   dryRun: false, // Set to true to see what would be committed without actually committing
   excludePatterns: [
     'node_modules/**',
@@ -78,9 +95,21 @@ const config = {
   failOnSensitive: true // Fail if sensitive files are detected (set to false to only warn)
 };
 
+/** First line must match @commitlint/config-conventional (type: subject). */
+const MAX_COMMIT_HEADER_LENGTH = 100;
+
 // Utility functions
 function log(message, color = 'reset') {
   console.log(`${colors[color]}${message}${colors.reset}`);
+}
+
+/**
+ * @param {string} type - feat | chore | refactor | ...
+ * @param {string} subject - no newlines; kept short for commitlint header-max-length
+ */
+function conventionalSubject(type, subject) {
+  const line = `${type}: ${subject}`.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return line.slice(0, MAX_COMMIT_HEADER_LENGTH);
 }
 
 // Security: Check if file is sensitive
@@ -157,7 +186,8 @@ function getChangedFiles() {
         // Remove any existing quotes and re-add them properly
         const cleanFile = file.replace(/^["']|["']$/g, '');
         return { status, file: cleanFile };
-      });
+      })
+      .filter(({ file }) => isTrackableCommitPath(file));
     
     // Security check
     if (config.securityCheck) {
@@ -195,16 +225,26 @@ function getSpecificMessage(filePath, status, dryRun) {
     if (!dryRun) {
       const addResult = spawnSync('git', ['add', '--', filePath], opts);
       if (addResult.error || addResult.status !== 0) {
-        return `update: modify ${path.basename(filePath)}`;
+        const errOut = `${addResult.stderr || ""}${addResult.stdout || ""}`.trim();
+        throw new Error(
+          `git add failed for ${filePath} (exit ${addResult.status}): ${errOut || addResult.error?.message || "unknown"}`
+        );
+      }
+      const stagedNames = spawnSync("git", ["diff", "--cached", "--name-only", "--", filePath], opts);
+      const staged = (stagedNames.stdout || "").toString().trim();
+      if (!staged) {
+        throw new Error(
+          `git add reported success but nothing is staged for ${filePath}; fix path or line endings and retry`
+        );
       }
     }
 
     // 3. Fallback for new (??) or staged new (A) or deleted (D)
     if (statusLine.startsWith('??') || statusLine.includes('A')) {
-      return `feat: add ${filePath}`;
+      return conventionalSubject('feat', `add ${filePath}`);
     }
     if (statusLine.includes('D')) {
-      return `remove: delete ${filePath}`;
+      return conventionalSubject('chore', `delete ${filePath}`);
     }
 
     // 4. Get word-level diff (staged vs HEAD, or working tree when dry-run)
@@ -218,20 +258,25 @@ function getSpecificMessage(filePath, status, dryRun) {
     const match = diff.match(/\[-(.*?)-\]\{\+(.*?)\+\}/s);
     if (match) {
       const [, was, now] = match;
-      const oldVal = (was || '').trim().substring(0, 50);
-      const newVal = (now || '').trim().substring(0, 50);
-      return `${filePath} – Updated ${oldVal} to ${newVal}`;
+      const oldVal = (was || '').trim().substring(0, 40);
+      const newVal = (now || '').trim().substring(0, 40);
+      const detail = [oldVal && `from ${oldVal}`, newVal && `to ${newVal}`].filter(Boolean).join(' ');
+      const base = `update ${path.basename(filePath)}`;
+      return conventionalSubject('chore', detail ? `${base} (${detail})` : base);
     }
 
-    return `refactor: modify logic in ${filePath}`;
+    return conventionalSubject('refactor', `modify logic in ${filePath}`);
   } catch (e) {
-    return `update: modify ${path.basename(filePath)}`;
+    if (e instanceof Error && /git add|nothing is staged/i.test(e.message)) {
+      throw e;
+    }
+    return conventionalSubject('chore', `modify ${path.basename(filePath)}`);
   }
 }
 
 function getCommitMessage(file, status, dryRun) {
   const msg = getSpecificMessage(file, status, dryRun);
-  return msg.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
+  return msg.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, MAX_COMMIT_HEADER_LENGTH);
 }
 
 function commitFile(file, status) {
@@ -243,20 +288,28 @@ function commitFile(file, status) {
       return;
     }
 
-    const commitMessage = getCommitMessage(file, status, config.dryRun);
+    const cwd = process.cwd();
+    const spawnOpts = { encoding: 'utf8', cwd, maxBuffer: 1024 * 1024 };
 
     if (config.dryRun) {
+      const commitMessage = getCommitMessage(file, status, true);
       log(`[DRY RUN] Would stage and commit: "${file}"\n  → Message: "${commitMessage}"`, 'yellow');
       resolve({ file, success: true, message: commitMessage });
       return;
     }
 
-    const cwd = process.cwd();
-    const spawnOpts = { encoding: 'utf8', cwd, maxBuffer: 1024 * 1024 };
-
     try {
-      // getSpecificMessage already staged the file; commit only this file with --only
-      const commitResult = spawnSync('git', ['commit', '-m', commitMessage, '--only', '--', file], spawnOpts);
+      // Clear the index so only this file is staged. Otherwise pre-commit/lint-staged runs on every
+      // previously staged file (Turbo + parallel chunks) and Windows hits .git/index.lock.
+      const resetResult = spawnSync('git', ['reset', 'HEAD'], spawnOpts);
+      if (resetResult.error) {
+        throw new Error(resetResult.error.message || 'git reset failed');
+      }
+
+      const commitMessage = getCommitMessage(file, status, false);
+
+      // getSpecificMessage (inside getCommitMessage) staged this file only.
+      const commitResult = spawnSync('git', ['commit', '-m', commitMessage], spawnOpts);
 
       if (commitResult.error) {
         throw new Error(commitResult.error.message || 'git commit failed');
@@ -340,11 +393,23 @@ async function main() {
     config.dryRun = true;
     log('🔍 DRY RUN MODE - No actual commits will be made', 'yellow');
   }
-  
+
+  if (args.includes('--no-stage-all')) {
+    config.stageAllBeforeScan = false;
+    log('⏭️  Skipping git add -A (only paths already visible to git will be listed)', 'yellow');
+  }
+
+  if (args.includes('--skip-preflight') || process.env.COMMIT_SKIP_PREFLIGHT === '1') {
+    config.runCiPreflight = false;
+    log('⏭️  Skipping CI preflight (--skip-preflight or COMMIT_SKIP_PREFLIGHT=1)', 'yellow');
+  }
+
   if (args.includes('--help') || args.includes('-h')) {
     log('\nUsage: node parallel-commit.js [options]', 'cyan');
     log('Options:', 'cyan');
     log('  --dry-run              Show what would be committed without actually committing', 'cyan');
+    log('  --no-stage-all         Do not run git add -A first (default: stage all tracked + untracked)', 'cyan');
+    log('  --skip-preflight       Do not run pnpm ci:preflight (turbo lint/typecheck/test + Python)', 'cyan');
     log('  --no-security-check    Disable security checks (NOT RECOMMENDED)', 'cyan');
     log('  --warn-only            Warn about sensitive files but don\'t fail', 'cyan');
     log('  --help, -h             Show this help message', 'cyan');
@@ -353,6 +418,8 @@ async function main() {
     log('  Message style: diff-parser (extracts specific changes from git diff)', 'cyan');
     log(`  Security check: ${config.securityCheck ? 'enabled' : 'disabled'}`, 'cyan');
     log(`  Fail on sensitive: ${config.failOnSensitive ? 'yes' : 'no (warn only)'}`, 'cyan');
+    log(`  Stage all before scan: ${config.stageAllBeforeScan ? 'yes (git add -A)' : 'no'}`, 'cyan');
+    log(`  CI preflight: ${config.runCiPreflight ? 'yes (pnpm ci:preflight)' : 'no'}`, 'cyan');
     log(`  Exclude patterns: ${config.excludePatterns.join(', ')}`, 'cyan');
     log('\nSecurity:', 'yellow');
     log('  The script automatically blocks commits of sensitive files:', 'yellow');
@@ -380,7 +447,39 @@ async function main() {
     log('❌ Not in a git repository!', 'red');
     process.exit(1);
   }
-  
+
+  if (config.runCiPreflight) {
+    const pkgJson = path.join(process.cwd(), 'package.json');
+    if (!fs.existsSync(pkgJson)) {
+      log('⚠️  No package.json in cwd; skipping CI preflight', 'yellow');
+    } else {
+      log('\n🧪 CI preflight (pnpm run ci:preflight)...', 'bright');
+      try {
+        execSync('pnpm run ci:preflight', {
+          stdio: 'inherit',
+          cwd: process.cwd(),
+          env: process.env,
+        });
+      } catch (err) {
+        log(
+          '\n❌ CI preflight failed. Fix the errors above, or use --skip-preflight (not recommended for shared branches).',
+          'red',
+        );
+        process.exit(1);
+      }
+    }
+  }
+
+  if (config.stageAllBeforeScan && !config.dryRun) {
+    log('\n📥 Staging all changes (git add -A)...', 'blue');
+    try {
+      execSync('git add -A', { stdio: 'inherit', cwd: process.cwd() });
+    } catch (err) {
+      log(`❌ git add -A failed: ${err.message || err}`, 'red');
+      process.exit(1);
+    }
+  }
+
   // Get changed files
   log('\n🔍 Scanning for changed files...', 'blue');
   const changedFiles = getChangedFiles();
@@ -405,9 +504,19 @@ async function main() {
   
   // Show summary
   showSummary(results);
-  
-  if (!config.dryRun && results.flat().some(r => r.status === 'fulfilled' && r.value.success)) {
-    log('\n🎉 All commits completed!', 'green');
+
+  const flat = Array.isArray(results) ? results.flat() : [];
+  const failedCount = flat.filter(
+    (r) => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.success),
+  ).length;
+
+  if (!config.dryRun) {
+    if (failedCount === 0) {
+      log('\n🎉 All commits completed!', 'green');
+    } else {
+      log(`\n⚠️  Finished with ${failedCount} failed commit(s).`, 'yellow');
+      process.exit(1);
+    }
   }
 }
 
