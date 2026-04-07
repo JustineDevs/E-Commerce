@@ -39,6 +39,8 @@ export async function GET(
     provider: row.provider,
     status: row.status,
     checkoutState: row.checkout_state,
+    quoteFingerprint: row.quote_fingerprint,
+    staleReason: row.stale_reason,
     medusaOrderId: row.medusa_order_id,
     lastError: row.last_error,
     finalizeAttempts: row.finalize_attempts,
