@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 import { expectCheckoutShellVisible, gotoFirstCatalogPdp } from "../helpers/storefront";
+import { journeySignInHeading } from "../workflows/storefront-journeys.workflow";
 
 function shouldFailOnMissingPrereq(): boolean {
   return process.env.CI_STRICT_E2E === "1" || process.env.CI === "true";
@@ -8,9 +9,9 @@ function shouldFailOnMissingPrereq(): boolean {
 
 /**
  * End-to-end commerce paths (guest): SOP, catalog, PDP, bag affordance, checkout shell.
- * Payment capture and PSP redirects stay out of scope here; use staging QA for providers.
+ * Tags: @workflow @checkout — `pnpm exec playwright test --grep "@workflow"`
  */
-test.describe("Full commerce journey (guest)", () => {
+test.describe("@workflow @checkout Full commerce journey (guest)", () => {
   test("commerce SOP reports Medusa", async ({ request }) => {
     const res = await request.get("/api/health/sop");
     expect(res.ok(), `/api/health/sop ${res.status()}`).toBeTruthy();
@@ -28,7 +29,7 @@ test.describe("Full commerce journey (guest)", () => {
       }
       test.skip(
         true,
-        "No catalog products. Run: node scripts/e2e-prep-medusa.mjs (Medusa must be stopped or DB lock OK).",
+        "No catalog products. Run: node stress-test/scripts/e2e-prep-medusa.mjs (Medusa must be stopped or DB lock OK).",
       );
     }
     const addBtn = page.getByTestId("pdp-add-to-bag");
@@ -43,9 +44,6 @@ test.describe("Full commerce journey (guest)", () => {
   });
 
   test("sign-in page loads for account flows", async ({ page }) => {
-    await page.goto("/sign-in");
-    await expect(page.getByRole("heading", { name: /sign/i })).toBeVisible({
-      timeout: 20_000,
-    });
+    await journeySignInHeading(page);
   });
 });
