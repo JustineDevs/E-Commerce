@@ -9,10 +9,23 @@ type AttemptRow = {
   status: string;
   checkoutState: string;
   medusaOrderId: string | null;
+  quoteFingerprint: string | null;
+  staleReason: string | null;
+  invalidatedAt: string | null;
+  invalidatedBy: string | null;
   lastError: string | null;
   finalizeAttempts: number;
   updatedAt: string;
 };
+
+function statusTone(status: string): string {
+  if (status === "completed") return "bg-emerald-100 text-emerald-800";
+  if (status === "expired" || status === "needs_review") {
+    return "bg-amber-100 text-amber-900";
+  }
+  if (status === "failed") return "bg-red-100 text-red-800";
+  return "bg-slate-100 text-slate-700";
+}
 
 export default function AdminPaymentsPage() {
   const [rows, setRows] = useState<AttemptRow[]>([]);
@@ -97,12 +110,14 @@ export default function AdminPaymentsPage() {
 
       {!loading && (
         <div className="bg-white border border-gray-200 rounded-lg overflow-x-auto">
-          <table className="w-full text-sm min-w-[800px]">
+          <table className="w-full text-sm min-w-[1100px]">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="text-left p-3 font-medium text-gray-700">Provider</th>
                 <th className="text-left p-3 font-medium text-gray-700">Status</th>
+                <th className="text-left p-3 font-medium text-gray-700">Stale / review reason</th>
                 <th className="text-left p-3 font-medium text-gray-700">Order</th>
+                <th className="text-left p-3 font-medium text-gray-700">Quote</th>
                 <th className="text-left p-3 font-medium text-gray-700">Finalize #</th>
                 <th className="text-left p-3 font-medium text-gray-700">Updated</th>
                 <th className="text-left p-3 font-medium text-gray-700">Correlation</th>
@@ -114,10 +129,28 @@ export default function AdminPaymentsPage() {
                 <tr key={row.correlationId} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="p-3">{row.provider}</td>
                   <td className="p-3">
-                    <span className="text-xs">{row.status}</span>
+                    <span
+                      className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold uppercase tracking-wide ${statusTone(row.status)}`}
+                    >
+                      {row.status}
+                    </span>
                     <div className="text-xs text-gray-400">{row.checkoutState}</div>
                   </td>
+                  <td className="p-3 max-w-[260px]">
+                    <p className="text-xs text-gray-700">
+                      {row.staleReason ?? row.lastError ?? "—"}
+                    </p>
+                    {row.invalidatedAt ? (
+                      <p className="mt-1 text-[11px] text-gray-400">
+                        Invalidated {new Date(row.invalidatedAt).toLocaleString()}
+                        {row.invalidatedBy ? ` by ${row.invalidatedBy}` : ""}
+                      </p>
+                    ) : null}
+                  </td>
                   <td className="p-3 font-mono text-xs">{row.medusaOrderId ?? "—"}</td>
+                  <td className="p-3 font-mono text-[11px] text-gray-600 break-all max-w-[180px]">
+                    {row.quoteFingerprint ?? "legacy-row"}
+                  </td>
                   <td className="p-3">{row.finalizeAttempts}</td>
                   <td className="p-3 text-xs text-gray-500">
                     {new Date(row.updatedAt).toLocaleString()}
@@ -129,7 +162,9 @@ export default function AdminPaymentsPage() {
                     <button
                       type="button"
                       className="text-xs font-medium text-primary hover:underline disabled:opacity-50"
-                      disabled={busy === row.correlationId}
+                      disabled={
+                        busy === row.correlationId || row.status === "completed"
+                      }
                       onClick={() => void retryFinalization(row.correlationId)}
                     >
                       Retry finalize
