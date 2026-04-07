@@ -1,3 +1,4 @@
+import "../runtime-logs-init";
 import { type Page, type APIRequestContext, test, expect } from "@playwright/test";
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
@@ -220,6 +221,126 @@ export async function clickPayButton(page: Page): Promise<void> {
   const payBtn = page.getByTestId("checkout-submit-pay");
   await expect(payBtn).toBeVisible({ timeout: 10_000 });
   await payBtn.click();
+}
+
+/** Medusa Stripe module uses Checkout Sessions → redirect to `checkout.stripe.com` (not Elements on our domain). */
+export const STRIPE_SANDBOX_TEST_CARD_SUCCESS = "4242424242424242";
+export const STRIPE_SANDBOX_TEST_CARD_DECLINE = "4000000000000002";
+
+/**
+ * After "Continue to payment", the storefront shows "Continue to Stripe" which sends the
+ * browser to Stripe Hosted Checkout. Call this after {@link clickPayButton} when that button appears.
+ */
+export async function clickContinueToStripeHostedCheckout(page: Page): Promise<void> {
+  const btn = page.getByTestId("checkout-continue-payment");
+  await expect(btn).toBeVisible({ timeout: 60_000 });
+  await btn.click();
+  await page.waitForURL(/checkout\.stripe\.com/, { timeout: 90_000 });
+}
+
+/**
+ * Fills Stripe's documented test card on the hosted Checkout page (test mode only).
+ * @see https://docs.stripe.com/testing#cards
+ */
+export async function fillStripeHostedCheckoutTestCard(
+  page: Page,
+  cardNumber: string,
+): Promise<void> {
+  await page
+    .locator('iframe[src*="stripe"], iframe[name*="stripe"]')
+    .first()
+    .waitFor({ state: "attached", timeout: 45_000 })
+    .catch(() => {});
+
+  let filled = false;
+  for (const frame of page.frames()) {
+    const url = frame.url();
+    if (!url.includes("stripe") && !url.includes("js.stripe.com")) continue;
+    const numberLoc = frame.locator(
+      'input[autocomplete="cc-number"], input[name="cardnumber"], input[data-elements-stable-field-name="cardNumber"]',
+    );
+    if ((await numberLoc.count()) === 0) continue;
+    await numberLoc.first().fill(cardNumber, { timeout: 20_000 });
+    const expLoc = frame.locator(
+      'input[autocomplete="cc-exp"], input[name="exp-date"], input[data-elements-stable-field-name="cardExpiry"]',
+    );
+    if ((await expLoc.count()) > 0) {
+      await expLoc.first().fill("12 / 34");
+    }
+    const cvcLoc = frame.locator(
+      'input[autocomplete="cc-csc"], input[name="cvc"], input[data-elements-stable-field-name="cardCvc"]',
+    );
+    if ((await cvcLoc.count()) > 0) {
+      await cvcLoc.first().fill("123");
+    }
+    filled = true;
+    break;
+  }
+  if (!filled) {
+    const anyNumber = page.locator(
+      'input[autocomplete="cc-number"]',
+    );
+    await expect(anyNumber.first()).toBeVisible({ timeout: 30_000 });
+    await anyNumber.first().fill(cardNumber);
+    const exp = page.locator('input[autocomplete="cc-exp"]').first();
+    if (await exp.isVisible().catch(() => false)) await exp.fill("12 / 34");
+    const cvc = page.locator('input[autocomplete="cc-csc"]').first();
+    if (await cvc.isVisible().catch(() => false)) await cvc.fill("123");
+  }
+}
+
+/**
+ * Submits payment on Stripe Hosted Checkout and waits for redirect back to the storefront.
+ */
+export async function submitStripeHostedCheckoutAndWaitForReturn(page: Page): Promise<void> {
+  const pay = page
+    .getByTestId("hosted-payment-submit-button")
+    .or(page.getByRole("button", { name: /^pay\b/i }))
+    .first();
+  await expect(pay).toBeVisible({ timeout: 30_000 });
+  await pay.click();
+  await page.waitForURL(/\/(track\/[^/]+|checkout\/stripe-return)/, { timeout: 120_000 });
+}
+
+/**
+ * Full path for Medusa Stripe Checkout Session: start checkout on storefront, pay on stripe.com with a test card.
+ */
+export async function payWithStripeSandboxCard(
+  page: Page,
+  cardNumber: string,
+): Promise<void> {
+  await clickPayButton(page);
+
+  const hostedContinue = page.getByTestId("checkout-continue-payment");
+  if (await hostedContinue.isVisible({ timeout: 15_000 }).catch(() => false)) {
+    await clickContinueToStripeHostedCheckout(page);
+    await fillStripeHostedCheckoutTestCard(page, cardNumber);
+    await submitStripeHostedCheckoutAndWaitForReturn(page);
+    return;
+  }
+
+  const stripeFrame = page.frameLocator("iframe[name*='stripe']").first();
+  const cardInput = stripeFrame
+    .locator("[name='cardnumber'], [placeholder*='card'], input[autocomplete='cc-number']")
+    .first();
+  if (await cardInput.isVisible({ timeout: 10_000 }).catch(() => false)) {
+    await cardInput.fill(cardNumber);
+    const expiryInput = stripeFrame
+      .locator("[name='exp-date'], [placeholder*='MM'], input[autocomplete='cc-exp']")
+      .first();
+    await expiryInput.fill("12/30");
+    const cvcInput = stripeFrame
+      .locator("[name='cvc'], [placeholder*='CVC'], input[autocomplete='cc-csc']")
+      .first();
+    await cvcInput.fill("123");
+    await page.getByRole("button", { name: /complete payment/i }).click();
+    await page.waitForURL(/\/(track\/[^/]+|checkout\/stripe-return)/, { timeout: 120_000 });
+    return;
+  }
+
+  throw new Error(
+    "Could not find Stripe Hosted Checkout or embedded card form. Is Stripe selected and Medusa returning a Checkout Session URL?",
+  );
 }
 
 /**
