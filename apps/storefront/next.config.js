@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const path = require("path");
-const { loadMonorepoRootEnv } = require("../../stress-test/scripts/load-monorepo-root-env.cjs");
+const { loadMonorepoRootEnv } = require("../../scripts/load-monorepo-root-env.cjs");
 // Repo-root `.env` + `.env.local` (e.g. MEDUSA_SECRET_API_KEY for checkout totals preview)
 loadMonorepoRootEnv(__dirname);
 
