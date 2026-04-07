@@ -9,7 +9,7 @@ const parallelCommitPath = path.join(__dirname, '../../parallel-commit.js');
 
 async function run(opts = {}) {
   const prevArgv = process.argv.slice();
-  const args = ['node', 'hyperagent-commit'];
+  const args = ['node', 'apparel-commerce-commit'];
   if (opts.dryRun) args.push('--dry-run');
   if (opts.noSecurityCheck) args.push('--no-security-check');
   if (opts.warnOnly) args.push('--warn-only');
@@ -25,7 +25,7 @@ async function run(opts = {}) {
 
 function help() {
   console.log(`
-  hyperagent commit [options]
+  apparel-commerce-commit commit [options]
 
   Parallel commit with security checks. Commits each changed file individually.
 
@@ -39,9 +39,9 @@ function help() {
     -h, --help             Show this help
 
   Examples:
-    hyperagent commit --dry-run
-    hyperagent commit --max 3
-    hyperagent commit --no-stage-all
+    pnpm run commit:dry
+    pnpm run commit -- --max 3
+    pnpm run commit -- --no-stage-all
 `);
 }
 
