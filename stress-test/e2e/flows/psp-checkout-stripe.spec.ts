@@ -5,8 +5,13 @@ import {
   navigateToCheckout,
   fillCheckoutShippingInfo,
   selectPaymentProvider,
-  clickPayButton,
   expectOrderConfirmation,
+  clickPayButton,
+  payWithStripeSandboxCard,
+  clickContinueToStripeHostedCheckout,
+  fillStripeHostedCheckoutTestCard,
+  STRIPE_SANDBOX_TEST_CARD_SUCCESS,
+  STRIPE_SANDBOX_TEST_CARD_DECLINE,
 } from "../helpers/checkout";
 
 function shouldFailOnMissingPrereq(): boolean {
@@ -16,7 +21,10 @@ function shouldFailOnMissingPrereq(): boolean {
 /**
  * Stripe checkout flow E2E test.
  * Requires E2E_STRIPE_API_KEY env var with a Stripe test-mode key.
- * Uses Stripe's test card numbers for sandbox transactions.
+ *
+ * Medusa uses Stripe Checkout (hosted) — the customer pays on checkout.stripe.com.
+ * Incomplete Payment Intents in the Stripe Dashboard usually mean the hosted page was never completed.
+ * Use Stripe test cards: https://docs.stripe.com/testing#cards (e.g. 4242424242424242).
  */
 test.describe("Stripe checkout flow", () => {
   test.beforeEach(() => {
@@ -37,18 +45,7 @@ test.describe("Stripe checkout flow", () => {
       return;
     }
 
-    const stripeFrame = page.frameLocator("iframe[name*='stripe']").first();
-    const cardInput = stripeFrame.locator("[name='cardnumber'], [placeholder*='card']").first();
-
-    if (await cardInput.isVisible({ timeout: 10_000 }).catch(() => false)) {
-      await cardInput.fill("4242424242424242");
-      const expiryInput = stripeFrame.locator("[name='exp-date'], [placeholder*='MM']").first();
-      await expiryInput.fill("12/30");
-      const cvcInput = stripeFrame.locator("[name='cvc'], [placeholder*='CVC']").first();
-      await cvcInput.fill("123");
-    }
-
-    await clickPayButton(page);
+    await payWithStripeSandboxCard(page, STRIPE_SANDBOX_TEST_CARD_SUCCESS);
     await expectOrderConfirmation(page);
   });
 
@@ -66,21 +63,17 @@ test.describe("Stripe checkout flow", () => {
       return;
     }
 
-    const stripeFrame = page.frameLocator("iframe[name*='stripe']").first();
-    const cardInput = stripeFrame.locator("[name='cardnumber'], [placeholder*='card']").first();
-
-    if (await cardInput.isVisible({ timeout: 10_000 }).catch(() => false)) {
-      await cardInput.fill("4000000000000002");
-      const expiryInput = stripeFrame.locator("[name='exp-date'], [placeholder*='MM']").first();
-      await expiryInput.fill("12/30");
-      const cvcInput = stripeFrame.locator("[name='cvc'], [placeholder*='CVC']").first();
-      await cvcInput.fill("123");
-    }
-
     await clickPayButton(page);
+    await clickContinueToStripeHostedCheckout(page);
+    await fillStripeHostedCheckoutTestCard(page, STRIPE_SANDBOX_TEST_CARD_DECLINE);
+    const pay = page
+      .getByTestId("hosted-payment-submit-button")
+      .or(page.getByRole("button", { name: /^pay\b/i }))
+      .first();
+    await pay.click();
 
     await expect(
-      page.getByText(/declined|failed|error|unable/i).first(),
-    ).toBeVisible({ timeout: 30_000 });
+      page.getByText(/declined|your card was declined|card.*declined/i).first(),
+    ).toBeVisible({ timeout: 45_000 });
   });
 });
