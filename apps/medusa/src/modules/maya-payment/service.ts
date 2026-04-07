@@ -72,6 +72,23 @@ function verifyMayaSignature(
   }
 }
 
+export function formatMayaCreateInvoiceError(
+  error: unknown,
+  sandbox: boolean,
+): string {
+  const raw = (error instanceof Error ? error.message : String(error ?? "")).trim();
+  const message = raw.replace(/^Maya create invoice failed:\s*/i, "");
+  if (!message) {
+    return "Unknown Maya invoice error.";
+  }
+  if (/401|403|unauthorized|forbidden/i.test(message)) {
+    return `${message}. Check MAYA_SECRET_KEY and MAYA_SANDBOX; the key must match the ${
+      sandbox ? "sandbox" : "production"
+    } PayMaya environment.`;
+  }
+  return message;
+}
+
 export default class MayaPaymentProviderService extends AbstractPaymentProvider<MayaPaymentOptions> {
   static identifier = "maya";
 
@@ -144,7 +161,10 @@ export default class MayaPaymentProviderService extends AbstractPaymentProvider<
     } catch (err) {
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
-        `Maya create invoice failed: ${err instanceof Error ? err.message : String(err)}`,
+        `Maya create invoice failed: ${formatMayaCreateInvoiceError(
+          err,
+          this.clientOptions.sandbox,
+        )}`,
       );
     }
   }
