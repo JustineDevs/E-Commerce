@@ -159,3 +159,5 @@ export {
   stockedQuantityFromVariantRaw,
   availableQuantityFromVariantRaw,
 } from "./medusa-inventory-math";
+
+export { sanitizeCmsHtml } from "./sanitize-cms-html";
