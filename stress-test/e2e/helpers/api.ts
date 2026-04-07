@@ -1,3 +1,4 @@
+import "../runtime-logs-init";
 import { test, type APIRequestContext } from "@playwright/test";
 
 export function apiBaseUrl(): string {
