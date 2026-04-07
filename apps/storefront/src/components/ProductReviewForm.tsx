@@ -201,7 +201,7 @@ export function ProductReviewForm({
         disabled={saving}
         className="rounded-lg bg-primary px-6 py-2.5 text-sm font-semibold text-on-primary shadow-sm transition hover:opacity-95 disabled:opacity-50"
       >
-        {saving ? "Submitting…" : "Submit for moderation"}
+        {saving ? "Submitting…" : "Submit a review"}
       </button>
     </form>
   );
