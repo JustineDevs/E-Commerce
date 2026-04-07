@@ -4,12 +4,24 @@ import type { ProductGallerySlide } from "@apparel-commerce/types";
 import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 import {
-  isDirectVideoUrl,
+  effectiveGallerySlideKind,
+  urlLooksLikeRasterImage,
   youtubeEmbedUrlAutoplay,
+  youtubeThumbnailUrl,
 } from "@/lib/product-media";
 import { ProductImageZoom } from "./ProductImageZoom";
 
 function VideoSlide({ url, title }: { url: string; title: string }) {
+  if (urlLooksLikeRasterImage(url)) {
+    return (
+      <ProductImageZoom
+        src={url}
+        alt={title}
+        sizes="(max-width: 1024px) 100vw, (max-width: 1536px) 50vw, 46vw"
+        priority={false}
+      />
+    );
+  }
   const yt = youtubeEmbedUrlAutoplay(url);
   if (yt) {
     return (
@@ -24,31 +36,102 @@ function VideoSlide({ url, title }: { url: string; title: string }) {
       </div>
     );
   }
-  if (isDirectVideoUrl(url)) {
+  return <HostedVideoPlayer url={url} title={title} />;
+}
+
+/** Direct file or Supabase URL: use HTML5 video. Fallback only if load fails (wrong URL or CORS). */
+function HostedVideoPlayer({ url, title }: { url: string; title: string }) {
+  const [broken, setBroken] = useState(false);
+  if (broken) {
     return (
-      <video
-        controls
-        autoPlay
-        muted
-        playsInline
-        loop
-        className="h-full w-full object-contain"
-        src={url}
-      />
+      <div className="flex h-full min-h-[280px] flex-col items-center justify-center gap-3 bg-surface-container-high p-6 text-center">
+        <p className="text-sm text-on-surface-variant">
+          This clip could not play inline. Open it in a new tab.
+        </p>
+        <a
+          href={url}
+          className="font-medium text-primary underline"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Open link
+        </a>
+      </div>
     );
   }
   return (
-    <div className="flex h-full min-h-[280px] flex-col items-center justify-center gap-3 bg-surface-container-high p-6 text-center">
-      <p className="text-sm text-on-surface-variant">Open this video in a new tab.</p>
-      <a
-        href={url}
-        className="font-medium text-primary underline"
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        Open link
-      </a>
-    </div>
+    <video
+      title={title}
+      controls
+      autoPlay
+      muted
+      playsInline
+      loop
+      className="h-full w-full object-contain"
+      src={url}
+      onError={() => setBroken(true)}
+    />
+  );
+}
+
+function GalleryVideoThumbnail({ url }: { url: string }) {
+  const poster = youtubeThumbnailUrl(url);
+  const [posterFailed, setPosterFailed] = useState(false);
+  const [thumbBroken, setThumbBroken] = useState(false);
+
+  if (urlLooksLikeRasterImage(url)) {
+    return (
+      <Image
+        src={url}
+        alt=""
+        fill
+        sizes="80px"
+        className="object-cover"
+      />
+    );
+  }
+  if (poster && !posterFailed) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- remote YouTube poster; not in Next image remotePatterns
+      <img
+        src={poster}
+        alt=""
+        className="h-full w-full object-cover"
+        onError={() => setPosterFailed(true)}
+      />
+    );
+  }
+  if (youtubeEmbedUrlAutoplay(url)) {
+    return (
+      <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-black px-1 text-center">
+        <span className="material-symbols-outlined text-lg text-white" aria-hidden>
+          play_circle
+        </span>
+        <span className="text-[9px] font-semibold uppercase tracking-wide text-white/90">
+          Video
+        </span>
+      </div>
+    );
+  }
+  if (thumbBroken) {
+    return (
+      <div className="flex h-full w-full flex-col items-center justify-center gap-0.5 bg-surface-container-high px-0.5 text-center">
+        <span className="material-symbols-outlined text-base text-on-surface-variant" aria-hidden>
+          play_circle
+        </span>
+      </div>
+    );
+  }
+  return (
+    <video
+      src={url}
+      muted
+      playsInline
+      preload="metadata"
+      className="h-full w-full object-cover"
+      aria-hidden
+      onError={() => setThumbBroken(true)}
+    />
   );
 }
 
@@ -100,14 +183,14 @@ export function ProductGalleryCarousel({
     <div className="flex flex-col gap-4 md:flex-row md:items-start md:gap-6">
       <div className={mainStageClass}>
         <div className="relative h-[500px] w-full md:h-[716px]">
-          {slide?.kind === "image" ? (
+          {slide && effectiveGallerySlideKind(slide) === "image" ? (
             <ProductImageZoom
               src={slide.url}
               alt={productName}
               sizes="(max-width: 1024px) 100vw, (max-width: 1536px) 50vw, 46vw"
               priority={safe === 0}
             />
-          ) : slide?.kind === "video" ? (
+          ) : slide && effectiveGallerySlideKind(slide) === "video" ? (
             <VideoSlide key={slide.url} url={slide.url} title={productName} />
           ) : null}
         </div>
@@ -168,7 +251,9 @@ export function ProductGalleryCarousel({
               role="tab"
               aria-selected={idx === safe}
               aria-label={
-                s.kind === "image" ? `Image ${idx + 1}` : `Video ${idx + 1}`
+                effectiveGallerySlideKind(s) === "image"
+                  ? `Image ${idx + 1}`
+                  : `Video ${idx + 1}`
               }
               onClick={() => setActive(idx)}
               className={`relative h-24 w-20 shrink-0 overflow-hidden rounded-md border-2 bg-surface-container-highest transition ${
@@ -177,7 +262,7 @@ export function ProductGalleryCarousel({
                   : "border-transparent opacity-90 hover:opacity-100"
               }`}
             >
-              {s.kind === "image" ? (
+              {effectiveGallerySlideKind(s) === "image" ? (
                 <Image
                   src={s.url}
                   alt=""
@@ -186,14 +271,7 @@ export function ProductGalleryCarousel({
                   className="object-cover"
                 />
               ) : (
-                <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-black px-1 text-center">
-                  <span className="material-symbols-outlined text-lg text-white" aria-hidden>
-                    play_circle
-                  </span>
-                  <span className="text-[9px] font-semibold uppercase tracking-wide text-white/90">
-                    Video
-                  </span>
-                </div>
+                <GalleryVideoThumbnail url={s.url} />
               )}
             </button>
           ))}
