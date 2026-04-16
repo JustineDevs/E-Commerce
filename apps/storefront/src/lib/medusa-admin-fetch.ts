@@ -2,6 +2,10 @@ import { getMedusaSecretApiKey, getMedusaStoreBaseUrl } from "./storefront-medus
 
 /**
  * Medusa Admin API (server-only). Same Basic auth as admin app.
+ *
+ * Do not import Node fs/dotenv loaders here: this module is reachable from the client bundle via
+ * medusa-checkout → medusa-checkout-cart-prep → storefront-inventory-guard. Hydrate repo-root env in
+ * next.config.js and instrumentation.ts instead.
  */
 function secretApiKeyBasicAuthorization(secret: string): string {
   const payload = `${secret}:`;
