@@ -33,21 +33,62 @@ function findWorkspaceRoot(startDir: string): string | null {
     }
     const parent = path.dirname(dir);
     if (parent === dir) {
-      return null;
+      break;
     }
     dir = parent;
   }
+  const twoUp = path.resolve(startDir, "..", "..");
+  if (hasWorkspaceMarker(twoUp)) {
+    return twoUp;
+  }
+  return null;
+}
+
+/** Unique monorepo roots to scan for root `.env` (Windows / turbo cwd quirks). */
+function collectMonorepoRoots(preferredCwd?: string): string[] {
+  const candidates: string[] = [];
+  const monorepoRootEnv = process.env.MONOREPO_ROOT?.trim();
+  if (monorepoRootEnv) {
+    candidates.push(path.resolve(monorepoRootEnv));
+  }
+  const starts = new Set<string>();
+  if (preferredCwd) starts.add(path.resolve(preferredCwd));
+  starts.add(path.resolve(process.cwd()));
+  for (const start of starts) {
+    const w = findWorkspaceRoot(start);
+    if (w) candidates.push(w);
+    candidates.push(path.resolve(start, "..", ".."));
+    candidates.push(path.resolve(start, ".."));
+  }
+
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const c of candidates) {
+    const r = path.resolve(c);
+    if (seen.has(r)) continue;
+    seen.add(r);
+    if (hasWorkspaceMarker(r)) {
+      out.push(r);
+    }
+  }
+  return out;
+}
+
+function readEnvFileUtf8(filePath: string): string {
+  return fs.readFileSync(filePath, "utf8").replace(/^\uFEFF/, "");
 }
 
 function parseEnvFile(filePath: string): Partial<Record<StorefrontRuntimeEnvKey, string>> {
   if (!fs.existsSync(filePath)) {
     return {};
   }
-  const parsed = parse(fs.readFileSync(filePath, "utf8"));
+  const parsed = parse(readEnvFileUtf8(filePath));
   const out: Partial<Record<StorefrontRuntimeEnvKey, string>> = {};
   for (const key of STOREFRONT_RUNTIME_ENV_KEYS) {
-    const value = parsed[key];
-    if (typeof value === "string") {
+    const raw = parsed[key];
+    if (typeof raw !== "string") continue;
+    const value = raw.replace(/^\uFEFF/, "").trim();
+    if (value !== "") {
       out[key] = value;
     }
   }
@@ -63,25 +104,45 @@ function mergeRootEnv(
   };
 }
 
+function applyMergedEnv(envFromFiles: Partial<Record<StorefrontRuntimeEnvKey, string>>) {
+  for (const key of STOREFRONT_RUNTIME_ENV_KEYS) {
+    const fromFile = envFromFiles[key];
+    const trimmedFile = typeof fromFile === "string" ? fromFile.trim() : "";
+    if (!trimmedFile) continue;
+    const cur = process.env[key];
+    if (cur == null || String(cur).trim() === "") {
+      process.env[key] = fromFile;
+    }
+  }
+}
+
 export function ensureStorefrontRuntimeEnvLoaded(options?: {
   cwd?: string;
+  force?: boolean;
 }): void {
+  if (options?.force) {
+    runtimeEnvLoaded = false;
+  }
   if (runtimeEnvLoaded) {
     return;
   }
 
-  const rootDir = findWorkspaceRoot(options?.cwd ?? process.cwd());
-  if (!rootDir) {
-    runtimeEnvLoaded = true;
-    return;
-  }
-
-  const envFromFiles = mergeRootEnv(rootDir);
-  for (const key of STOREFRONT_RUNTIME_ENV_KEYS) {
-    if (process.env[key] == null && envFromFiles[key] != null) {
-      process.env[key] = envFromFiles[key];
+  const roots = collectMonorepoRoots(options?.cwd);
+  if (roots.length > 0) {
+    for (const rootDir of roots) {
+      const envFromFiles = mergeRootEnv(rootDir);
+      applyMergedEnv(envFromFiles);
+    }
+  } else {
+    const fallback = path.resolve(process.cwd(), "..", "..");
+    if (
+      fs.existsSync(path.join(fallback, ".env")) ||
+      fs.existsSync(path.join(fallback, ".env.local"))
+    ) {
+      applyMergedEnv(mergeRootEnv(fallback));
     }
   }
+
   runtimeEnvLoaded = true;
 }
 
