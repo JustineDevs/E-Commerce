@@ -1,3 +1,6 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") {
     return;
@@ -5,7 +8,8 @@ export async function register() {
   const { ensureStorefrontRuntimeEnvLoaded } = await import(
     "./src/lib/storefront-runtime-env"
   );
-  ensureStorefrontRuntimeEnvLoaded();
+  const storefrontDir = path.dirname(fileURLToPath(import.meta.url));
+  ensureStorefrontRuntimeEnvLoaded({ cwd: storefrontDir });
 
   const { assertMedusaStorefrontEnvProduction } = await import(
     "@apparel-commerce/sdk"
