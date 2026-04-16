@@ -7,7 +7,7 @@
   },
   "scripts": {
     "pretest": "node ../../stress-test/scripts/check-test-runtime.cjs esbuild",
-    "dev": "next dev --port 3000",
+    "dev": "node ../../scripts/clean-next-trace.cjs apps/storefront && next dev --port 3000",
     "build": "node ../../scripts/clean-next-dir.cjs apps/storefront && next build",
     "start": "next start",
     "lint": "next lint",
