@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "pretest": "node ../../stress-test/scripts/check-test-runtime.cjs esbuild",
-    "dev": "next dev --port 3001",
+    "dev": "node ../../scripts/clean-next-trace.cjs apps/admin && next dev --port 3001",
     "build": "node ../../scripts/clean-next-dir.cjs apps/admin && next build",
     "start": "next start -p 3001",
     "lint": "next lint",
